@@ -1866,14 +1866,16 @@ function initNavHud() {
 }
 
 /* ---------- Missions / challenges ---------- */
+/* Two intro milestones a preset can reach, then five constraint puzzles that no
+   preset satisfies: each forces a deliberate tradeoff, so they must be hand-tuned. */
 const MISSIONS = [
-  { id: "firstlight", name: "First Light", goal: "Produce fusion power", test: (m) => m.fusionPower >= 10 },
-  { id: "burning", name: "Burning Plasma", goal: "Reach energy gain Q of 1", test: (m) => m.q >= 1 },
-  { id: "netpos", name: "Net Positive", goal: "Send real power to the grid", test: (m) => m.netElec > 0 },
-  { id: "steady", name: "Steady Hand", goal: "Hold net positive for 25 seconds", hold: 25, test: (m) => m.netElec > 0 },
-  { id: "breed", name: "Self-Sufficient", goal: "Breed tritium (TBR over 1) while burning", test: (m) => m.tritiumRatio >= 1 && m.fusionPower >= 200 },
-  { id: "highgain", name: "High Gain", goal: "Reach energy gain Q of 10", test: (m) => m.q >= 10 },
-  { id: "ignition", name: "Ignition", goal: "Let alpha heating sustain the burn", test: (m) => m.phi >= 0.95 }
+  { id: "firstlight", name: "First Light", goal: "Produce 400 MW of fusion power", test: (m) => m.fusionPower >= 400 },
+  { id: "netpos", name: "Net Positive", goal: "Send real power to the grid (net above 0)", test: (m) => m.netElec > 0 },
+  { id: "leanburn", name: "Lean Burn", goal: "Reach Q of 4 with fuel injection at 65% or less", test: (m) => m.q >= 4 && m.fuelRate <= 65 },
+  { id: "strongfield", name: "Strong Field", goal: "Reach Q of 3 with magnetic field at 8 T or more", test: (m) => m.q >= 3 && m.magneticField >= 8.0 },
+  { id: "frugal", name: "Frugal Plant", goal: "Go net positive with turbine load at 70% or less", test: (m) => m.netElec > 0 && m.turbineLoad <= 70 },
+  { id: "breed", name: "Self-Sufficient", goal: "Breed tritium (TBR over 1) with coolant at 70% or less", test: (m) => m.tritiumRatio >= 1 && m.coolingFlow <= 70 },
+  { id: "ignition", name: "Ignition", goal: "Reach ignition with fuel injection at 75% or less", test: (m) => m.phi >= 0.95 && m.fuelRate <= 75 }
 ];
 const missionState = {};
 let missionPrevT = 0, missionsInitialized = false;
