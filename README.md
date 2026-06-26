@@ -20,9 +20,9 @@ The model is simplified but physically motivated, aimed at undergraduate and STE
 
 ## The reactor visualization
 
-The central canvas is a real, dependency-free software-rendered 3D tokamak (perspective camera, depth-sorted painter's pass, atmospheric depth fog). It shows a temperature-colored plasma torus with a hot burning core, toroidal-field coils that correctly weave through the plasma, poloidal-field coils, a central solenoid, vacuum-vessel ribs, helical magnetic field lines wound at a q ≈ 4 safety factor, streaming ions, neutrons firing out to the blanket, an attached divertor whose strike point sweeps when enabled, and a full balance of plant (steam generator, turbine, generator, condenser, and grid) linked by flowing coolant and steam loops.
+The central canvas is a real, dependency-free software-rendered 3D tokamak (perspective camera, depth-sorted painter's pass, atmospheric depth fog). It shows a temperature-colored plasma torus with a hot burning core, toroidal-field coils that correctly weave through the plasma, poloidal-field coils, a central solenoid, vacuum-vessel ribs, helical magnetic field lines wound at a q ≈ 4 safety factor, streaming ions, neutrons firing out to the blanket, and an attached divertor whose strike point sweeps when enabled. Beside it sits a fully 3D balance of plant built from shaded solids on a ground pad: a steam-generator drum, a turbine and coupled generator, a condenser, a hyperboloid cooling tower with a steam plume, and a transmission pylon, all linked by flowing coolant, steam, and power lines.
 
-Drag to orbit, scroll to zoom, and double-click (or press R) to reset the view. It auto-rotates when idle. All of it responds live to the operating setpoints.
+Drag to orbit, scroll to zoom, shift-drag (or right-drag) to pan, and double-click (or press R) to reset the view. It auto-rotates when idle. All of it responds live to the operating setpoints.
 
 ## Files
 

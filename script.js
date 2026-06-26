@@ -435,13 +435,14 @@ const cam = { yaw: -0.62, pitch: 0.60, dist: 3.15, focalK: 0.95 };
 let dragOn = false, dragX = 0, dragY = 0, lastInteract = -9999, prevTime = 0;
 let reduceMotion = false, inputBound = false;
 let velYaw = 0, velPitch = 0;
+let panX = 0, panY = 0, panMode = false;
 const CAM_DEFAULT = { yaw: -0.62, pitch: 0.60, dist: 3.15 };
-function resetCamera() { cam.yaw = CAM_DEFAULT.yaw; cam.pitch = CAM_DEFAULT.pitch; cam.dist = CAM_DEFAULT.dist; velYaw = 0; velPitch = 0; lastInteract = performance.now(); }
+function resetCamera() { cam.yaw = CAM_DEFAULT.yaw; cam.pitch = CAM_DEFAULT.pitch; cam.dist = CAM_DEFAULT.dist; velYaw = 0; velPitch = 0; panX = 0; panY = 0; lastInteract = performance.now(); }
 
 /* Balance-of-plant anchors (off to +X so the plant sits beside the reactor). */
 const BOP = {
   sg: { x: 2.05, y: -0.12, z: 0.55 },   // steam generator
-  turb: { x: 2.72, y: -0.06, z: 0.18 }, // turbine
+  turb: { x: 2.72, y: -0.40, z: 0.18 }, // turbine
   gen: { x: 3.18, y: -0.06, z: -0.12 }, // generator
   cond: { x: 2.72, y: -0.66, z: 0.18 }, // condenser
   grid: { x: 3.40, y: 0.52, z: -0.42 }  // grid / pylon
@@ -534,19 +535,25 @@ function bindInput() {
   reactorCanvas.style.cursor = "grab";
   reactorCanvas.style.touchAction = "none";
 
-  const down = (cx, cy) => { dragOn = true; dragX = cx; dragY = cy; lastInteract = performance.now(); reactorCanvas.style.cursor = "grabbing"; };
+  const down = (cx, cy, pan) => { dragOn = true; dragX = cx; dragY = cy; panMode = !!pan; lastInteract = performance.now(); reactorCanvas.style.cursor = pan ? "move" : "grabbing"; };
   const move = (cx, cy) => {
     if (!dragOn) return;
-    const dyaw = (cx - dragX) * 0.0095;
-    const dpitch = -(cy - dragY) * 0.0095;
-    cam.yaw += dyaw;
-    cam.pitch = clamp(cam.pitch + dpitch, 0.06, 1.46);
-    velYaw = dyaw; velPitch = dpitch;
+    const ddx = cx - dragX, ddy = cy - dragY;
+    if (panMode) {
+      panX += ddx; panY += ddy;
+    } else {
+      const dyaw = ddx * 0.0095;
+      const dpitch = -ddy * 0.0095;
+      cam.yaw += dyaw;
+      cam.pitch = clamp(cam.pitch + dpitch, -0.55, 1.55);
+      velYaw = dyaw; velPitch = dpitch;
+    }
     dragX = cx; dragY = cy; lastInteract = performance.now();
   };
-  const up = () => { dragOn = false; reactorCanvas.style.cursor = "grab"; };
+  const up = () => { dragOn = false; panMode = false; reactorCanvas.style.cursor = "grab"; };
 
-  reactorCanvas.addEventListener("mousedown", (e) => down(e.clientX, e.clientY));
+  reactorCanvas.addEventListener("mousedown", (e) => down(e.clientX, e.clientY, e.button === 2 || e.shiftKey));
+  reactorCanvas.addEventListener("contextmenu", (e) => e.preventDefault());
   window.addEventListener("mousemove", (e) => move(e.clientX, e.clientY));
   window.addEventListener("mouseup", up);
   reactorCanvas.addEventListener("wheel", (e) => {
@@ -554,7 +561,7 @@ function bindInput() {
     cam.dist = clamp(cam.dist + e.deltaY * 0.0022, 1.9, 6.4);
     lastInteract = performance.now();
   }, { passive: false });
-  reactorCanvas.addEventListener("touchstart", (e) => { if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+  reactorCanvas.addEventListener("touchstart", (e) => { if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY, e.touches.length >= 2); }, { passive: true });
   reactorCanvas.addEventListener("touchmove", (e) => { if (e.touches[0]) { move(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); } }, { passive: false });
   window.addEventListener("touchend", up);
   reactorCanvas.addEventListener("dblclick", () => resetCamera());
@@ -580,15 +587,15 @@ function drawReactor(time) {
 
   if (!dragOn) {
     cam.yaw += velYaw;
-    cam.pitch = clamp(cam.pitch + velPitch, 0.06, 1.46);
+    cam.pitch = clamp(cam.pitch + velPitch, -0.55, 1.55);
     velYaw *= 0.90; velPitch *= 0.90;
     if (Math.abs(velYaw) < 0.00006) velYaw = 0;
     if (Math.abs(velPitch) < 0.00006) velPitch = 0;
   }
   if (!reduceMotion && !dragOn && velYaw === 0 && time - lastInteract > 3500) cam.yaw += dt * 0.00006;
 
-  PROJ.cx = w * 0.47;
-  PROJ.cy = h * 0.45;
+  PROJ.cx = w * 0.47 + panX;
+  PROJ.cy = h * 0.45 + panY;
   PROJ.focal = size * cam.focalK;
 
   const tNorm = clamp((model.temperature - 6) / 22, 0, 1);
@@ -811,97 +818,188 @@ function drawReactor(time) {
   positionHotspots();
 }
 
-/* ---- balance of plant ---- */
+/* ---- 3D balance-of-plant: flat-shaded solids in world space ---- */
+const LIGHT = (() => { const v = [-0.35, 0.85, 0.4]; const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; })();
+function v3cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+function v3dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+function v3norm(a) { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
+function basisFor(axis) {
+  const helper = Math.abs(axis[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  const v = v3norm(v3cross(axis, helper));
+  const w = v3cross(axis, v);
+  return [v, w];
+}
+function faceShade(normal) { return 0.30 + 0.70 * Math.max(0, v3dot(normal, LIGHT)); }
+function addFace(prims, ctx, pts3, rgb, shade, alpha, zBias) {
+  const pr = projectAll(pts3);
+  const r = clamp(Math.round(rgb[0] * shade), 0, 255);
+  const g = clamp(Math.round(rgb[1] * shade), 0, 255);
+  const b = clamp(Math.round(rgb[2] * shade), 0, 255);
+  const a = (alpha === undefined) ? 1 : alpha;
+  prims.push({ z: pr.depth + (zBias || 0), d: () => {
+    tracePts(ctx, pr.pts, true);
+    ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(${clamp(r + 22, 0, 255)},${clamp(g + 22, 0, 255)},${clamp(b + 22, 0, 255)},${Math.min(1, a + 0.2)})`;
+    ctx.lineWidth = 1; ctx.stroke();
+  } });
+}
+function addBox(prims, ctx, c, dims, rgb, alpha) {
+  const x = c[0], y = c[1], z = c[2], hx = dims[0] / 2, hy = dims[1] / 2, hz = dims[2] / 2;
+  const A = [x - hx, y - hy, z - hz], B = [x + hx, y - hy, z - hz], C = [x + hx, y - hy, z + hz], D = [x - hx, y - hy, z + hz];
+  const E = [x - hx, y + hy, z - hz], F = [x + hx, y + hy, z - hz], G = [x + hx, y + hy, z + hz], H = [x - hx, y + hy, z + hz];
+  const faces = [
+    [[A, B, C, D], [0, -1, 0]], [[E, F, G, H], [0, 1, 0]],
+    [[A, B, F, E], [0, 0, -1]], [[D, C, G, H], [0, 0, 1]],
+    [[A, D, H, E], [-1, 0, 0]], [[B, C, G, F], [1, 0, 0]]
+  ];
+  for (let i = 0; i < faces.length; i += 1) addFace(prims, ctx, faces[i][0], rgb, faceShade(faces[i][1]), alpha);
+}
+function addRevolution(prims, ctx, base, axis, nodes, sides, rgb, alpha, caps) {
+  const bw = basisFor(axis), v = bw[0], w = bw[1];
+  const ringAt = (node) => {
+    const cx = base[0] + axis[0] * node.d, cy = base[1] + axis[1] * node.d, cz = base[2] + axis[2] * node.d;
+    const ring = [];
+    for (let k = 0; k < sides; k += 1) {
+      const t = (k / sides) * Math.PI * 2, ct = Math.cos(t), st = Math.sin(t);
+      const dx = v[0] * ct + w[0] * st, dy = v[1] * ct + w[1] * st, dz = v[2] * ct + w[2] * st;
+      ring.push([cx + dx * node.r, cy + dy * node.r, cz + dz * node.r, dx, dy, dz]);
+    }
+    return ring;
+  };
+  const rings = nodes.map(ringAt);
+  for (let i = 0; i < rings.length - 1; i += 1) {
+    const r0 = rings[i], r1 = rings[i + 1];
+    for (let k = 0; k < sides; k += 1) {
+      const k2 = (k + 1) % sides;
+      const quad = [
+        [r0[k][0], r0[k][1], r0[k][2]], [r0[k2][0], r0[k2][1], r0[k2][2]],
+        [r1[k2][0], r1[k2][1], r1[k2][2]], [r1[k][0], r1[k][1], r1[k][2]]
+      ];
+      const n = v3norm([(r0[k][3] + r0[k2][3]) / 2, (r0[k][4] + r0[k2][4]) / 2, (r0[k][5] + r0[k2][5]) / 2]);
+      addFace(prims, ctx, quad, rgb, faceShade(n), alpha);
+    }
+  }
+  if (caps) {
+    const first = rings[0], last = rings[rings.length - 1];
+    if (nodes[0].r > 0.001) addFace(prims, ctx, first.map((p) => [p[0], p[1], p[2]]), rgb, faceShade([-axis[0], -axis[1], -axis[2]]), alpha);
+    if (nodes[nodes.length - 1].r > 0.001) addFace(prims, ctx, last.map((p) => [p[0], p[1], p[2]]), rgb, faceShade(axis), alpha);
+  }
+}
+function addCyl(prims, ctx, base, axis, len, r, sides, rgb, alpha, caps) {
+  addRevolution(prims, ctx, base, axis, [{ d: 0, r }, { d: len, r }], sides, rgb, alpha, caps !== false);
+}
+
+/* ---- balance of plant: a small power station beside the reactor ---- */
 function addBOP(prims, ctx, time, intensity) {
   const flow = clamp(model.coolingFlow / 100, 0, 1);
-  const sg = project(BOP.sg.x, BOP.sg.y, BOP.sg.z);
-  const turb = project(BOP.turb.x, BOP.turb.y, BOP.turb.z);
-  const gen = project(BOP.gen.x, BOP.gen.y, BOP.gen.z);
-  const cond = project(BOP.cond.x, BOP.cond.y, BOP.cond.z);
-  const grid = project(BOP.grid.x, BOP.grid.y, BOP.grid.z);
-  const blanketTap = project((R + A_VESSEL) * Math.cos(Math.PI * 0.35), -A_VESSEL * 0.4, (R + A_VESSEL) * Math.sin(Math.PI * 0.35));
+  const net = model.netElec;
+  const yG = -0.6;
 
-  const pipe = (p0, p1, color, speed, depth, lw) => {
-    prims.push({ z: depth, d: () => {
-      ctx.save(); ctx.lineCap = "round";
-      ctx.beginPath(); ctx.moveTo(p0.x, p0.y);
-      const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2 + 18;
-      ctx.quadraticCurveTo(mx, my, p1.x, p1.y);
-      ctx.strokeStyle = "rgba(34,40,52,0.9)"; ctx.lineWidth = lw + 3; ctx.stroke();
-      ctx.strokeStyle = color; ctx.lineWidth = lw;
-      ctx.setLineDash([13, 11]); ctx.lineDashOffset = -time * speed; ctx.stroke();
-      ctx.setLineDash([]); ctx.restore();
-    } });
-  };
+  // ground pad
+  addBox(prims, ctx, [2.9, yG - 0.04, 0.05], [2.4, 0.08, 1.9], [24, 28, 38], 0.95);
 
-  pipe(blanketTap, sg, `rgba(255,150,90,${0.45 + flow * 0.45})`, 0.05 + flow * 0.15, (blanketTap.depth + sg.depth) / 2, 3);
-  pipe(sg, turb, `rgba(214,240,255,${0.5 + flow * 0.4})`, 0.12 + flow * 0.2, (sg.depth + turb.depth) / 2, 2.6);
-  pipe(turb, cond, `rgba(120,200,220,${0.4 + flow * 0.4})`, 0.06 + flow * 0.12, (turb.depth + cond.depth) / 2, 2.4);
-  pipe(cond, sg, `rgba(56,225,198,${0.4 + flow * 0.4})`, 0.05 + flow * 0.12, (cond.depth + sg.depth) / 2, 2.2);
+  // steam generator: vertical drum + tapered dome, with a hot band near the base
+  const sgBase = [2.0, yG, 0.55], sgLen = 0.6, sgR = 0.15;
+  addCyl(prims, ctx, sgBase, [0, 1, 0], sgLen, sgR, 16, [126, 138, 156], 1, true);
+  addRevolution(prims, ctx, [sgBase[0], sgBase[1] + sgLen, sgBase[2]], [0, 1, 0],
+    [{ d: 0, r: sgR }, { d: 0.12, r: sgR * 0.5 }, { d: 0.18, r: 0.02 }], 16, [150, 160, 176], 1, false);
+  addRevolution(prims, ctx, sgBase, [0, 1, 0], [{ d: 0.03, r: sgR * 1.03 }, { d: 0.17, r: sgR * 1.03 }], 16,
+    [Math.round(180 + intensity * 60), Math.round(96 + intensity * 24), 60], 0.45 + intensity * 0.35, false);
+  const sgTop = [sgBase[0], sgBase[1] + sgLen + 0.18, sgBase[2]];
 
-  // steam generator drum
-  prims.push({ z: sg.depth, d: () => {
-    const ww = 26 * sg.s * 0.018, hh = ww * 1.7;
-    const x = sg.x - ww / 2, y = sg.y - hh / 2;
-    const g = ctx.createLinearGradient(0, y, 0, y + hh);
-    g.addColorStop(0, "rgba(40,120,130,0.95)");
-    g.addColorStop(1, `rgba(${Math.round(180 + intensity * 60)},${Math.round(96 + intensity * 24)},60,0.95)`);
-    ctx.fillStyle = g; roundedRect(ctx, x, y, ww, hh, ww * 0.32); ctx.fill();
-    ctx.strokeStyle = "rgba(214,224,240,0.4)"; ctx.lineWidth = 1.2; ctx.stroke();
-    ctx.fillStyle = "rgba(238,242,248,0.62)"; ctx.font = `700 ${Math.max(8, 9 * sg.s * 0.02)}px Inter, system-ui, sans-serif`;
-    ctx.textAlign = "center"; ctx.fillText("STEAM GEN", sg.x, y + hh + 12); ctx.textAlign = "left";
-  } });
+  // turbine + coupled generator (horizontal cylinders along X)
+  const turbBase = [2.5, -0.4, 0.18];
+  addCyl(prims, ctx, turbBase, [1, 0, 0], 0.44, 0.12, 14, [120, 132, 150], 1, true);
+  const genBase = [2.98, -0.4, 0.18];
+  const genRgb = net > 0 ? [92, 152, 112] : [110, 118, 138];
+  addCyl(prims, ctx, genBase, [1, 0, 0], 0.34, 0.10, 14, genRgb, 1, true);
 
-  // condenser
-  prims.push({ z: cond.depth, d: () => {
-    const ww = 30 * cond.s * 0.018, hh = ww * 0.66;
-    roundedRect(ctx, cond.x - ww / 2, cond.y - hh / 2, ww, hh, hh * 0.3);
-    ctx.fillStyle = "rgba(46,78,98,0.92)"; ctx.fill();
-    ctx.strokeStyle = "rgba(120,200,220,0.4)"; ctx.lineWidth = 1; ctx.stroke();
-  } });
+  // condenser (horizontal cylinder along Z, lower/behind)
+  const condBase = [2.72, -0.52, -0.32];
+  addCyl(prims, ctx, condBase, [0, 0, 1], 0.44, 0.11, 14, [58, 104, 130], 1, true);
 
-  // generator block
-  prims.push({ z: gen.depth, d: () => {
-    const ww = 22 * gen.s * 0.018, hh = ww * 0.8;
-    roundedRect(ctx, gen.x - ww / 2, gen.y - hh / 2, ww, hh, hh * 0.22);
-    const net = model.netElec;
-    const gg = ctx.createLinearGradient(gen.x - ww / 2, 0, gen.x + ww / 2, 0);
-    gg.addColorStop(0, "rgba(70,80,100,0.95)");
-    gg.addColorStop(1, net > 0 ? "rgba(126,231,135,0.85)" : "rgba(120,128,150,0.8)");
-    ctx.fillStyle = gg; ctx.fill();
-    ctx.strokeStyle = "rgba(214,224,240,0.4)"; ctx.lineWidth = 1; ctx.stroke();
-  } });
+  // cooling tower (hyperboloid surface of revolution)
+  const towerBase = [3.62, yG, -0.5];
+  addRevolution(prims, ctx, towerBase, [0, 1, 0],
+    [{ d: 0, r: 0.26 }, { d: 0.18, r: 0.2 }, { d: 0.42, r: 0.16 }, { d: 0.62, r: 0.18 }, { d: 0.74, r: 0.21 }], 18,
+    [148, 154, 166], 0.96, false);
 
-  // turbine wheel (spins)
-  prims.push({ z: turb.depth - 0.001, d: () => {
-    const rad = Math.max(10, 0.07 * turb.s);
-    ctx.save(); ctx.translate(turb.x, turb.y);
-    ctx.strokeStyle = "rgba(238,242,248,0.28)"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(0, 0, rad * 1.4, 0, Math.PI * 2); ctx.stroke();
+  // transmission pylon (mast + crossarm)
+  addBox(prims, ctx, [4.12, yG + 0.26, 0.5], [0.045, 0.52, 0.045], [150, 158, 172], 1);
+  addBox(prims, ctx, [4.12, yG + 0.44, 0.5], [0.36, 0.045, 0.045], [150, 158, 172], 1);
+
+  // turbine spin fan (billboard at the near end)
+  const fan = project(turbBase[0], turbBase[1], turbBase[2]);
+  prims.push({ z: fan.depth - 0.002, d: () => {
+    const rad = Math.max(8, 0.08 * fan.s);
+    ctx.save(); ctx.translate(fan.x, fan.y);
     ctx.rotate((reduceMotion ? 0 : time * 0.004) * (0.2 + model.turbineLoad / 100));
-    ctx.fillStyle = "rgba(255,194,75,0.85)";
+    ctx.fillStyle = "rgba(255,200,96,0.9)";
     for (let i = 0; i < 8; i += 1) {
       ctx.rotate(Math.PI / 4);
       ctx.beginPath(); ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(rad * 0.6, -rad * 0.16, rad * 1.25, -rad * 0.05);
+      ctx.quadraticCurveTo(rad * 0.6, -rad * 0.16, rad * 1.2, -rad * 0.05);
       ctx.quadraticCurveTo(rad * 0.5, rad * 0.24, 0, 0); ctx.fill();
     }
     ctx.fillStyle = "#eef2f8"; ctx.beginPath(); ctx.arc(0, 0, rad * 0.18, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   } });
 
-  // power line gen -> grid, plus pylon
-  prims.push({ z: (gen.depth + grid.depth) / 2 - 0.01, d: () => {
-    const net = model.netElec;
+  // cooling-tower steam plume (billboard)
+  const towerTop = project(towerBase[0], towerBase[1] + 0.82, towerBase[2]);
+  prims.push({ z: towerTop.depth - 0.05, d: () => {
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    const rr = Math.max(10, 0.22 * towerTop.s);
+    const a = 0.08 + flow * 0.14;
+    const g = ctx.createRadialGradient(towerTop.x, towerTop.y - rr * 0.4, 0, towerTop.x, towerTop.y - rr * 0.4, rr);
+    g.addColorStop(0, `rgba(232,242,252,${a})`); g.addColorStop(1, "rgba(232,242,252,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(towerTop.x, towerTop.y - rr * 0.4, rr, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  } });
+
+  // ---- pipes (projected ports) ----
+  const blanketTap = project((R + A_VESSEL) * Math.cos(Math.PI * 0.35), -A_VESSEL * 0.4, (R + A_VESSEL) * Math.sin(Math.PI * 0.35));
+  const pSgTop = project(sgTop[0], sgTop[1], sgTop[2]);
+  const pTurbIn = project(turbBase[0] + 0.1, turbBase[1] + 0.12, turbBase[2]);
+  const pCondTop = project(condBase[0], condBase[1] + 0.11, condBase[2] + 0.22);
+  const pSgMid = project(sgBase[0] + sgR, sgBase[1] + 0.22, sgBase[2]);
+  const pTowerIn = project(towerBase[0], towerBase[1] + 0.12, towerBase[2]);
+  const pGen = project(genBase[0] + 0.34, genBase[1], genBase[2]);
+  const pGrid = project(4.12, yG + 0.42, 0.5);
+
+  const pipe = (p0, p1, color, speed, lw) => {
+    prims.push({ z: (p0.depth + p1.depth) / 2 - 0.02, d: () => {
+      ctx.save(); ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(p0.x, p0.y);
+      const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2 + 14;
+      ctx.quadraticCurveTo(mx, my, p1.x, p1.y);
+      ctx.strokeStyle = "rgba(30,36,48,0.92)"; ctx.lineWidth = lw + 3; ctx.stroke();
+      ctx.strokeStyle = color; ctx.lineWidth = lw;
+      ctx.setLineDash([12, 10]); ctx.lineDashOffset = -time * speed; ctx.stroke();
+      ctx.setLineDash([]); ctx.restore();
+    } });
+  };
+  pipe(blanketTap, pSgTop, `rgba(255,150,90,${0.5 + flow * 0.4})`, 0.05 + flow * 0.15, 3);
+  pipe(pSgTop, pTurbIn, `rgba(214,240,255,${0.55 + flow * 0.4})`, 0.12 + flow * 0.2, 2.6);
+  pipe(pTurbIn, pCondTop, `rgba(120,200,220,${0.45 + flow * 0.4})`, 0.07 + flow * 0.12, 2.4);
+  pipe(pCondTop, pSgMid, `rgba(56,225,198,${0.45 + flow * 0.4})`, 0.05 + flow * 0.12, 2.2);
+  pipe(pCondTop, pTowerIn, `rgba(150,190,210,${0.3 + flow * 0.3})`, 0.04 + flow * 0.1, 2.0);
+
+  // power export gen -> grid pylon
+  prims.push({ z: (pGen.depth + pGrid.depth) / 2 - 0.03, d: () => {
     ctx.save();
     ctx.strokeStyle = net > 0 ? `rgba(126,231,135,${0.5 + clamp(net / 500, 0, 0.5)})` : "rgba(120,128,150,0.5)";
     ctx.lineWidth = 1.8; ctx.setLineDash([6, 6]); ctx.lineDashOffset = -time * 0.05;
-    ctx.beginPath(); ctx.moveTo(gen.x, gen.y); ctx.lineTo(grid.x, grid.y); ctx.stroke();
-    ctx.setLineDash([]);
-    const s = Math.max(8, 0.05 * grid.s);
-    ctx.strokeStyle = "rgba(200,210,230,0.5)"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(grid.x, grid.y - s); ctx.lineTo(grid.x - s * 0.6, grid.y + s); ctx.lineTo(grid.x + s * 0.6, grid.y + s); ctx.closePath(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(grid.x - s * 0.45, grid.y); ctx.lineTo(grid.x + s * 0.45, grid.y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(pGen.x, pGen.y); ctx.lineTo(pGrid.x, pGrid.y); ctx.stroke();
+    ctx.setLineDash([]); ctx.restore();
+  } });
+
+  // label
+  prims.push({ z: pSgTop.depth - 0.01, d: () => {
+    ctx.save(); ctx.fillStyle = "rgba(238,242,248,0.6)";
+    ctx.font = `700 ${Math.max(8, 10 * pSgTop.s * 0.02)}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = "center"; ctx.fillText("STEAM GENERATOR", pSgTop.x, pSgTop.y - 12); ctx.textAlign = "left";
     ctx.restore();
   } });
 }
@@ -948,7 +1046,7 @@ function drawTitle(ctx, w, h) {
   ctx.fillText("MAGNETIC CONFINEMENT VESSEL", Math.max(16, w * 0.05), Math.max(24, h * 0.06));
   ctx.fillStyle = "rgba(154,164,184,0.42)";
   ctx.font = "600 9.5px Inter, system-ui, sans-serif";
-  ctx.fillText("DRAG TO ORBIT · SCROLL TO ZOOM · DBL-CLICK TO RESET", Math.max(16, w * 0.05), Math.max(40, h * 0.06) + 16);
+  ctx.fillText("DRAG ORBIT · SCROLL ZOOM · SHIFT-DRAG PAN · DBL-CLICK RESET", Math.max(16, w * 0.05), Math.max(40, h * 0.06) + 16);
   ctx.restore();
 }
 
