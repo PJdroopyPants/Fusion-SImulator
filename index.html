@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fusion Generator Simulator</title>
+    <meta name="description" content="An interactive, physically grounded tokamak fusion power simulator for STEM learners.">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="ambient" aria-hidden="true"></div>
+
+    <main class="sim-shell">
+      <header class="topbar">
+        <div class="brand">
+          <p class="eyebrow">Tokamak Learning Lab</p>
+          <h1>Fusion Power Generator</h1>
+          <p class="subtitle">Drive a magnetic-confinement reactor toward ignition and watch the physics respond.</p>
+        </div>
+        <div class="status-strip" aria-live="polite">
+          <span class="status-block">
+            <span class="status-caption">Reactor state</span>
+            <span id="reactorState" class="state-pill">Startup</span>
+          </span>
+          <span class="status-block">
+            <span class="status-caption">Net electric</span>
+            <span id="netPowerBadge" class="power-badge">0 MW</span>
+          </span>
+          <span class="status-block">
+            <span class="status-caption">Energy gain Q</span>
+            <span id="qBadge" class="q-badge">0.0</span>
+          </span>
+        </div>
+      </header>
+
+      <section class="sim-grid" aria-label="Interactive fusion power simulator">
+        <!-- CONTROL ROOM -->
+        <aside class="panel controls-panel" aria-label="Generator controls">
+          <div class="panel-heading">
+            <p class="panel-kicker">Control Room</p>
+            <h2>Operating Setpoints</h2>
+          </div>
+
+          <div class="preset-row" aria-label="Preset operating modes">
+            <button class="preset active" type="button" data-preset="startup">Startup</button>
+            <button class="preset" type="button" data-preset="cruise">Cruise</button>
+            <button class="preset" type="button" data-preset="gain">High Gain</button>
+            <button class="preset" type="button" data-preset="stress">Stress</button>
+            <button class="preset" type="button" data-preset="shutdown">Shutdown</button>
+          </div>
+
+          <div class="control-stack">
+            <label class="control" for="temperature">
+              <span>
+                <strong>Plasma temperature</strong>
+                <small>Ion thermal energy in the core</small>
+              </span>
+              <output id="temperatureValue" for="temperature">11.0 keV</output>
+              <input id="temperature" type="range" min="3" max="30" step="0.1" value="11">
+            </label>
+
+            <label class="control" for="magneticField">
+              <span>
+                <strong>Magnetic field</strong>
+                <small>Confinement from superconducting coils</small>
+              </span>
+              <output id="magneticFieldValue" for="magneticField">5.2 T</output>
+              <input id="magneticField" type="range" min="1.8" max="8.8" step="0.1" value="5.2">
+            </label>
+
+            <label class="control" for="fuelRate">
+              <span>
+                <strong>Fuel injection</strong>
+                <small>D-T pellet feed sets plasma density</small>
+              </span>
+              <output id="fuelRateValue" for="fuelRate">58%</output>
+              <input id="fuelRate" type="range" min="0" max="100" step="1" value="58">
+            </label>
+
+            <label class="control" for="fuelBalance">
+              <span>
+                <strong>D-T balance</strong>
+                <small>50/50 blend maximizes reaction rate</small>
+              </span>
+              <output id="fuelBalanceValue" for="fuelBalance">50 / 50</output>
+              <input id="fuelBalance" type="range" min="25" max="75" step="1" value="50">
+            </label>
+
+            <label class="control" for="coolingFlow">
+              <span>
+                <strong>Blanket coolant</strong>
+                <small>Heat carried to the steam cycle</small>
+              </span>
+              <output id="coolingFlowValue" for="coolingFlow">66%</output>
+              <input id="coolingFlow" type="range" min="15" max="100" step="1" value="66">
+            </label>
+
+            <label class="control" for="turbineLoad">
+              <span>
+                <strong>Turbine load</strong>
+                <small>Electrical draw on the generator</small>
+              </span>
+              <output id="turbineLoadValue" for="turbineLoad">54%</output>
+              <input id="turbineLoad" type="range" min="0" max="100" step="1" value="54">
+            </label>
+          </div>
+
+          <div class="toggle-grid" aria-label="Auxiliary systems">
+            <label class="toggle">
+              <input id="neutralBeam" type="checkbox" checked>
+              <span>Neutral beam heating</span>
+            </label>
+            <label class="toggle">
+              <input id="pelletPulse" type="checkbox" checked>
+              <span>Pellet pacing</span>
+            </label>
+            <label class="toggle">
+              <input id="divertorSweep" type="checkbox">
+              <span>Divertor sweep</span>
+            </label>
+            <label class="toggle">
+              <input id="emergencyQuench" type="checkbox">
+              <span>Emergency quench</span>
+            </label>
+          </div>
+
+          <p class="disclaimer">Simplified teaching model. Numbers are illustrative, not a reactor design code.</p>
+        </aside>
+
+        <!-- REACTOR STAGE -->
+        <section class="reactor-stage" aria-label="Tokamak reactor visualization">
+          <canvas id="reactorCanvas" aria-label="Animated reactor cutaway"></canvas>
+          <div class="stage-overlay">
+            <button class="hotspot hotspot-magnets" type="button" data-topic="magnets">Magnets</button>
+            <button class="hotspot hotspot-core active" type="button" data-topic="plasma">Plasma core</button>
+            <button class="hotspot hotspot-blanket" type="button" data-topic="blanket">Blanket</button>
+            <button class="hotspot hotspot-divertor" type="button" data-topic="divertor">Divertor</button>
+            <button class="hotspot hotspot-turbine" type="button" data-topic="turbine">Turbine</button>
+          </div>
+          <div class="stage-readout" aria-hidden="true">
+            <span><em id="stageTemp">11.0</em> keV</span>
+            <span><em id="stageField">5.2</em> T</span>
+            <span><em id="stageDensity">0.61</em>×10²⁰ m⁻³</span>
+          </div>
+        </section>
+
+        <!-- TELEMETRY -->
+        <aside class="panel telemetry-panel" aria-label="Live telemetry">
+          <div class="panel-heading">
+            <p class="panel-kicker">Plant Output</p>
+            <h2>Live Telemetry</h2>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric">
+              <span class="metric-label">Fusion power</span>
+              <strong id="fusionPower">0 MW</strong>
+              <meter id="fusionPowerMeter" min="0" max="2000" value="0"></meter>
+            </article>
+            <article class="metric metric-q">
+              <span class="metric-label">Energy gain Q</span>
+              <strong id="qPlasma">0.0</strong>
+              <meter id="qMeter" min="0" max="25" value="0"></meter>
+            </article>
+            <article class="metric">
+              <span class="metric-label">Net electric</span>
+              <strong id="electricOutput">0 MW</strong>
+              <meter id="electricMeter" min="-300" max="700" value="0"></meter>
+            </article>
+            <article class="metric metric-triple">
+              <span class="metric-label">Triple product nT&tau;<sub>E</sub></span>
+              <strong id="tripleProduct">0.00</strong>
+              <span class="metric-unit">×10²¹ keV·s·m⁻³ &nbsp;(ignition ≈ 3)</span>
+              <meter id="tripleMeter" min="0" max="3.5" value="0"></meter>
+            </article>
+            <article class="metric">
+              <span class="metric-label">Confinement &tau;<sub>E</sub></span>
+              <strong id="confinementTime">0.0 s</strong>
+              <meter id="confinementMeter" min="0" max="3" value="0"></meter>
+            </article>
+            <article class="metric">
+              <span class="metric-label">Stability</span>
+              <strong id="stability">0%</strong>
+              <meter id="stabilityMeter" min="0" max="100" value="0"></meter>
+            </article>
+          </div>
+
+          <div class="mini-systems">
+            <div class="system-row">
+              <span>Wall load</span>
+              <div class="bar"><span id="wallLoadBar"></span></div>
+              <strong id="wallLoad">0 MW/m²</strong>
+            </div>
+            <div class="system-row">
+              <span>Coolant outlet</span>
+              <div class="bar"><span id="coolantBar"></span></div>
+              <strong id="coolantTemp">0 °C</strong>
+            </div>
+            <div class="system-row">
+              <span>Tritium breeding</span>
+              <div class="bar"><span id="tritiumBar"></span></div>
+              <strong id="tritiumRatio">0.00</strong>
+            </div>
+          </div>
+
+          <section class="coach" aria-live="polite">
+            <p class="coach-kicker">Operator's read</p>
+            <p id="coachText">Bring the plasma up to temperature with confinement to match, then watch the operating point climb toward the ignition curve.</p>
+          </section>
+        </aside>
+      </section>
+
+      <!-- ANALYSIS ROW -->
+      <section class="analysis-grid" aria-label="Physics analysis">
+        <article class="panel viz-panel">
+          <div class="panel-heading">
+            <p class="panel-kicker">Where you are</p>
+            <h2>Lawson Operating-Point Map</h2>
+          </div>
+          <p class="viz-caption">Confinement parameter n&tau;<sub>E</sub> vs. temperature. Cross the upper curve and alpha self-heating sustains the burn: ignition.</p>
+          <canvas id="lawsonCanvas" aria-label="Lawson operating point diagram"></canvas>
+          <div class="legend">
+            <span class="legend-item"><i class="swatch swatch-ignite"></i>Ignition curve</span>
+            <span class="legend-item"><i class="swatch swatch-breakeven"></i>Breakeven (Q = 1)</span>
+            <span class="legend-item"><i class="swatch swatch-point"></i>Your operating point</span>
+          </div>
+        </article>
+
+        <article class="panel viz-panel">
+          <div class="panel-heading">
+            <p class="panel-kicker">Energy budget</p>
+            <h2>Power Balance</h2>
+          </div>
+          <p class="viz-caption">External heating in vs. fusion power out. Q is the ratio. Of the fusion energy, alphas (20%) stay to heat the plasma; neutrons (80%) deposit in the blanket.</p>
+          <div class="balance">
+            <div class="balance-row">
+              <span class="balance-label">External heating in</span>
+              <div class="balance-track"><span id="pbExt" class="seg seg-ext"></span></div>
+              <strong id="pbExtVal">0 MW</strong>
+            </div>
+            <div class="balance-row">
+              <span class="balance-label">Fusion power out</span>
+              <div class="balance-track">
+                <span id="pbAlpha" class="seg seg-alpha"></span>
+                <span id="pbNeutron" class="seg seg-neutron"></span>
+              </div>
+              <strong id="pbFusVal">0 MW</strong>
+            </div>
+          </div>
+          <div class="balance-legend">
+            <span class="legend-item"><i class="swatch swatch-ext"></i>Heating input</span>
+            <span class="legend-item"><i class="swatch swatch-alpha"></i>α self-heating (stays)</span>
+            <span class="legend-item"><i class="swatch swatch-neutron"></i>Neutrons → blanket</span>
+          </div>
+          <div class="balance-foot">
+            <span>Gain factor</span>
+            <strong id="qBig">Q = 0.0</strong>
+          </div>
+        </article>
+
+        <article class="panel viz-panel">
+          <div class="panel-heading">
+            <p class="panel-kicker">History</p>
+            <h2>Output Over Time</h2>
+          </div>
+          <p class="viz-caption">Net electrical output (teal) and fusion power (amber) over the last ~40 seconds of simulated time.</p>
+          <canvas id="historyCanvas"></canvas>
+          <div class="chart-title">
+            <span>Peak net electric</span>
+            <strong id="chartPeak">0 MW</strong>
+          </div>
+        </article>
+      </section>
+
+      <!-- LEARNING ROW -->
+      <section class="learn-grid" aria-label="Educational concepts">
+        <article class="panel lesson-panel">
+          <div class="panel-heading">
+            <p class="panel-kicker" id="lessonTopic">Plasma core</p>
+            <h2 id="lessonTitle">A hot charged gas does the work.</h2>
+          </div>
+          <p id="lessonBody">
+            Heat deuterium and tritium until their nuclei move fast enough to fuse. The goal is a dense, stable plasma that releases more heat than the injectors consume.
+          </p>
+          <details class="deeper">
+            <summary>Go deeper</summary>
+            <p id="lessonDeeper">Select a component on the reactor to see the physics behind it.</p>
+            <p class="formula" id="lessonFormula"></p>
+          </details>
+          <p class="lesson-note" id="lessonNote">Raise temperature and confinement together to move toward ignition.</p>
+        </article>
+
+        <article class="panel glossary-panel">
+          <div class="panel-heading">
+            <p class="panel-kicker">Reference</p>
+            <h2>Glossary</h2>
+          </div>
+          <dl class="glossary">
+            <div>
+              <dt>Triple product (nT&tau;<sub>E</sub>)</dt>
+              <dd>Density times temperature times energy confinement time, the single figure of merit for fusion progress. D-T ignition needs about 3×10²¹ keV·s·m⁻³.</dd>
+            </div>
+            <div>
+              <dt>Lawson criterion</dt>
+              <dd>The threshold where fusion self-heating balances energy losses. Above it, the plasma can sustain itself without external heating.</dd>
+            </div>
+            <div>
+              <dt>Energy gain (Q)</dt>
+              <dd>Fusion power produced ÷ external heating power supplied. Q = 1 is scientific breakeven; Q → ∞ is ignition.</dd>
+            </div>
+            <div>
+              <dt>Confinement time (&tau;<sub>E</sub>)</dt>
+              <dd>How long the plasma holds its energy before it leaks out. Stronger magnetic fields and larger devices increase it.</dd>
+            </div>
+            <div>
+              <dt>Alpha heating</dt>
+              <dd>Each D-T reaction makes a 3.5 MeV helium nucleus (alpha, ~20% of the energy) that stays in the plasma and heats it. The 14.1 MeV neutron (~80%) escapes.</dd>
+            </div>
+            <div>
+              <dt>Tritium breeding ratio</dt>
+              <dd>Tritium bred in the lithium blanket per tritium burned. Above 1.0 the plant replaces its own fuel.</dd>
+            </div>
+            <div>
+              <dt>Divertor</dt>
+              <dd>The component that exhausts helium ash and heat from the plasma edge, protecting the vessel wall.</dd>
+            </div>
+            <div>
+              <dt>Disruption</dt>
+              <dd>A sudden loss of confinement when plasma pressure outruns the magnetic field, dumping energy onto the walls.</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
