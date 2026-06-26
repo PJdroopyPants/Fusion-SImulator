@@ -253,6 +253,19 @@
         </aside>
       </section>
 
+      <!-- MISSION CONTROL -->
+      <section class="missions panel" aria-label="Missions and challenges">
+        <div class="missions-head">
+          <div>
+            <p class="panel-kicker">Mission Control</p>
+            <h2>Challenges</h2>
+          </div>
+          <p class="missions-progress"><strong id="missionCount">0</strong> of <span id="missionTotal">7</span> complete</p>
+        </div>
+        <div class="mission-list" id="missionList"></div>
+      </section>
+      <div class="mission-toast" id="missionToast" role="status" aria-live="polite"></div>
+
       <!-- ANALYSIS ROW -->
       <section class="analysis-grid" aria-label="Physics analysis">
         <article class="panel viz-panel">
@@ -409,6 +422,8 @@
         </article>
       </section>
     </main>
+
+    <div id="tipPop" class="tip-pop" role="tooltip" hidden></div>
 
     <script src="script.js"></script>
   </body>

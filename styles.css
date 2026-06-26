@@ -1065,6 +1065,219 @@ meter::-moz-meter-bar {
   display: none;
 }
 
+/* ---------- Mission Control ---------- */
+.missions {
+  margin-top: 16px;
+}
+
+.missions-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.missions-progress {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.missions-progress strong {
+  color: var(--teal);
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mission-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+  gap: 10px;
+}
+
+.mission-chip {
+  position: relative;
+  padding: 12px 13px 13px 36px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.mission-check {
+  position: absolute;
+  left: 12px;
+  top: 13px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.mission-chip.done {
+  border-color: rgba(56, 225, 198, 0.5);
+  background: rgba(56, 225, 198, 0.08);
+  box-shadow: 0 0 0 1px rgba(56, 225, 198, 0.18), 0 0 22px rgba(56, 225, 198, 0.12);
+}
+
+.mission-chip.done .mission-check {
+  background: var(--teal);
+  border-color: var(--teal);
+}
+
+.mission-chip.done .mission-check::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid #07120f;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.mission-name {
+  display: block;
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: var(--text);
+}
+
+.mission-goal {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.mission-bar {
+  display: block;
+  margin-top: 8px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(120, 132, 156, 0.2);
+  overflow: hidden;
+}
+
+.mission-bar span {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--teal);
+  transition: width 0.3s ease;
+}
+
+.mission-chip.justdone {
+  animation: missionPop 0.9s ease;
+}
+
+@keyframes missionPop {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.045); }
+  100% { transform: scale(1); }
+}
+
+.mission-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  z-index: 20;
+  padding: 11px 18px;
+  border-radius: 12px;
+  background: rgba(13, 24, 22, 0.92);
+  border: 1px solid rgba(56, 225, 198, 0.55);
+  box-shadow: 0 12px 34px var(--shadow), 0 0 26px rgba(56, 225, 198, 0.2);
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 700;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 14px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.mission-toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* ---------- Teachable tooltips ---------- */
+.tip-dot {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--faint);
+  font-size: 9px;
+  font-weight: 800;
+  font-style: italic;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: help;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.tip-dot:hover,
+.tip-dot:focus-visible {
+  color: var(--teal);
+  border-color: var(--teal);
+  outline: none;
+}
+
+.tip-pop {
+  position: fixed;
+  z-index: 60;
+  max-width: 262px;
+  padding: 11px 13px;
+  border-radius: 11px;
+  background: rgba(13, 17, 24, 0.97);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 14px 36px var(--shadow);
+  pointer-events: none;
+}
+
+.tip-pop[hidden] {
+  display: none;
+}
+
+.tip-pop strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.tip-pop span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.tip-pop code {
+  display: block;
+  margin-top: 7px;
+  color: var(--teal);
+  font-size: 0.72rem;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+.tip-pop em {
+  display: block;
+  margin-top: 6px;
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
 @media (max-width: 920px) {
   .topbar {
     align-items: flex-start;

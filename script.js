@@ -1865,12 +1865,154 @@ function initNavHud() {
   });
 }
 
+/* ---------- Missions / challenges ---------- */
+const MISSIONS = [
+  { id: "firstlight", name: "First Light", goal: "Produce fusion power", test: (m) => m.fusionPower >= 10 },
+  { id: "burning", name: "Burning Plasma", goal: "Reach energy gain Q of 1", test: (m) => m.q >= 1 },
+  { id: "netpos", name: "Net Positive", goal: "Send real power to the grid", test: (m) => m.netElec > 0 },
+  { id: "steady", name: "Steady Hand", goal: "Hold net positive for 25 seconds", hold: 25, test: (m) => m.netElec > 0 },
+  { id: "breed", name: "Self-Sufficient", goal: "Breed tritium (TBR over 1) while burning", test: (m) => m.tritiumRatio >= 1 && m.fusionPower >= 200 },
+  { id: "highgain", name: "High Gain", goal: "Reach energy gain Q of 10", test: (m) => m.q >= 10 },
+  { id: "ignition", name: "Ignition", goal: "Let alpha heating sustain the burn", test: (m) => m.phi >= 0.95 }
+];
+const missionState = {};
+let missionPrevT = 0, missionsInitialized = false;
+
+function buildMissions() {
+  const list = document.getElementById("missionList");
+  const total = document.getElementById("missionTotal");
+  if (total) total.textContent = MISSIONS.length;
+  if (!list) return;
+  list.innerHTML = "";
+  MISSIONS.forEach((mn) => {
+    const chip = document.createElement("div");
+    chip.className = "mission-chip";
+    chip.innerHTML =
+      '<span class="mission-check" aria-hidden="true"></span>' +
+      `<span class="mission-name">${mn.name}</span>` +
+      `<span class="mission-goal">${mn.goal}</span>` +
+      (mn.hold ? '<span class="mission-bar"><span></span></span>' : "");
+    list.appendChild(chip);
+    missionState[mn.id] = { done: false, hold: 0, el: chip, bar: mn.hold ? chip.querySelector(".mission-bar span") : null };
+  });
+  missionPrevT = performance.now();
+}
+
+function showMissionToast(name) {
+  const t = document.getElementById("missionToast");
+  if (!t) return;
+  t.textContent = `Mission complete: ${name}`;
+  t.classList.add("show");
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+function completeMission(mn, st) {
+  st.done = true;
+  st.el.classList.add("done");
+  if (st.bar) st.bar.style.width = "100%";
+  if (missionsInitialized) {
+    st.el.classList.add("justdone");
+    setTimeout(() => st.el.classList.remove("justdone"), 900);
+    showMissionToast(mn.name);
+  }
+}
+
+function updateMissions() {
+  if (!missionState.firstlight) return;
+  const now = performance.now();
+  let dt = (now - missionPrevT) / 1000; missionPrevT = now;
+  if (!(dt > 0) || dt > 1) dt = 0.36;
+  let count = 0;
+  MISSIONS.forEach((mn) => {
+    const st = missionState[mn.id];
+    if (!st) return;
+    if (st.done) { count += 1; return; }
+    const pass = !!mn.test(model);
+    if (mn.hold) {
+      st.hold = pass ? Math.min(mn.hold, st.hold + dt) : 0;
+      if (st.bar) st.bar.style.width = `${(st.hold / mn.hold) * 100}%`;
+      if (st.hold >= mn.hold) completeMission(mn, st);
+    } else if (pass) {
+      completeMission(mn, st);
+    }
+    if (st.done) count += 1;
+  });
+  missionsInitialized = true;
+  const c = document.getElementById("missionCount");
+  if (c) c.textContent = count;
+}
+
+/* ---------- Teachable tooltips ---------- */
+const TIPS = {
+  temperature: { title: "Plasma temperature", body: "How hot the fuel ions are. 1 keV is about 11.6 million °C. Hotter ions fuse faster, but the rate only keeps climbing to roughly 65 keV. Reactors run at 10 to 20 keV, where confinement is achievable.", formula: "1 keV ≈ 11.6 million °C" },
+  magneticField: { title: "Magnetic field", body: "Field strength from the superconducting coils, in tesla. A stronger field holds the plasma's energy longer and lets it run at higher pressure before going unstable.", real: "ITER: about 5 to 12 T" },
+  fuelRate: { title: "Fuel injection", body: "How fast D-T pellets are fed in, which sets the plasma density. More fuel means more reactions, but more than the field can hold raises disruption risk." },
+  fuelBalance: { title: "D-T balance", body: "The deuterium to tritium mix. A 50/50 blend gives the highest reaction rate; drifting either way lowers fusion power." },
+  coolingFlow: { title: "Blanket coolant", body: "How much coolant carries blanket heat to the steam cycle. Too little overheats the blanket; too much wastes pumping power. There is a sweet spot." },
+  turbineLoad: { title: "Turbine load", body: "How hard the turbine-generator is driven. Higher load converts more heat to electricity, but only when the blanket is hot and cooling is matched." },
+  fusionPower: { title: "Fusion power", body: "Total power released by fusion, in megawatts. About 20% (alpha particles) stays to heat the plasma; 80% (neutrons) deposits in the blanket.", formula: "P_fus ∝ n² · ⟨σv⟩(T)" },
+  qPlasma: { title: "Energy gain Q", body: "Fusion power out divided by heating power in. Q = 1 is scientific breakeven; net electricity needs roughly Q above 5; Q to infinity is ignition.", formula: "Q = P_fusion / P_heating" },
+  electricOutput: { title: "Net electric", body: "Gross turbine electricity minus the power the plant uses to run itself (magnets, pumps, heating). This is what reaches the grid, and it can be negative." },
+  tripleProduct: { title: "Triple product", body: "Density times temperature times confinement time, the single figure of merit for fusion progress. D-T ignition needs about 3.", formula: "n · T · τ_E  (×10²¹ keV·s·m⁻³)" },
+  confinementTime: { title: "Confinement time", body: "How long the plasma holds its energy before it leaks out, in seconds. Rises strongly with magnetic field and device size." },
+  stability: { title: "Stability", body: "Margin against a disruption. Falls when plasma pressure outruns the field (high beta) or when wall and coolant heat run hot." },
+  wallLoad: { title: "Wall load", body: "Heat flux on the plasma-facing wall, in MW per square meter. Materials cap this near 10; sweeping the divertor spreads the load.", real: "Limit: roughly 10 MW/m²" },
+  coolantTemp: { title: "Coolant outlet", body: "Temperature of coolant leaving the blanket. Hotter coolant gives more efficient electricity, up to material limits." },
+  tritiumRatio: { title: "Tritium breeding ratio", body: "Tritium bred in the lithium blanket per tritium burned. Above 1.0 the plant makes its own fuel; below 1.0 it runs its supply down.", formula: "TBR > 1.0 = self-sufficient" },
+  reactorState: { title: "Reactor state", body: "The current operating regime, from Startup through Burning Plasma to Ignition, plus warnings like Disruption Risk or Thermal Limit." },
+  netPowerBadge: { title: "Net electric", body: "Gross turbine electricity minus the plant's own recirculating power. Positive means the reactor is a net energy source." },
+  qBadge: { title: "Energy gain Q", body: "Fusion power out divided by heating power in. Q = 1 is breakeven; ignition is Q to infinity.", formula: "Q = P_fusion / P_heating" }
+};
+let tipPop = null;
+function buildTipContent(t) {
+  return `<strong>${t.title}</strong><span>${t.body}</span>` + (t.formula ? `<code>${t.formula}</code>` : "") + (t.real ? `<em>${t.real}</em>` : "");
+}
+function positionTip(dot) {
+  const r = dot.getBoundingClientRect();
+  tipPop.style.left = "0px"; tipPop.style.top = "0px";
+  const p = tipPop.getBoundingClientRect();
+  let x = r.left + r.width / 2 - p.width / 2;
+  let y = r.top - p.height - 8;
+  if (y < 8) y = r.bottom + 8;
+  x = Math.max(8, Math.min(x, window.innerWidth - p.width - 8));
+  y = Math.max(8, Math.min(y, window.innerHeight - p.height - 8));
+  tipPop.style.left = `${x}px`; tipPop.style.top = `${y}px`;
+}
+function showTip(dot) { const t = TIPS[dot.dataset.tip]; if (!t || !tipPop) return; tipPop.innerHTML = buildTipContent(t); tipPop.hidden = false; positionTip(dot); }
+function hideTip() { if (tipPop) tipPop.hidden = true; }
+function attachTips() {
+  tipPop = document.getElementById("tipPop");
+  if (!tipPop) return;
+  const addDot = (container, id) => {
+    if (!container || !TIPS[id] || container.querySelector(".tip-dot")) return;
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "tip-dot"; b.dataset.tip = id; b.textContent = "i";
+    b.setAttribute("aria-label", `About ${TIPS[id].title}`);
+    b.addEventListener("pointerenter", () => showTip(b));
+    b.addEventListener("pointerleave", hideTip);
+    b.addEventListener("focus", () => showTip(b));
+    b.addEventListener("blur", hideTip);
+    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); if (tipPop.hidden) showTip(b); else hideTip(); });
+    container.appendChild(b);
+  };
+  document.querySelectorAll(".control").forEach((c) => addDot(c.querySelector("strong"), c.getAttribute("for")));
+  document.querySelectorAll(".metric").forEach((m) => { const s = m.querySelector("strong[id]"); if (s) addDot(m.querySelector(".metric-label"), s.id); });
+  document.querySelectorAll(".system-row").forEach((row) => { const s = row.querySelector("strong[id]"); if (s) addDot(row.querySelector("span"), s.id); });
+  document.querySelectorAll(".status-block").forEach((b) => { const idEl = b.querySelector("[id]"); const cap = b.querySelector(".status-caption"); if (idEl && cap) addDot(cap, idEl.id); });
+  document.addEventListener("click", (e) => { if (!e.target.closest(".tip-dot")) hideTip(); });
+  window.addEventListener("scroll", hideTip, true);
+}
+
 seedParticles();
 updateReadouts();
 initNavHud();
+buildMissions();
+attachTips();
 setInterval(() => {
   model = calculateModel();
   tickHistory();
   updateReadouts();
+  updateMissions();
 }, 360);
 requestAnimationFrame(animate);
