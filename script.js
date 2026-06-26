@@ -81,6 +81,12 @@ const historyCanvas = $("#historyCanvas");
 const historyCtx = historyCanvas.getContext("2d");
 const lawsonCanvas = $("#lawsonCanvas");
 const lawsonCtx = lawsonCanvas.getContext("2d");
+const reactivityCanvas = $("#reactivityCanvas");
+const reactivityCtx = reactivityCanvas ? reactivityCanvas.getContext("2d") : null;
+const sankeyCanvas = $("#sankeyCanvas");
+const sankeyCtx = sankeyCanvas ? sankeyCanvas.getContext("2d") : null;
+const fuelCycleCanvas = $("#fuelCycleCanvas");
+const fuelCycleCtx = fuelCycleCanvas ? fuelCycleCanvas.getContext("2d") : null;
 const presets = document.querySelectorAll("[data-preset]");
 const hotspots = document.querySelectorAll("[data-topic]");
 
@@ -437,12 +443,51 @@ let reduceMotion = false, inputBound = false;
 let velYaw = 0, velPitch = 0;
 let panX = 0, panY = 0, panMode = false;
 const CAM_DEFAULT = { yaw: -0.62, pitch: 0.60, dist: 3.15 };
-function resetCamera() { cam.yaw = CAM_DEFAULT.yaw; cam.pitch = CAM_DEFAULT.pitch; cam.dist = CAM_DEFAULT.dist; velYaw = 0; velPitch = 0; panX = 0; panY = 0; lastInteract = performance.now(); }
+let autoSpin = true;     // idle auto-rotation enabled
+let panSticky = false;   // pan latched from the HUD button (so non-shift / touch can pan)
+let camTween = null;     // active camera fly-to {from,dYaw,to,t0,dur}, or null
+
+/* Canonical viewpoints reachable from the gizmo. */
+const VIEW_PRESETS = {
+  iso:   { yaw: -0.62,   pitch: 0.60, dist: 3.15 },
+  top:   { yaw: -0.62,   pitch: 1.52, dist: 3.45 },
+  front: { yaw: 0.0,     pitch: 0.16, dist: 3.30 },
+  side:  { yaw: -1.5708, pitch: 0.18, dist: 3.45 }
+};
+
+function shortestAngle(from, to) {
+  let d = (to - from) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+/* Smoothly fly the camera to a target {yaw,pitch,dist}. Leaves pan untouched. */
+function animateCameraTo(target, dur) {
+  camTween = {
+    from: { yaw: cam.yaw, pitch: cam.pitch, dist: cam.dist },
+    dYaw: shortestAngle(cam.yaw, target.yaw),
+    to: { pitch: target.pitch, dist: target.dist },
+    t0: performance.now(),
+    dur: dur || 620
+  };
+  velYaw = 0; velPitch = 0; lastInteract = performance.now();
+}
+function snapToView(name) {
+  const v = VIEW_PRESETS[name];
+  if (!v) return;
+  animateCameraTo(v, 620);
+  panX = 0; panY = 0;
+}
+function resetCamera() {
+  camTween = null;
+  cam.yaw = CAM_DEFAULT.yaw; cam.pitch = CAM_DEFAULT.pitch; cam.dist = CAM_DEFAULT.dist;
+  velYaw = 0; velPitch = 0; panX = 0; panY = 0; lastInteract = performance.now();
+}
 
 /* Balance-of-plant anchors (off to +X so the plant sits beside the reactor). */
 const BOP = {
   sg: { x: 2.05, y: -0.12, z: 0.55 },   // steam generator
-  turb: { x: 2.72, y: -0.40, z: 0.18 }, // turbine
+  turb: { x: 2.42, y: -0.40, z: 0.18 }, // turbine
   gen: { x: 3.18, y: -0.06, z: -0.12 }, // generator
   cond: { x: 2.72, y: -0.66, z: 0.18 }, // condenser
   grid: { x: 3.40, y: 0.52, z: -0.42 }  // grid / pylon
@@ -535,7 +580,7 @@ function bindInput() {
   reactorCanvas.style.cursor = "grab";
   reactorCanvas.style.touchAction = "none";
 
-  const down = (cx, cy, pan) => { dragOn = true; dragX = cx; dragY = cy; panMode = !!pan; lastInteract = performance.now(); reactorCanvas.style.cursor = pan ? "move" : "grabbing"; };
+  const down = (cx, cy, pan) => { camTween = null; dragOn = true; dragX = cx; dragY = cy; panMode = !!pan; lastInteract = performance.now(); reactorCanvas.style.cursor = pan ? "move" : "grabbing"; };
   const move = (cx, cy) => {
     if (!dragOn) return;
     const ddx = cx - dragX, ddy = cy - dragY;
@@ -550,9 +595,9 @@ function bindInput() {
     }
     dragX = cx; dragY = cy; lastInteract = performance.now();
   };
-  const up = () => { dragOn = false; panMode = false; reactorCanvas.style.cursor = "grab"; };
+  const up = () => { dragOn = false; panMode = false; reactorCanvas.style.cursor = panSticky ? "move" : "grab"; };
 
-  reactorCanvas.addEventListener("mousedown", (e) => down(e.clientX, e.clientY, e.button === 2 || e.shiftKey));
+  reactorCanvas.addEventListener("mousedown", (e) => down(e.clientX, e.clientY, e.button === 2 || e.shiftKey || panSticky));
   reactorCanvas.addEventListener("contextmenu", (e) => e.preventDefault());
   window.addEventListener("mousemove", (e) => move(e.clientX, e.clientY));
   window.addEventListener("mouseup", up);
@@ -561,7 +606,7 @@ function bindInput() {
     cam.dist = clamp(cam.dist + e.deltaY * 0.0022, 1.9, 6.4);
     lastInteract = performance.now();
   }, { passive: false });
-  reactorCanvas.addEventListener("touchstart", (e) => { if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY, e.touches.length >= 2); }, { passive: true });
+  reactorCanvas.addEventListener("touchstart", (e) => { if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY, e.touches.length >= 2 || panSticky); }, { passive: true });
   reactorCanvas.addEventListener("touchmove", (e) => { if (e.touches[0]) { move(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); } }, { passive: false });
   window.addEventListener("touchend", up);
   reactorCanvas.addEventListener("dblclick", () => resetCamera());
@@ -585,18 +630,28 @@ function drawReactor(time) {
   prevTime = time;
   if (!(dt > 0) || dt > 60) dt = 16;
 
-  if (!dragOn) {
-    cam.yaw += velYaw;
-    cam.pitch = clamp(cam.pitch + velPitch, -0.55, 1.55);
-    velYaw *= 0.90; velPitch *= 0.90;
-    if (Math.abs(velYaw) < 0.00006) velYaw = 0;
-    if (Math.abs(velPitch) < 0.00006) velPitch = 0;
+  if (camTween) {
+    const k = clamp((time - camTween.t0) / camTween.dur, 0, 1);
+    const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; // easeInOutQuad
+    cam.yaw = camTween.from.yaw + camTween.dYaw * e;
+    cam.pitch = camTween.from.pitch + (camTween.to.pitch - camTween.from.pitch) * e;
+    cam.dist = camTween.from.dist + (camTween.to.dist - camTween.from.dist) * e;
+    if (k >= 1) camTween = null;
+  } else {
+    if (!dragOn) {
+      cam.yaw += velYaw;
+      cam.pitch = clamp(cam.pitch + velPitch, -0.55, 1.55);
+      velYaw *= 0.90; velPitch *= 0.90;
+      if (Math.abs(velYaw) < 0.00006) velYaw = 0;
+      if (Math.abs(velPitch) < 0.00006) velPitch = 0;
+    }
+    if (autoSpin && !reduceMotion && !dragOn && velYaw === 0 && time - lastInteract > 3500) cam.yaw += dt * 0.00006;
   }
-  if (!reduceMotion && !dragOn && velYaw === 0 && time - lastInteract > 3500) cam.yaw += dt * 0.00006;
 
   PROJ.cx = w * 0.47 + panX;
   PROJ.cy = h * 0.45 + panY;
   PROJ.focal = size * cam.focalK;
+  updateViewDir();
 
   const tNorm = clamp((model.temperature - 6) / 22, 0, 1);
   const intensity = clamp(model.fusionPower / 1200, 0.05, 1);
@@ -640,37 +695,11 @@ function drawReactor(time) {
     }
   });
 
-  // poloidal field coils (horizontal rings) + central solenoid is separate
-  const pfRings = [[0.58, 1.24], [-0.58, 1.24], [0.92, 0.66], [-0.92, 0.66]];
-  pfRings.forEach(([hh, rho]) => {
-    const ring = [];
-    for (let a = 0; a <= 60; a += 1) { const t = (a / 60) * Math.PI * 2; ring.push([rho * Math.cos(t), hh, rho * Math.sin(t)]); }
-    const pr = projectAll(ring);
-    const b = depthBright(pr.depth);
-    prims.push({ z: pr.depth, d: () => { tracePts(ctx, pr.pts, true); ctx.strokeStyle = `rgba(120,170,255,${0.18 + 0.34 * b})`; ctx.lineWidth = 1.4 + b * 1.4; ctx.stroke(); } });
-  });
+  // outer poloidal-field coils — solid ring magnets for plasma position + shaping
+  addPFCoils(prims, ctx, bNorm);
 
-  // toroidal field coils caging the plasma; each poloidal loop is split into
-  // arcs so segments sort independently and weave correctly through the torus
-  const NC = 16, CSEG = 8, CPTS = 40, CPER = CPTS / CSEG;
-  for (let ci = 0; ci < NC; ci += 1) {
-    const th = (ci / NC) * Math.PI * 2;
-    const loop = [];
-    for (let a = 0; a <= CPTS; a += 1) loop.push(torusPt(th, (a / CPTS) * Math.PI * 2, A_COIL));
-    for (let s = 0; s < CSEG; s += 1) {
-      const slice = loop.slice(s * CPER, s * CPER + CPER + 1);
-      const pr = projectAll(slice);
-      const b = depthBright(pr.depth);
-      const al = (0.16 + 0.40 * b) * (0.55 + bNorm * 0.6);
-      prims.push({ z: pr.depth, d: () => {
-        tracePts(ctx, pr.pts, false);
-        ctx.strokeStyle = `rgba(168,150,255,${clamp(al, 0, 0.9)})`;
-        ctx.lineWidth = 1.4 + b * 1.8;
-        if (b > 0.6) { ctx.shadowColor = "rgba(168,150,255,0.55)"; ctx.shadowBlur = 6 * b; }
-        ctx.stroke(); ctx.shadowBlur = 0;
-      } });
-    }
-  }
+  // toroidal field coils — solid, shaded D-shaped magnets caging the plasma
+  addDCoils(prims, ctx, bNorm);
 
   // plasma body — additive radial-gradient discs along the toroidal centerline,
   // with a hot white-gold core that brightens with fusion intensity
@@ -813,6 +842,7 @@ function drawReactor(time) {
   ctx.beginPath(); ctx.arc(core.x, core.y, (A_PLASMA + 0.4) * core.s, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 
+  applyBloom(ctx, w, h, 0.32 + intensity * 0.42);
   drawVignette(ctx, w, h);
   drawTitle(ctx, w, h);
   positionHotspots();
@@ -830,6 +860,80 @@ function basisFor(axis) {
   return [v, w];
 }
 function faceShade(normal) { return 0.30 + 0.70 * Math.max(0, v3dot(normal, LIGHT)); }
+
+/* World-space direction from a surface toward the camera, refreshed each frame. */
+let VIEW_DIR = [0, 0, -1];
+function updateViewDir() {
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  const sy = Math.sin(cam.yaw), cyv = Math.cos(cam.yaw);
+  VIEW_DIR = [-cp * sy, -sp, -cp * cyv];
+}
+/* Material shading: cool ambient fill + warm key light + a cool fresnel rim. */
+function shadeRGB(rgb, n) {
+  const ndl = Math.max(0, n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2]);
+  const amb = 0.36, key = 0.74;
+  let r = rgb[0] * (amb * 0.86 + ndl * key * 1.07);
+  let g = rgb[1] * (amb * 0.96 + ndl * key * 1.00);
+  let b = rgb[2] * (amb * 1.12 + ndl * key * 0.90);
+  const vd = clamp(Math.abs(n[0] * VIEW_DIR[0] + n[1] * VIEW_DIR[1] + n[2] * VIEW_DIR[2]), 0, 1);
+  const rim = Math.pow(1 - vd, 3) * 0.55;
+  r += 150 * rim; g += 172 * rim; b += 205 * rim;
+  return [clamp(Math.round(r), 0, 255), clamp(Math.round(g), 0, 255), clamp(Math.round(b), 0, 255)];
+}
+/* A flat face shaded by the material model (used for caps, boxes). */
+function addFaceN(prims, ctx, pts3, rgb, normal, alpha, zBias, stroke) {
+  const col = shadeRGB(rgb, v3norm(normal));
+  const pr = projectAll(pts3);
+  const a = (alpha === undefined) ? 1 : alpha;
+  prims.push({ z: pr.depth + (zBias || 0), d: () => {
+    tracePts(ctx, pr.pts, true);
+    ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${a})`;
+    ctx.fill();
+    if (stroke) {
+      ctx.strokeStyle = `rgba(${clamp(col[0] + 20, 0, 255)},${clamp(col[1] + 20, 0, 255)},${clamp(col[2] + 24, 0, 255)},${Math.min(1, a + 0.15)})`;
+      ctx.lineWidth = 1; ctx.stroke();
+    }
+  } });
+}
+/* A quad filled with a gradient between its two side-edge colors (smooth shading). */
+function addSmoothQuad(prims, ctx, quad, colA, colB, alpha, zBias) {
+  const pr = projectAll(quad);
+  prims.push({ z: pr.depth + (zBias || 0), d: () => {
+    const a = pr.pts;
+    const mAx = (a[0].x + a[3].x) / 2, mAy = (a[0].y + a[3].y) / 2;
+    const mBx = (a[1].x + a[2].x) / 2, mBy = (a[1].y + a[2].y) / 2;
+    let style;
+    if (Math.abs(mAx - mBx) < 0.6 && Math.abs(mAy - mBy) < 0.6) {
+      style = `rgba(${colA[0]},${colA[1]},${colA[2]},${alpha})`;
+    } else {
+      const grd = ctx.createLinearGradient(mAx, mAy, mBx, mBy);
+      grd.addColorStop(0, `rgba(${colA[0]},${colA[1]},${colA[2]},${alpha})`);
+      grd.addColorStop(1, `rgba(${colB[0]},${colB[1]},${colB[2]},${alpha})`);
+      style = grd;
+    }
+    tracePts(ctx, a, true);
+    ctx.fillStyle = style;
+    ctx.fill();
+  } });
+}
+/* Soft contact shadow: a flattened radial blob on the ground pad. */
+function addGroundShadow(prims, ctx, cx, cz, rx, rz, alpha) {
+  const yS = -0.598;
+  const ring = [];
+  for (let a = 0; a <= 22; a += 1) { const t = (a / 22) * Math.PI * 2; ring.push([cx + Math.cos(t) * rx, yS, cz + Math.sin(t) * rz]); }
+  const pr = projectAll(ring);
+  const c = project(cx, yS, cz);
+  prims.push({ z: pr.depth + 0.06, d: () => {
+    const rad = Math.max(6, Math.hypot(pr.pts[0].x - c.x, pr.pts[0].y - c.y));
+    const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, rad);
+    g.addColorStop(0, `rgba(0,0,0,${alpha})`);
+    g.addColorStop(0.7, `rgba(0,0,0,${alpha * 0.5})`);
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    tracePts(ctx, pr.pts, true);
+    ctx.fill();
+  } });
+}
 function addFace(prims, ctx, pts3, rgb, shade, alpha, zBias) {
   const pr = projectAll(pts3);
   const r = clamp(Math.round(rgb[0] * shade), 0, 255);
@@ -853,7 +957,7 @@ function addBox(prims, ctx, c, dims, rgb, alpha) {
     [[A, B, F, E], [0, 0, -1]], [[D, C, G, H], [0, 0, 1]],
     [[A, D, H, E], [-1, 0, 0]], [[B, C, G, F], [1, 0, 0]]
   ];
-  for (let i = 0; i < faces.length; i += 1) addFace(prims, ctx, faces[i][0], rgb, faceShade(faces[i][1]), alpha);
+  for (let i = 0; i < faces.length; i += 1) addFaceN(prims, ctx, faces[i][0], rgb, faces[i][1], alpha, 0, true);
 }
 function addRevolution(prims, ctx, base, axis, nodes, sides, rgb, alpha, caps) {
   const bw = basisFor(axis), v = bw[0], w = bw[1];
@@ -876,18 +980,139 @@ function addRevolution(prims, ctx, base, axis, nodes, sides, rgb, alpha, caps) {
         [r0[k][0], r0[k][1], r0[k][2]], [r0[k2][0], r0[k2][1], r0[k2][2]],
         [r1[k2][0], r1[k2][1], r1[k2][2]], [r1[k][0], r1[k][1], r1[k][2]]
       ];
-      const n = v3norm([(r0[k][3] + r0[k2][3]) / 2, (r0[k][4] + r0[k2][4]) / 2, (r0[k][5] + r0[k2][5]) / 2]);
-      addFace(prims, ctx, quad, rgb, faceShade(n), alpha);
+      const colA = shadeRGB(rgb, v3norm([r0[k][3], r0[k][4], r0[k][5]]));
+      const colB = shadeRGB(rgb, v3norm([r0[k2][3], r0[k2][4], r0[k2][5]]));
+      addSmoothQuad(prims, ctx, quad, colA, colB, alpha);
     }
   }
   if (caps) {
     const first = rings[0], last = rings[rings.length - 1];
-    if (nodes[0].r > 0.001) addFace(prims, ctx, first.map((p) => [p[0], p[1], p[2]]), rgb, faceShade([-axis[0], -axis[1], -axis[2]]), alpha);
-    if (nodes[nodes.length - 1].r > 0.001) addFace(prims, ctx, last.map((p) => [p[0], p[1], p[2]]), rgb, faceShade(axis), alpha);
+    if (nodes[0].r > 0.001) addFaceN(prims, ctx, first.map((p) => [p[0], p[1], p[2]]), rgb, [-axis[0], -axis[1], -axis[2]], alpha, 0, false);
+    if (nodes[nodes.length - 1].r > 0.001) addFaceN(prims, ctx, last.map((p) => [p[0], p[1], p[2]]), rgb, axis, alpha, 0, false);
   }
 }
 function addCyl(prims, ctx, base, axis, len, r, sides, rgb, alpha, caps) {
   addRevolution(prims, ctx, base, axis, [{ d: 0, r }, { d: len, r }], sides, rgb, alpha, caps !== false);
+}
+
+/* ---- balance of plant: a small power station beside the reactor ---- */
+/* ---- toroidal-field coils: solid, shaded D-section magnets ---- */
+let D_PROFILE = null;
+function buildDProfile() {
+  // Closed D outline in local (u = radial offset from plasma centre, v = vertical):
+  // a straight inboard leg, rounded inboard corners, and a wide rounded outboard bulge.
+  const uIn = -0.42, uOut = 0.52, H = 0.60, rc = 0.15, cIn = uIn + rc;
+  const legN = 6, filN = 4, arcN = 18, ax = uOut - cIn, ay = H;
+  const pts = [];
+  for (let i = 0; i <= legN; i += 1) pts.push([uIn, (H - rc) - 2 * (H - rc) * (i / legN)]);
+  for (let i = 1; i <= filN; i += 1) { const a = Math.PI + (Math.PI / 2) * (i / filN); pts.push([cIn + rc * Math.cos(a), -(H - rc) + rc * Math.sin(a)]); }
+  for (let i = 1; i < arcN; i += 1) { const a = -Math.PI / 2 + Math.PI * (i / arcN); pts.push([cIn + ax * Math.cos(a), ay * Math.sin(a)]); }
+  for (let i = 1; i < filN; i += 1) { const a = (Math.PI / 2) + (Math.PI / 2) * (i / filN); pts.push([cIn + rc * Math.cos(a), (H - rc) + rc * Math.sin(a)]); }
+  return pts;
+}
+/* Metallic coil shading: cool ambient + warm key + fresnel rim + Blinn-Phong
+   specular sheen, plus an optional emissive term for the energised winding. */
+function shadeCoil(rgb, n, emissive) {
+  const ndl = Math.max(0, n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2]);
+  let r = rgb[0] * (0.30 + ndl * 0.78);
+  let g = rgb[1] * (0.33 + ndl * 0.74);
+  let b = rgb[2] * (0.40 + ndl * 0.70);
+  const vd = clamp(Math.abs(n[0] * VIEW_DIR[0] + n[1] * VIEW_DIR[1] + n[2] * VIEW_DIR[2]), 0, 1);
+  const rim = Math.pow(1 - vd, 3) * 0.30;
+  r += 58 * rim; g += 72 * rim; b += 104 * rim;
+  const hx = LIGHT[0] + VIEW_DIR[0], hy = LIGHT[1] + VIEW_DIR[1], hz = LIGHT[2] + VIEW_DIR[2];
+  const hl = Math.hypot(hx, hy, hz) || 1;
+  const ndh = Math.max(0, (n[0] * hx + n[1] * hy + n[2] * hz) / hl);
+  const spec = Math.pow(ndh, 30) * 74;
+  r += spec; g += spec; b += spec * 1.05;
+  if (emissive > 0) { r += 50 * emissive; g += 42 * emissive; b += 98 * emissive; }
+  return [clamp(Math.round(r), 0, 255), clamp(Math.round(g), 0, 255), clamp(Math.round(b), 0, 255)];
+}
+function addFaceCoil(prims, ctx, pts, normal, rgb, emissive) {
+  if (v3dot(normal, VIEW_DIR) < -0.05) return;          // cull back faces (opaque solid)
+  const col = shadeCoil(rgb, v3norm(normal), emissive || 0);
+  const pr = projectAll(pts);
+  prims.push({ z: pr.depth, d: () => {
+    tracePts(ctx, pr.pts, true);
+    ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},1)`;
+    ctx.fill();
+  } });
+}
+function addDCoils(prims, ctx, bNorm) {
+  const prof = D_PROFILE || (D_PROFILE = buildDProfile());
+  const M = prof.length;
+  const NC = 14, wP = 0.036, wT = 0.036;                // thinner, less intrusive
+  const emis = clamp((bNorm - 0.18) / 0.82, 0, 1);      // brighter / more energised at high field
+  const caseRgb = [120, 120, 144];                      // brushed-steel coil case
+  const windRgb = [136, 128, 206];                      // superconducting winding pack (inner face)
+  for (let ci = 0; ci < NC; ci += 1) {
+    const th = (ci / NC) * Math.PI * 2;
+    const cth = Math.cos(th), sth = Math.sin(th);
+    const et = [-sth, 0, cth];                           // toroidal (out-of-plane) unit
+    const rings = new Array(M);
+    for (let i = 0; i < M; i += 1) {
+      const a = prof[i], pv = prof[(i - 1 + M) % M], nx = prof[(i + 1) % M];
+      let nu = -(nx[1] - pv[1]), nv = (nx[0] - pv[0]);
+      const ln = Math.hypot(nu, nv) || 1; nu /= ln; nv /= ln;     // in-plane normal (radial, vertical)
+      const u = a[0], v = a[1];
+      const Px = (R + u) * cth, Py = v, Pz = (R + u) * sth;
+      const npx = nu * cth, npy = nv, npz = nu * sth;             // world in-plane normal
+      rings[i] = {
+        c0: [Px + wP * npx + wT * et[0], Py + wP * npy, Pz + wP * npz + wT * et[2]],
+        c1: [Px + wP * npx - wT * et[0], Py + wP * npy, Pz + wP * npz - wT * et[2]],
+        c2: [Px - wP * npx + wT * et[0], Py - wP * npy, Pz - wP * npz + wT * et[2]],
+        c3: [Px - wP * npx - wT * et[0], Py - wP * npy, Pz - wP * npz - wT * et[2]],
+        np: [npx, npy, npz]
+      };
+    }
+    const netor = [-et[0], 0, -et[2]];
+    for (let i = 0; i < M; i += 1) {
+      const r0 = rings[i], r1 = rings[(i + 1) % M];
+      const band = (i % 4 === 0) ? 0.82 : 1.0;                                                   // casing-segment ribs
+      const cs = [caseRgb[0] * band, caseRgb[1] * band, caseRgb[2] * band];
+      addFaceCoil(prims, ctx, [r0.c0, r0.c1, r1.c1, r1.c0], r0.np, windRgb, emis * 0.5 + 0.04);   // inner winding (faces plasma)
+      addFaceCoil(prims, ctx, [r0.c3, r0.c2, r1.c2, r1.c3], [-r0.np[0], -r0.np[1], -r0.np[2]], cs, emis * 0.1); // outer case
+      addFaceCoil(prims, ctx, [r0.c2, r0.c0, r1.c0, r1.c2], et, cs, emis * 0.1);                   // +toroidal side
+      addFaceCoil(prims, ctx, [r0.c1, r0.c3, r1.c3, r1.c1], netor, cs, emis * 0.1);                // -toroidal side
+    }
+  }
+}
+
+/* ---- outer poloidal-field coils: solid ring magnets that position + shape the plasma ----
+   The classic stacked set: small rings top and bottom, larger rings hugging the
+   outboard midplane, all sitting outside the toroidal-field cage. */
+function addPFCoils(prims, ctx, bNorm) {
+  const coils = [
+    { h: 0.86, rho: 0.74, tr: 0.05 },   // upper shaping coil
+    { h: -0.86, rho: 0.74, tr: 0.05 }   // lower shaping coil
+  ];
+  const Nmaj = 34, Nmin = 8;                             // higher-poly = smoother rings
+  const caseRgb = [106, 126, 164];                       // blue-steel, distinct from the violet TF coils
+  const emis = 0.04 + 0.14 * clamp((bNorm - 0.18) / 0.82, 0, 1);
+  for (const co of coils) {
+    const rings = new Array(Nmaj + 1);
+    for (let j = 0; j <= Nmaj; j += 1) {
+      const phi = ((j % Nmaj) / Nmaj) * Math.PI * 2;
+      const cphi = Math.cos(phi), sphi = Math.sin(phi);
+      const cx = co.rho * cphi, cy = co.h, cz = co.rho * sphi;
+      const ring = new Array(Nmin);
+      for (let k = 0; k < Nmin; k += 1) {
+        const a = (k / Nmin) * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+        const nx = ca * cphi, ny = sa, nz = ca * sphi;   // outward normal of the tube surface
+        ring[k] = { p: [cx + co.tr * nx, cy + co.tr * ny, cz + co.tr * nz], n: [nx, ny, nz] };
+      }
+      rings[j] = ring;
+    }
+    for (let j = 0; j < Nmaj; j += 1) {
+      const r0 = rings[j], r1 = rings[j + 1];
+      for (let k = 0; k < Nmin; k += 1) {
+        const k2 = (k + 1) % Nmin;
+        const quad = [r0[k].p, r0[k2].p, r1[k2].p, r1[k].p];
+        const nrm = [(r0[k].n[0] + r0[k2].n[0]) / 2, (r0[k].n[1] + r0[k2].n[1]) / 2, (r0[k].n[2] + r0[k2].n[2]) / 2];
+        addFaceCoil(prims, ctx, quad, nrm, caseRgb, emis);
+      }
+    }
+  }
 }
 
 /* ---- balance of plant: a small power station beside the reactor ---- */
@@ -897,10 +1122,17 @@ function addBOP(prims, ctx, time, intensity) {
   const yG = -0.6;
 
   // ground pad
-  addBox(prims, ctx, [2.9, yG - 0.04, 0.05], [2.4, 0.08, 1.9], [24, 28, 38], 0.95);
+  addBox(prims, ctx, [2.6, yG - 0.04, 0.05], [2.4, 0.08, 1.9], [24, 28, 38], 0.95);
+
+  // soft contact shadows that ground each solid on the pad
+  addGroundShadow(prims, ctx, 1.7, 0.55, 0.27, 0.17, 0.50);   // steam generator
+  addGroundShadow(prims, ctx, 2.48, 0.18, 0.52, 0.2, 0.42);   // turbine + generator
+  addGroundShadow(prims, ctx, 2.42, -0.32, 0.3, 0.2, 0.34);   // condenser
+  addGroundShadow(prims, ctx, 3.32, -0.5, 0.34, 0.26, 0.52);  // cooling tower
+  addGroundShadow(prims, ctx, 3.82, 0.5, 0.13, 0.13, 0.4);    // pylon
 
   // steam generator: vertical drum + tapered dome, with a hot band near the base
-  const sgBase = [2.0, yG, 0.55], sgLen = 0.6, sgR = 0.15;
+  const sgBase = [1.7, yG, 0.55], sgLen = 0.6, sgR = 0.15;
   addCyl(prims, ctx, sgBase, [0, 1, 0], sgLen, sgR, 16, [126, 138, 156], 1, true);
   addRevolution(prims, ctx, [sgBase[0], sgBase[1] + sgLen, sgBase[2]], [0, 1, 0],
     [{ d: 0, r: sgR }, { d: 0.12, r: sgR * 0.5 }, { d: 0.18, r: 0.02 }], 16, [150, 160, 176], 1, false);
@@ -909,25 +1141,25 @@ function addBOP(prims, ctx, time, intensity) {
   const sgTop = [sgBase[0], sgBase[1] + sgLen + 0.18, sgBase[2]];
 
   // turbine + coupled generator (horizontal cylinders along X)
-  const turbBase = [2.5, -0.4, 0.18];
+  const turbBase = [2.2, -0.4, 0.18];
   addCyl(prims, ctx, turbBase, [1, 0, 0], 0.44, 0.12, 14, [120, 132, 150], 1, true);
-  const genBase = [2.98, -0.4, 0.18];
+  const genBase = [2.68, -0.4, 0.18];
   const genRgb = net > 0 ? [92, 152, 112] : [110, 118, 138];
   addCyl(prims, ctx, genBase, [1, 0, 0], 0.34, 0.10, 14, genRgb, 1, true);
 
   // condenser (horizontal cylinder along Z, lower/behind)
-  const condBase = [2.72, -0.52, -0.32];
+  const condBase = [2.42, -0.52, -0.32];
   addCyl(prims, ctx, condBase, [0, 0, 1], 0.44, 0.11, 14, [58, 104, 130], 1, true);
 
   // cooling tower (hyperboloid surface of revolution)
-  const towerBase = [3.62, yG, -0.5];
+  const towerBase = [3.32, yG, -0.5];
   addRevolution(prims, ctx, towerBase, [0, 1, 0],
     [{ d: 0, r: 0.26 }, { d: 0.18, r: 0.2 }, { d: 0.42, r: 0.16 }, { d: 0.62, r: 0.18 }, { d: 0.74, r: 0.21 }], 18,
     [148, 154, 166], 0.96, false);
 
   // transmission pylon (mast + crossarm)
-  addBox(prims, ctx, [4.12, yG + 0.26, 0.5], [0.045, 0.52, 0.045], [150, 158, 172], 1);
-  addBox(prims, ctx, [4.12, yG + 0.44, 0.5], [0.36, 0.045, 0.045], [150, 158, 172], 1);
+  addBox(prims, ctx, [3.82, yG + 0.26, 0.5], [0.045, 0.52, 0.045], [150, 158, 172], 1);
+  addBox(prims, ctx, [3.82, yG + 0.44, 0.5], [0.36, 0.045, 0.045], [150, 158, 172], 1);
 
   // turbine spin fan (billboard at the near end)
   const fan = project(turbBase[0], turbBase[1], turbBase[2]);
@@ -966,7 +1198,7 @@ function addBOP(prims, ctx, time, intensity) {
   const pSgMid = project(sgBase[0] + sgR, sgBase[1] + 0.22, sgBase[2]);
   const pTowerIn = project(towerBase[0], towerBase[1] + 0.12, towerBase[2]);
   const pGen = project(genBase[0] + 0.34, genBase[1], genBase[2]);
-  const pGrid = project(4.12, yG + 0.42, 0.5);
+  const pGrid = project(3.82, yG + 0.42, 0.5);
 
   const pipe = (p0, p1, color, speed, lw) => {
     prims.push({ z: (p0.depth + p1.depth) / 2 - 0.02, d: () => {
@@ -997,9 +1229,9 @@ function addBOP(prims, ctx, time, intensity) {
 
   // label
   prims.push({ z: pSgTop.depth - 0.01, d: () => {
-    ctx.save(); ctx.fillStyle = "rgba(238,242,248,0.6)";
-    ctx.font = `700 ${Math.max(8, 10 * pSgTop.s * 0.02)}px Inter, system-ui, sans-serif`;
-    ctx.textAlign = "center"; ctx.fillText("STEAM GENERATOR", pSgTop.x, pSgTop.y - 12); ctx.textAlign = "left";
+    ctx.save(); ctx.fillStyle = "rgba(214,224,240,0.32)";
+    ctx.font = `700 ${Math.max(8, Math.min(13, 10 * pSgTop.s * 0.02))}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = "center"; ctx.fillText("STEAM GENERATOR", pSgTop.x, pSgTop.y - 10); ctx.textAlign = "left";
     ctx.restore();
   } });
 }
@@ -1012,6 +1244,25 @@ function drawAtmosphere(ctx, w, h, intensity) {
   g.addColorStop(0.6, "rgba(10,14,20,0.0)");
   g.addColorStop(1, "rgba(6,8,12,0.35)");
   ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  ctx.restore();
+}
+
+/* ---- cheap additive bloom: blur a downscaled copy of the frame back over itself ---- */
+let glowCanvas = null, glowCtx = null;
+function applyBloom(ctx, w, h, amount) {
+  if (reduceMotion && amount < 0.2) return;
+  const gw = Math.max(1, Math.floor(w * 0.34)), gh = Math.max(1, Math.floor(h * 0.34));
+  if (!glowCanvas) { glowCanvas = document.createElement("canvas"); glowCtx = glowCanvas.getContext("2d"); }
+  if (glowCanvas.width !== gw || glowCanvas.height !== gh) { glowCanvas.width = gw; glowCanvas.height = gh; }
+  glowCtx.clearRect(0, 0, gw, gh);
+  glowCtx.drawImage(reactorCanvas, 0, 0, gw, gh);
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = clamp(amount, 0, 1);
+  ctx.filter = `blur(${Math.max(2, Math.round(Math.min(w, h) * 0.013))}px)`;
+  ctx.drawImage(glowCanvas, 0, 0, w, h);
+  ctx.filter = "none";
+  ctx.globalAlpha = 1;
   ctx.restore();
 }
 
@@ -1044,9 +1295,6 @@ function drawTitle(ctx, w, h) {
   ctx.fillStyle = "rgba(238,242,248,0.5)";
   ctx.font = "700 11px Inter, system-ui, sans-serif";
   ctx.fillText("MAGNETIC CONFINEMENT VESSEL", Math.max(16, w * 0.05), Math.max(24, h * 0.06));
-  ctx.fillStyle = "rgba(154,164,184,0.42)";
-  ctx.font = "600 9.5px Inter, system-ui, sans-serif";
-  ctx.fillText("DRAG ORBIT · SCROLL ZOOM · SHIFT-DRAG PAN · DBL-CLICK RESET", Math.max(16, w * 0.05), Math.max(40, h * 0.06) + 16);
   ctx.restore();
 }
 
@@ -1073,19 +1321,95 @@ const HOTSPOT_ANCHORS = {
 };
 function positionHotspots() {
   const rect = reactorCanvas.getBoundingClientRect();
+  // 1) project each label to its target pixel position
+  const items = [];
   hotspots.forEach((b) => {
     const fn = HOTSPOT_ANCHORS[b.dataset.topic];
     if (!fn) return;
     const wpt = fn();
     const p = project(wpt[0], wpt[1], wpt[2]);
-    b.style.left = `${(p.x / rect.width) * 100}%`;
-    b.style.top = `${(p.y / rect.height) * 100}%`;
-    b.style.right = "auto";
-    b.style.bottom = "auto";
-    b.style.transform = "translate(-50%, -50%)";
-    b.style.opacity = `${clamp(0.4 + depthBright(p.depth) * 0.6, 0.4, 1)}`;
+    items.push({ b, x: p.x, y: p.y, depth: p.depth, w: (b.offsetWidth || 96) + 6, h: (b.offsetHeight || 30) + 4 });
+  });
+  // 2) relax overlapping labels apart along whichever axis needs the least movement
+  for (let iter = 0; iter < 5; iter += 1) {
+    for (let i = 0; i < items.length; i += 1) {
+      for (let j = i + 1; j < items.length; j += 1) {
+        const A = items[i], B = items[j];
+        const dx = B.x - A.x, dy = B.y - A.y;
+        const ox = (A.w + B.w) / 2 - Math.abs(dx);
+        const oy = (A.h + B.h) / 2 - Math.abs(dy);
+        if (ox > 0 && oy > 0) {
+          if (oy <= ox) { const pu = oy / 2 + 0.5, d = dy >= 0 ? 1 : -1; B.y += pu * d; A.y -= pu * d; }
+          else { const pu = ox / 2 + 0.5, d = dx >= 0 ? 1 : -1; B.x += pu * d; A.x -= pu * d; }
+        }
+      }
+    }
+  }
+  // 3) apply, clamped to the stage bounds
+  items.forEach((it) => {
+    const left = clamp(it.x, it.w / 2, rect.width - it.w / 2);
+    const top = clamp(it.y, it.h / 2, rect.height - it.h / 2);
+    it.b.style.left = `${(left / rect.width) * 100}%`;
+    it.b.style.top = `${(top / rect.height) * 100}%`;
+    it.b.style.right = "auto";
+    it.b.style.bottom = "auto";
+    it.b.style.transform = "translate(-50%, -50%)";
+    it.b.style.opacity = `${clamp(0.4 + depthBright(it.depth) * 0.6, 0.4, 1)}`;
   });
 }
+
+/* ---------- Orientation gizmo (axis triad in a cube, top-right of the stage) ---------- */
+let gizmoCanvas = null, gizmoCtx = null, gizmoReady = false;
+function initGizmo() {
+  gizmoCanvas = document.getElementById("gizmoCanvas");
+  if (!gizmoCanvas) return;
+  gizmoCtx = gizmoCanvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  gizmoCanvas.width = 84 * dpr; gizmoCanvas.height = 84 * dpr;
+  gizmoCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  gizmoReady = true;
+}
+function drawGizmo() {
+  if (!gizmoReady) return;
+  const g = gizmoCtx, S = 84, cx = S / 2, cy = S / 2, L = 24;
+  g.clearRect(0, 0, S, S);
+  const proj = (x, y, z) => {
+    const cyaw = Math.cos(cam.yaw), syaw = Math.sin(cam.yaw);
+    const x1 = x * cyaw - z * syaw, z1 = x * syaw + z * cyaw;
+    const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+    const y2 = y * cp - z1 * sp, z2 = y * sp + z1 * cp;
+    return { x: cx + x1 * L, y: cy - y2 * L, z: z2 };
+  };
+  // faint cube cage
+  const s = 0.62;
+  const corners = [[-s, -s, -s], [s, -s, -s], [s, -s, s], [-s, -s, s], [-s, s, -s], [s, s, -s], [s, s, s], [-s, s, s]].map((p) => proj(p[0], p[1], p[2]));
+  const edges = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]];
+  g.lineWidth = 1; g.strokeStyle = "rgba(120,132,156,0.26)";
+  g.beginPath();
+  edges.forEach((e) => { g.moveTo(corners[e[0]].x, corners[e[0]].y); g.lineTo(corners[e[1]].x, corners[e[1]].y); });
+  g.stroke();
+  // axis triad, depth-sorted so the near axis sits on top
+  const o = proj(0, 0, 0);
+  const axes = [
+    { v: [1.05, 0, 0], col: [255, 122, 102], lab: "X" },
+    { v: [0, 1.05, 0], col: [126, 231, 135], lab: "Y" },
+    { v: [0, 0, 1.05], col: [92, 200, 255], lab: "Z" }
+  ].map((a) => ({ ...a, p: proj(a.v[0], a.v[1], a.v[2]) }));
+  axes.sort((a, b) => b.p.z - a.p.z);
+  axes.forEach((a) => {
+    const near = clamp(0.6 - a.p.z * 0.5, 0.35, 1);
+    g.strokeStyle = `rgba(${a.col[0]},${a.col[1]},${a.col[2]},${near})`;
+    g.lineWidth = 2;
+    g.beginPath(); g.moveTo(o.x, o.y); g.lineTo(a.p.x, a.p.y); g.stroke();
+    g.fillStyle = `rgba(${a.col[0]},${a.col[1]},${a.col[2]},${near})`;
+    g.beginPath(); g.arc(a.p.x, a.p.y, 3, 0, Math.PI * 2); g.fill();
+    g.fillStyle = `rgba(238,242,248,${near})`;
+    g.font = "700 8px Inter, system-ui, sans-serif";
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText(a.lab, a.p.x, a.p.y - 6.5);
+  });
+}
+
 /* ---------- Lawson operating-point map ---------- */
 function drawLawson() {
   const rect = resizeCanvas(lawsonCanvas, lawsonCtx);
@@ -1256,14 +1580,192 @@ function drawHistory() {
   plot(netHistory, "#38e1c6", true);
 }
 
+/* ---------- D-T reactivity vs temperature ---------- */
+/* Relative reaction-rate shape: rises ~T^2, rolls over past ~65 keV. */
+function reactivityShape(T) { return (T * T) / (1 + Math.pow(T / 60, 3.3)); }
+
+function drawReactivity() {
+  if (!reactivityCtx) return;
+  const rect = resizeCanvas(reactivityCanvas, reactivityCtx);
+  const w = rect.width, h = rect.height, ctx = reactivityCtx;
+  const padL = 30, padR = 14, padT = 14, padB = 30;
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+  const tMin = 1, tMax = 100;
+  let peakT = 1, maxR = 0;
+  for (let T = tMin; T <= tMax; T += 0.5) { const r = reactivityShape(T); if (r > maxR) { maxR = r; peakT = T; } }
+  const xOf = (T) => padL + ((T - tMin) / (tMax - tMin)) * plotW;
+  const yOf = (r) => padT + (1 - r / maxR) * plotH;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "rgba(8,10,14,0.6)"; ctx.fillRect(padL, padT, plotW, plotH);
+
+  // practical operating window (8-25 keV)
+  ctx.fillStyle = "rgba(56,225,198,0.09)";
+  ctx.fillRect(xOf(8), padT, xOf(25) - xOf(8), plotH);
+  ctx.fillStyle = "rgba(56,225,198,0.65)"; ctx.font = "9px Inter, system-ui, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ctx.fillText("practical window", (xOf(8) + xOf(25)) / 2, padT + 4);
+
+  // grid + x labels
+  ctx.strokeStyle = "rgba(120,132,156,0.16)"; ctx.lineWidth = 1;
+  ctx.fillStyle = "rgba(154,164,184,0.8)";
+  for (let T = 20; T <= 100; T += 20) {
+    const x = xOf(T);
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, h - padB); ctx.stroke();
+    ctx.fillText(`${T}`, x, h - padB + 5);
+  }
+  ctx.fillStyle = "rgba(154,164,184,0.7)";
+  ctx.fillText("Ion temperature (keV)", padL + plotW / 2, h - 12);
+
+  // curve + fill
+  ctx.beginPath();
+  for (let T = tMin; T <= tMax; T += 0.5) { const x = xOf(T), y = yOf(reactivityShape(T)); if (T === tMin) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+  ctx.strokeStyle = "rgba(255,194,75,0.95)"; ctx.lineWidth = 2.2; ctx.stroke();
+  ctx.lineTo(xOf(tMax), h - padB); ctx.lineTo(xOf(tMin), h - padB); ctx.closePath();
+  ctx.fillStyle = "rgba(255,194,75,0.08)"; ctx.fill();
+
+  // peak label
+  const pkx = xOf(peakT), pky = yOf(maxR);
+  ctx.fillStyle = "rgba(255,194,75,0.9)"; ctx.font = "700 9px Inter, system-ui, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+  ctx.fillText(`peak ≈ ${Math.round(peakT)} keV`, pkx, pky - 4);
+  ctx.beginPath(); ctx.arc(pkx, pky, 2.5, 0, Math.PI * 2); ctx.fill();
+
+  // live operating temperature
+  const T0 = model.temperature || 11;
+  const cx = xOf(clamp(T0, tMin, tMax)), cy = yOf(reactivityShape(T0));
+  ctx.strokeStyle = "rgba(56,225,198,0.5)"; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(cx, padT); ctx.lineTo(cx, h - padB); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = "#38e1c6"; ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = "#eef2f8"; ctx.font = "700 10px Inter, system-ui, sans-serif";
+  ctx.textAlign = cx > w * 0.7 ? "right" : "left"; ctx.textBaseline = "middle";
+  ctx.fillText(`${T0.toFixed(1)} keV`, cx + (cx > w * 0.7 ? -10 : 10), cy - 12);
+}
+
+/* ---------- Energy-flow Sankey ---------- */
+function drawSankey() {
+  if (!sankeyCtx) return;
+  const rect = resizeCanvas(sankeyCanvas, sankeyCtx);
+  const w = rect.width, h = rect.height, ctx = sankeyCtx;
+  ctx.clearRect(0, 0, w, h);
+  const heat = Math.max(0, model.pExt || 0);
+  const fus = Math.max(0, model.fusionPower || 0);
+  const thermal = Math.max(0, model.thermalPower || 0);
+  const gross = Math.max(0, model.grossElec || 0);
+  const recirc = Math.max(0, model.recirc || 0);
+  const net = model.netElec || 0;
+  const inTot = heat + fus;
+  const maxP = Math.max(inTot, thermal, 300);
+  const sc = (h * 0.28) / maxP;
+  const wOf = (p) => Math.max(2.5, p * sc);
+  const midY = h * 0.42;
+  const xIn = w * 0.11, xTh = w * 0.40, xEl = w * 0.66, xOut = w * 0.90;
+
+  const ribbon = (x0, y0, x1, y1, wp, col) => {
+    const mx = (x0 + x1) / 2;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0 - wp / 2);
+    ctx.bezierCurveTo(mx, y0 - wp / 2, mx, y1 - wp / 2, x1, y1 - wp / 2);
+    ctx.lineTo(x1, y1 + wp / 2);
+    ctx.bezierCurveTo(mx, y1 + wp / 2, mx, y0 + wp / 2, x0, y0 + wp / 2);
+    ctx.closePath(); ctx.fillStyle = col; ctx.fill();
+  };
+
+  ribbon(xIn, midY, xTh, midY, wOf(thermal), "rgba(255,150,90,0.30)");
+  ribbon(xTh, midY, xEl, midY, wOf(gross), "rgba(56,225,198,0.36)");
+  ribbon(xTh, midY, xEl, h * 0.86, wOf(Math.max(0, thermal - gross)), "rgba(110,122,146,0.20)");
+  ribbon(xEl, midY, xOut, h * 0.18, wOf(Math.max(0, net)), net >= 0 ? "rgba(126,231,135,0.5)" : "rgba(120,132,156,0.12)");
+  ribbon(xEl, midY, xOut, h * 0.82, wOf(recirc), "rgba(168,150,255,0.34)");
+
+  ctx.textBaseline = "alphabetic";
+  const node = (x, y, name, val, nameCol, valCol) => {
+    ctx.fillStyle = nameCol; ctx.font = "700 10px Inter, system-ui, sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(name, x, y - 8);
+    ctx.fillStyle = valCol; ctx.font = "800 11px Inter, system-ui, sans-serif";
+    ctx.fillText(val, x, y + 6);
+  };
+  node(xIn, midY, "Power in", `${Math.round(inTot)} MW`, "rgba(238,242,248,0.92)", "#ffc24b");
+  ctx.fillStyle = "rgba(154,164,184,0.8)"; ctx.font = "8.5px Inter, system-ui, sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(`heat ${Math.round(heat)} + fusion ${Math.round(fus)}`, xIn, midY + 22);
+  node(xTh, midY, "Thermal", `${Math.round(thermal)} MW`, "rgba(238,242,248,0.92)", "#ff9a5a");
+  node(xEl, midY, "Gross elec", `${Math.round(gross)} MW`, "rgba(238,242,248,0.92)", "#38e1c6");
+  node(xOut, h * 0.18, "Net to grid", `${Math.round(net)} MW`, "rgba(238,242,248,0.92)", net >= 0 ? "#7ee787" : "#ff5d5d");
+  node(xOut, h * 0.82, "Recirculating", `${Math.round(recirc)} MW`, "rgba(168,150,255,0.95)", "rgba(214,224,240,0.85)");
+  ctx.fillStyle = "rgba(150,160,180,0.75)"; ctx.font = "8.5px Inter, system-ui, sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("rejected heat", (xTh + xEl) / 2, h * 0.86 + 14);
+}
+
+/* ---------- D-T fuel-cycle animation ---------- */
+function drawFuelCycle(time) {
+  if (!fuelCycleCtx) return;
+  const rect = resizeCanvas(fuelCycleCanvas, fuelCycleCtx);
+  const w = rect.width, h = rect.height, ctx = fuelCycleCtx;
+  ctx.clearRect(0, 0, w, h);
+  const cy = h * 0.46;
+  const xFuel = w * 0.16, xCore = w * 0.46, xBlanket = w * 0.82;
+  const period = 2600 / (0.6 + clamp((model.fusionPower || 0) / 800, 0, 1.4));
+  const ph = (time % period) / period;
+
+  // lithium blanket block
+  ctx.fillStyle = "rgba(52,78,92,0.5)"; roundedRect(ctx, xBlanket - 28, cy - 42, 56, 84, 8); ctx.fill();
+  ctx.strokeStyle = "rgba(120,200,220,0.4)"; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = "rgba(214,224,240,0.85)"; ctx.font = "700 10px Inter, system-ui, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("Li blanket", xBlanket, cy - 50);
+
+  const nucleus = (x, y, r, col, label) => {
+    const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, 1, x, y, r);
+    g.addColorStop(0, "rgba(255,255,255,0.9)"); g.addColorStop(0.45, col); g.addColorStop(1, "rgba(0,0,0,0.25)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    if (label) { ctx.fillStyle = "#0b0d12"; ctx.font = "800 10px Inter, system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(label, x, y); ctx.textBaseline = "alphabetic"; }
+  };
+
+  if (ph < 0.4) {
+    const t = ph / 0.4;
+    nucleus(lerp(xFuel, xCore - 14, t), cy, 13, "#5cc8ff", "D");
+    nucleus(lerp(xFuel, xCore + 14, t), cy, 13, "#ff7a66", "T");
+  } else if (ph < 0.55) {
+    const t = (ph - 0.4) / 0.15;
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    const fr = 18 + t * 34;
+    const g = ctx.createRadialGradient(xCore, cy, 0, xCore, cy, fr);
+    g.addColorStop(0, `rgba(255,240,180,${0.9 * (1 - t)})`); g.addColorStop(1, "rgba(255,180,80,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(xCore, cy, fr, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  } else {
+    const t = (ph - 0.55) / 0.45;
+    nucleus(xCore - 8, cy + lerp(0, -20, t), 12, "#ffc24b", "⁴He");
+    const nx = lerp(xCore + 10, xBlanket - 30, clamp(t * 1.4, 0, 1));
+    nucleus(nx, cy, 7, "#e6ecf5", "n");
+    if (t > 0.62) {
+      const u = (t - 0.62) / 0.38;
+      const bx = lerp(xBlanket - 8, xFuel, u), by = cy + Math.sin(u * Math.PI) * -42;
+      const tbrOk = (model.tritiumRatio || 1) >= 1;
+      nucleus(bx, by, 10, tbrOk ? "#7ee787" : "#ffb24b", "T");
+    }
+  }
+
+  // captions + equation
+  ctx.fillStyle = "rgba(154,164,184,0.9)"; ctx.font = "700 9px Inter, system-ui, sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("fuel: D + T", xFuel, cy + 32);
+  ctx.fillStyle = "rgba(214,224,240,0.88)"; ctx.font = "700 11px Inter, system-ui, sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("D + T → ⁴He (3.5 MeV) + n (14.1 MeV)", 14, h - 12);
+  const tbr = model.tritiumRatio || 1;
+  ctx.fillStyle = tbr >= 1 ? "#7ee787" : "#ffb24b"; ctx.font = "800 10px Inter, system-ui, sans-serif"; ctx.textAlign = "right";
+  ctx.fillText(`TBR ${tbr.toFixed(2)}`, w - 14, h - 12);
+}
+
 /* ---------- Animation + ticking ---------- */
 function animate(time) {
   const delta = time - lastFrame;
   lastFrame = time;
   if (delta > 0) {
     drawReactor(time);
+    drawGizmo();
     drawHistory();
     drawLawson();
+    drawReactivity();
+    drawSankey();
+    drawFuelCycle(time);
   }
   requestAnimationFrame(animate);
 }
@@ -1316,8 +1818,56 @@ window.addEventListener("resize", () => {
   resizeCanvas(lawsonCanvas, lawsonCtx);
 });
 
+/* ---------- Navigation HUD wiring ---------- */
+function initNavHud() {
+  initGizmo();
+  window.addEventListener("resize", initGizmo);
+
+  const legend = document.getElementById("navLegend");
+  const help = document.getElementById("navHelp");
+  const showLegend = (show) => {
+    if (legend) legend.classList.toggle("hide", !show);
+    if (help) help.hidden = show;
+  };
+  let legendDismissed = false;
+  const dismissLegend = () => { if (!legendDismissed) { legendDismissed = true; showLegend(false); } };
+  document.getElementById("legendClose")?.addEventListener("click", dismissLegend);
+  help?.addEventListener("click", () => { legendDismissed = false; showLegend(true); });
+  reactorCanvas.addEventListener("pointerdown", dismissLegend, { once: true });
+  reactorCanvas.addEventListener("wheel", dismissLegend, { once: true, passive: true });
+  setTimeout(dismissLegend, 7000);
+
+  // gizmo view snaps + active-state
+  const viewBtns = Array.from(document.querySelectorAll(".gizmo-btn"));
+  const setActiveView = (name) => viewBtns.forEach((b) => b.classList.toggle("active", b.dataset.view === name));
+  viewBtns.forEach((b) => b.addEventListener("click", () => { snapToView(b.dataset.view); setActiveView(b.dataset.view); dismissLegend(); }));
+  // clicking the cube cycles iso -> top -> front -> side
+  const order = ["iso", "top", "front", "side"];
+  let gz = 0;
+  gizmoCanvas?.addEventListener("click", () => { gz = (gz + 1) % order.length; snapToView(order[gz]); setActiveView(order[gz]); dismissLegend(); });
+  // any manual orbit clears the highlighted view
+  reactorCanvas.addEventListener("pointerdown", () => setActiveView(null));
+
+  // camera control cluster
+  const cluster = document.querySelector(".nav-cluster");
+  const spinBtn = cluster?.querySelector('[data-cam="spin"]');
+  const panBtn = cluster?.querySelector('[data-cam="pan"]');
+  cluster?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-cam]");
+    if (!btn) return;
+    const cmd = btn.dataset.cam;
+    if (cmd === "zoom-in") animateCameraTo({ yaw: cam.yaw, pitch: cam.pitch, dist: clamp(cam.dist - 0.5, 1.9, 6.4) }, 260);
+    else if (cmd === "zoom-out") animateCameraTo({ yaw: cam.yaw, pitch: cam.pitch, dist: clamp(cam.dist + 0.5, 1.9, 6.4) }, 260);
+    else if (cmd === "reset") { snapToView("iso"); setActiveView(null); }
+    else if (cmd === "spin") { autoSpin = !autoSpin; spinBtn.setAttribute("aria-pressed", String(autoSpin)); lastInteract = performance.now(); }
+    else if (cmd === "pan") { panSticky = !panSticky; panBtn.setAttribute("aria-pressed", String(panSticky)); reactorCanvas.style.cursor = panSticky ? "move" : "grab"; }
+    dismissLegend();
+  });
+}
+
 seedParticles();
 updateReadouts();
+initNavHud();
 setInterval(() => {
   model = calculateModel();
   tickHistory();
