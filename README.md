@@ -20,7 +20,9 @@ The model is simplified but physically motivated, aimed at undergraduate and STE
 
 ## The reactor visualization
 
-The central canvas shows a tilted top-down tokamak: a temperature-colored plasma torus, projected toroidal-field coils caging the donut, nested magnetic flux surfaces in the core, a central solenoid, an attached divertor at the bottom whose strike point sweeps when enabled, and a coolant loop routed to the turbine.
+The central canvas is a real, dependency-free software-rendered 3D tokamak (perspective camera, depth-sorted painter's pass, atmospheric depth fog). It shows a temperature-colored plasma torus with a hot burning core, toroidal-field coils that correctly weave through the plasma, poloidal-field coils, a central solenoid, vacuum-vessel ribs, helical magnetic field lines wound at a q ≈ 4 safety factor, streaming ions, neutrons firing out to the blanket, an attached divertor whose strike point sweeps when enabled, and a full balance of plant (steam generator, turbine, generator, condenser, and grid) linked by flowing coolant and steam loops.
+
+Drag to orbit, scroll to zoom, and double-click (or press R) to reset the view. It auto-rotates when idle. All of it responds live to the operating setpoints.
 
 ## Files
 

@@ -143,6 +143,7 @@ let fusionHistory = Array.from({ length: 120 }, () => 0);
 let trail = [];
 let particles = [];
 let sparks = [];
+let neutrons = [];
 let lastFrame = performance.now();
 let model = {};
 
@@ -403,476 +404,551 @@ function resizeCanvas(canvas, ctx) {
   return rect;
 }
 
+/* ===========================================================
+   REACTOR 3D ENGINE  (software-rendered, dependency-free)
+
+   A real 3D scene drawn on the 2D canvas. Every component is
+   defined by genuine 3D geometry in a right-handed world where
+   +Y is up and the plasma torus lies in the X-Z plane:
+
+     centerline(th)      = ( R cos th, 0, R sin th )
+     surface(th, ph)     = ( (R + r cos ph) cos th,
+                              r sin ph,
+                              (R + r cos ph) sin th )
+
+   A yaw/pitch camera rotates the world, a perspective divide
+   projects to the screen, and a painter's-algorithm pass sorts
+   every primitive by camera-space depth so occlusion is correct.
+   Drag to orbit, scroll to zoom; it auto-rotates when idle.
+   =========================================================== */
+
+/* World-space dimensions (plasma major radius R = 1). */
+const R = 1.0;
+const A_PLASMA = 0.32;   // plasma minor radius
+const A_COIL = 0.40;     // toroidal-field coil radius (cages the plasma)
+const A_VESSEL = 0.52;   // vacuum vessel / blanket shell radius
+const SOL_R = 0.17;      // central solenoid radius
+const SOL_H = 0.74;      // central solenoid half-height
+
+/* Camera + interaction state. */
+const cam = { yaw: -0.62, pitch: 0.60, dist: 3.15, focalK: 0.95 };
+let dragOn = false, dragX = 0, dragY = 0, lastInteract = -9999, prevTime = 0;
+let reduceMotion = false, inputBound = false;
+let velYaw = 0, velPitch = 0;
+const CAM_DEFAULT = { yaw: -0.62, pitch: 0.60, dist: 3.15 };
+function resetCamera() { cam.yaw = CAM_DEFAULT.yaw; cam.pitch = CAM_DEFAULT.pitch; cam.dist = CAM_DEFAULT.dist; velYaw = 0; velPitch = 0; lastInteract = performance.now(); }
+
+/* Balance-of-plant anchors (off to +X so the plant sits beside the reactor). */
+const BOP = {
+  sg: { x: 2.05, y: -0.12, z: 0.55 },   // steam generator
+  turb: { x: 2.72, y: -0.06, z: 0.18 }, // turbine
+  gen: { x: 3.18, y: -0.06, z: -0.12 }, // generator
+  cond: { x: 2.72, y: -0.66, z: 0.18 }, // condenser
+  grid: { x: 3.40, y: 0.52, z: -0.42 }  // grid / pylon
+};
+
+/* ---- small 3D helpers ---- */
+function hexToRgb(hex) {
+  const m = hex.replace("#", "");
+  return [parseInt(m.slice(0, 2), 16), parseInt(m.slice(2, 4), 16), parseInt(m.slice(4, 6), 16)];
+}
+
+function plasmaColor(t) {
+  const stops = [[120, 40, 95], [232, 92, 70], [255, 182, 112], [255, 236, 182], [182, 236, 255]];
+  const x = clamp(t, 0, 1) * (stops.length - 1);
+  const i = Math.min(stops.length - 2, Math.floor(x));
+  return mixColor(stops[i], stops[i + 1], x - i);
+}
+
+/* Projection context, rebuilt each frame for the current canvas size. */
+let PROJ = { cx: 0, cy: 0, focal: 1 };
+function project(x, y, z) {
+  const cy0 = Math.cos(cam.yaw), sy0 = Math.sin(cam.yaw);
+  const x1 = x * cy0 - z * sy0;
+  const z1 = x * sy0 + z * cy0;
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  const y2 = y * cp - z1 * sp;
+  const z2 = y * sp + z1 * cp;
+  let depth = z2 + cam.dist;
+  if (depth < 0.05) depth = 0.05;
+  const s = PROJ.focal / depth;
+  return { x: PROJ.cx + x1 * s, y: PROJ.cy - y2 * s, depth, s };
+}
+
+/* Nearer geometry (smaller depth) is brighter. */
+function depthBright(depth) {
+  return clamp(1 - (depth - (cam.dist - 1.5)) / 3.0, 0, 1);
+}
+
+/* A torus point: toroidal angle th, poloidal angle ph, minor radius r. */
+function torusPt(th, ph, r) {
+  const cph = Math.cos(ph), rr = R + r * cph;
+  return [rr * Math.cos(th), r * Math.sin(ph), rr * Math.sin(th)];
+}
+
+/* Project an array of [x,y,z] points; returns {pts, depth} with mean depth. */
+function projectAll(world) {
+  const pts = new Array(world.length);
+  let d = 0;
+  for (let i = 0; i < world.length; i += 1) {
+    const p = project(world[i][0], world[i][1], world[i][2]);
+    pts[i] = p; d += p.depth;
+  }
+  return { pts, depth: d / world.length };
+}
+
+function tracePts(ctx, pts, close) {
+  ctx.beginPath();
+  for (let i = 0; i < pts.length; i += 1) {
+    if (i === 0) ctx.moveTo(pts[i].x, pts[i].y);
+    else ctx.lineTo(pts[i].x, pts[i].y);
+  }
+  if (close) ctx.closePath();
+}
+
+/* ---- particles ---- */
 function seedParticles() {
-  particles = Array.from({ length: 150 }, (_, i) => ({
-    angle: (Math.PI * 2 * i) / 150,
-    lane: Math.random(),
-    speed: 0.45 + Math.random() * 1.8,
-    size: 1.1 + Math.random() * 2.2,
-    phase: Math.random() * Math.PI * 2
+  particles = Array.from({ length: 168 }, () => ({
+    th: Math.random() * Math.PI * 2,
+    ph: Math.random() * Math.PI * 2,
+    lane: 0.18 + Math.random() * 0.78,
+    sp: 0.5 + Math.random() * 1.7,
+    size: 0.010 + Math.random() * 0.018,
+    hot: Math.random() < 0.5
   }));
-  sparks = Array.from({ length: 46 }, () => ({
-    angle: Math.random() * Math.PI * 2,
+  sparks = [];
+  neutrons = Array.from({ length: 64 }, () => ({
+    th: Math.random() * Math.PI * 2,
+    ph: Math.random() * Math.PI * 2,
     life: Math.random(),
-    speed: 0.2 + Math.random() * 0.6
+    sp: 0.6 + Math.random() * 0.9
   }));
+  prevTime = 0;
+}
+
+/* ---- input (orbit + zoom) ---- */
+function bindInput() {
+  if (inputBound) return;
+  inputBound = true;
+  reduceMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  reactorCanvas.style.cursor = "grab";
+  reactorCanvas.style.touchAction = "none";
+
+  const down = (cx, cy) => { dragOn = true; dragX = cx; dragY = cy; lastInteract = performance.now(); reactorCanvas.style.cursor = "grabbing"; };
+  const move = (cx, cy) => {
+    if (!dragOn) return;
+    const dyaw = (cx - dragX) * 0.0095;
+    const dpitch = -(cy - dragY) * 0.0095;
+    cam.yaw += dyaw;
+    cam.pitch = clamp(cam.pitch + dpitch, 0.06, 1.46);
+    velYaw = dyaw; velPitch = dpitch;
+    dragX = cx; dragY = cy; lastInteract = performance.now();
+  };
+  const up = () => { dragOn = false; reactorCanvas.style.cursor = "grab"; };
+
+  reactorCanvas.addEventListener("mousedown", (e) => down(e.clientX, e.clientY));
+  window.addEventListener("mousemove", (e) => move(e.clientX, e.clientY));
+  window.addEventListener("mouseup", up);
+  reactorCanvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    cam.dist = clamp(cam.dist + e.deltaY * 0.0022, 1.9, 6.4);
+    lastInteract = performance.now();
+  }, { passive: false });
+  reactorCanvas.addEventListener("touchstart", (e) => { if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+  reactorCanvas.addEventListener("touchmove", (e) => { if (e.touches[0]) { move(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); } }, { passive: false });
+  window.addEventListener("touchend", up);
+  reactorCanvas.addEventListener("dblclick", () => resetCamera());
+  window.addEventListener("keydown", (e) => { if (e.key === "r" || e.key === "R") resetCamera(); });
+
+  // hotspots are repositioned every frame; keep their transitions off-position
+  hotspots.forEach((b) => { b.style.transitionProperty = "background-color, border-color, box-shadow, color, opacity"; });
 }
 
 /* ===========================================================
-   Reactor render
-   The torus is drawn in a tilted top-down projection. A point
-   on the plasma centerline at toroidal angle th is:
-     C(th) = (cx + Rx*cos th, cy + Ry*sin th),  Ry = Rx*tilt
-   A toroidal-field coil at th is a circle of minor radius `a`
-   lying in the plane of the vertical axis and the local radial
-   direction; projected, it traces an ellipse. Coils whose
-   center sits in the lower half (sin th > 0) are nearer the
-   viewer and are drawn in front of the plasma.
+   Main reactor render
    =========================================================== */
-function reactorGeometry(w, h) {
-  const cx = w * 0.46;
-  const cy = h * 0.42;
-  const size = Math.min(w, h);
-  const Rx = Math.min(w * 0.255, size * 0.32); // plasma centerline major radius
-  const tilt = 0.56;
-  const Ry = Rx * tilt;
-  const a = Rx * 0.34;        // tube minor radius
-  const zScale = a * 0.95;    // vertical projection of poloidal direction
-  const tx = w * 0.87;        // turbine, lower-right
-  const ty = h * 0.80;
-  const turbineR = size * 0.05;
-  const hxW = clamp(size * 0.075, 42, 66);   // steam-generator drum
-  const hxH = hxW * 1.7;
-  const hxX = w * 0.70;
-  const hxY = h * 0.78;
-  return { cx, cy, Rx, Ry, a, tilt, zScale, size, w, h, tx, ty, turbineR, hxX, hxY, hxW, hxH };
-}
-
 function drawReactor(time) {
   const rect = resizeCanvas(reactorCanvas, reactorCtx);
   const ctx = reactorCtx;
-  const w = rect.width;
-  const h = rect.height;
-  const g = reactorGeometry(w, h);
-  const intensity = clamp(model.fusionPower / 1250, 0.05, 1);
+  const w = rect.width, h = rect.height;
+  const size = Math.min(w, h);
+  bindInput();
+
+  let dt = time - prevTime;
+  prevTime = time;
+  if (!(dt > 0) || dt > 60) dt = 16;
+
+  if (!dragOn) {
+    cam.yaw += velYaw;
+    cam.pitch = clamp(cam.pitch + velPitch, 0.06, 1.46);
+    velYaw *= 0.90; velPitch *= 0.90;
+    if (Math.abs(velYaw) < 0.00006) velYaw = 0;
+    if (Math.abs(velPitch) < 0.00006) velPitch = 0;
+  }
+  if (!reduceMotion && !dragOn && velYaw === 0 && time - lastInteract > 3500) cam.yaw += dt * 0.00006;
+
+  PROJ.cx = w * 0.47;
+  PROJ.cy = h * 0.45;
+  PROJ.focal = size * cam.focalK;
+
+  const tNorm = clamp((model.temperature - 6) / 22, 0, 1);
+  const intensity = clamp(model.fusionPower / 1200, 0.05, 1);
+  const bNorm = clamp(model.magneticField / 8.8, 0.18, 1);
+  const pColor = plasmaColor(tNorm);
+  const stateRgb = hexToRgb(model.stateColor);
 
   ctx.clearRect(0, 0, w, h);
-  drawGrid(ctx, w, h, time);
-  drawCoolantPipe(ctx, g, time);
-  drawHeatExchanger(ctx, g, time, intensity);
-  drawTurbine(ctx, g, time);
-  drawCoils(ctx, g, time, false);   // back coils (behind plasma)
-  drawBlanket(ctx, g, intensity);
-  drawFluxSurfaces(ctx, g, time);
-  drawSolenoid(ctx, g, time, intensity);
-  drawPlasma(ctx, g, intensity, time);
-  drawParticles(ctx, g, intensity, time);
-  drawNeutrons(ctx, g, intensity, time);
-  drawDivertor(ctx, g, intensity, time);
-  drawCoils(ctx, g, time, true);    // front coils (over plasma)
-  drawLabels(ctx, w, h);
-}
+  drawAtmosphere(ctx, w, h, intensity);
+  drawCoreShaft(ctx, intensity, stateRgb);
 
-function drawGrid(ctx, w, h, time) {
-  ctx.save();
-  ctx.globalAlpha = 0.09;
-  ctx.strokeStyle = "#5e6878";
-  ctx.lineWidth = 1;
-  const offset = (time * 0.006) % 44;
-  for (let x = -44 + offset; x < w + 44; x += 44) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-  }
-  for (let y = -44; y < h + 44; y += 44) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-  }
-  ctx.restore();
-}
+  /* ---- assemble depth-sorted primitives ---- */
+  const prims = [];
 
-function drawCoils(ctx, g, time, front) {
-  const N = 18;
-  const strength = clamp(model.magneticField / 8.8, 0.25, 1);
-  ctx.save();
-  for (let i = 0; i < N; i += 1) {
-    const th = (i / N) * Math.PI * 2;
-    const isFront = Math.sin(th) > 0.0001;
-    if (isFront !== front) continue;
-    const Cx = g.cx + g.Rx * Math.cos(th);
-    const Cy = g.cy + g.Ry * Math.sin(th);
-    const ax = g.a * Math.cos(th);          // radial screen-x component
-    const ayIn = g.a * Math.sin(th) * g.tilt; // radial screen-y component
-    ctx.beginPath();
-    for (let p = 0; p <= 32; p += 1) {
-      const phi = (p / 32) * Math.PI * 2;
-      const x = Cx + ax * Math.cos(phi);
-      const y = Cy + ayIn * Math.cos(phi) - g.zScale * Math.sin(phi);
-      if (p === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  // central solenoid (rings up the axis)
+  for (let i = 0; i <= 9; i += 1) {
+    const yy = -SOL_H + (2 * SOL_H * i) / 9;
+    const ring = [];
+    for (let a = 0; a <= 28; a += 1) { const t = (a / 28) * Math.PI * 2; ring.push([SOL_R * Math.cos(t), yy, SOL_R * Math.sin(t)]); }
+    const pr = projectAll(ring);
+    prims.push({ z: pr.depth, d: () => { tracePts(ctx, pr.pts, true); ctx.strokeStyle = "rgba(170,182,210,0.30)"; ctx.lineWidth = 1; ctx.stroke(); } });
+  }
+
+  // vacuum vessel / blanket shell — ghostly amber cage of poloidal ribs
+  for (let ci = 0; ci < 26; ci += 1) {
+    const th = (ci / 26) * Math.PI * 2;
+    const loop = [];
+    for (let a = 0; a <= 30; a += 1) loop.push(torusPt(th, (a / 30) * Math.PI * 2, A_VESSEL));
+    const pr = projectAll(loop);
+    const b = depthBright(pr.depth);
+    prims.push({ z: pr.depth + 0.001, d: () => { tracePts(ctx, pr.pts, true); ctx.strokeStyle = `rgba(255,196,96,${(0.05 + 0.10 * b) * (0.6 + intensity * 0.5)})`; ctx.lineWidth = 1; ctx.stroke(); } });
+  }
+  // a couple of toroidal vessel hoops for read
+  [0.0, Math.PI].forEach((ph) => {
+    const hoop = [];
+    for (let a = 0; a <= 80; a += 1) hoop.push(torusPt((a / 80) * Math.PI * 2, ph, A_VESSEL));
+    for (let seg = 0; seg < 4; seg += 1) {
+      const slice = hoop.slice(seg * 20, seg * 20 + 21);
+      const pr = projectAll(slice);
+      prims.push({ z: pr.depth + 0.002, d: () => { tracePts(ctx, pr.pts, false); ctx.strokeStyle = `rgba(120,132,156,${0.05 + 0.10 * depthBright(pr.depth)})`; ctx.lineWidth = 1; ctx.stroke(); } });
     }
-    const alpha = (front ? 0.5 : 0.22) * (0.6 + strength * 0.5);
-    ctx.strokeStyle = `rgba(168, 150, 255, ${clamp(alpha, 0, 0.85)})`;
-    ctx.lineWidth = front ? 2.4 : 1.6;
-    if (front) { ctx.shadowColor = "rgba(168,150,255,0.6)"; ctx.shadowBlur = 6; }
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-  }
-  ctx.restore();
-}
+  });
 
-function drawBlanket(ctx, g, intensity) {
-  const oRx = g.Rx + g.a;
-  const oRy = g.Ry + g.a * g.tilt;
-  ctx.save();
-  // structural vessel ring
-  ctx.lineWidth = g.a * 0.85;
-  ctx.strokeStyle = "rgba(40, 46, 58, 0.9)";
-  ctx.beginPath();
-  ctx.ellipse(g.cx, g.cy, oRx * 1.16, oRy * 1.16, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  // breeding blanket (amber)
-  ctx.lineWidth = g.a * 0.5;
-  ctx.strokeStyle = `rgba(255, 194, 75, ${0.16 + intensity * 0.14})`;
-  ctx.beginPath();
-  ctx.ellipse(g.cx, g.cy, oRx * 1.08, oRy * 1.08, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-}
+  // poloidal field coils (horizontal rings) + central solenoid is separate
+  const pfRings = [[0.58, 1.24], [-0.58, 1.24], [0.92, 0.66], [-0.92, 0.66]];
+  pfRings.forEach(([hh, rho]) => {
+    const ring = [];
+    for (let a = 0; a <= 60; a += 1) { const t = (a / 60) * Math.PI * 2; ring.push([rho * Math.cos(t), hh, rho * Math.sin(t)]); }
+    const pr = projectAll(ring);
+    const b = depthBright(pr.depth);
+    prims.push({ z: pr.depth, d: () => { tracePts(ctx, pr.pts, true); ctx.strokeStyle = `rgba(120,170,255,${0.18 + 0.34 * b})`; ctx.lineWidth = 1.4 + b * 1.4; ctx.stroke(); } });
+  });
 
-function drawFluxSurfaces(ctx, g, time) {
-  // nested magnetic flux surfaces inside the torus hole
-  const holeRx = g.Rx - g.a;
-  const holeRy = g.Ry - g.a * g.tilt;
-  ctx.save();
-  ctx.strokeStyle = "rgba(92, 200, 255, 0.16)";
-  ctx.lineWidth = 1;
-  for (let i = 1; i <= 4; i += 1) {
-    const f = i / 5;
-    ctx.beginPath();
-    ctx.ellipse(g.cx, g.cy, holeRx * f, holeRy * f, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function drawSolenoid(ctx, g, time, intensity) {
-  // central solenoid stack running through the torus hole
-  const wd = g.a * 0.42;
-  const ht = g.Ry * 1.5;
-  ctx.save();
-  ctx.translate(g.cx, g.cy);
-  const grad = ctx.createLinearGradient(-wd, 0, wd, 0);
-  grad.addColorStop(0, "rgba(120,128,150,0.25)");
-  grad.addColorStop(0.5, "rgba(196,204,224,0.5)");
-  grad.addColorStop(1, "rgba(120,128,150,0.25)");
-  ctx.fillStyle = grad;
-  roundedRect(ctx, -wd, -ht, wd * 2, ht * 2, wd * 0.6);
-  ctx.fill();
-  // winding segments
-  ctx.strokeStyle = "rgba(20,24,32,0.55)";
-  ctx.lineWidth = 1;
-  const segs = 9;
-  for (let i = 1; i < segs; i += 1) {
-    const y = -ht + (2 * ht * i) / segs;
-    ctx.beginPath(); ctx.moveTo(-wd, y); ctx.lineTo(wd, y); ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function drawPlasma(ctx, g, intensity, time) {
-  const tNorm = clamp((model.temperature - 6) / 20, 0, 1);
-  const pulse = 0.5 + Math.sin(time * 0.003) * 0.5;
-  const edgeColor = [34, 120, 150];
-  const coreColor = mixColor([90, 235, 215], [255, 246, 220], tNorm * 0.85 + intensity * 0.15);
-
-  ctx.save();
-  // soft outer bloom (controlled, gradient based rather than heavy shadowBlur)
-  const bloom = ctx.createRadialGradient(g.cx, g.cy, g.Rx * 0.3, g.cx, g.cy, g.Rx + g.a * 2.4);
-  const sc = hexToRgb(model.stateColor);
-  bloom.addColorStop(0, `rgba(${sc[0]},${sc[1]},${sc[2]},${0.05 + intensity * 0.12})`);
-  bloom.addColorStop(0.55, `rgba(${sc[0]},${sc[1]},${sc[2]},${0.03 + intensity * 0.06})`);
-  bloom.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = bloom;
-  ctx.beginPath();
-  ctx.ellipse(g.cx, g.cy, g.Rx + g.a * 2.4, (g.Ry + g.a * 2.4) * 0.92, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // tube band: concentric ellipses across the minor radius, hot center to cool edge
-  ctx.globalCompositeOperation = "lighter";
-  const steps = 26;
-  for (let k = 0; k <= steps; k += 1) {
-    const off = (k / steps - 0.5) * 2;          // -1..1 across tube
-    const edgeIntensity = 1 - Math.abs(off);     // 1 at center, 0 at edges
-    const ringRx = g.Rx + off * g.a;
-    const ringRy = g.Ry + off * g.a * g.tilt;
-    const c = mixColor(edgeColor, coreColor, Math.pow(edgeIntensity, 0.8));
-    const alpha = (0.04 + intensity * 0.10) * (0.25 + edgeIntensity * 0.85);
-    ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
-    ctx.lineWidth = (2 * g.a) / steps + 2.2 + pulse * 1.5;
-    ctx.beginPath();
-    ctx.ellipse(g.cx, g.cy, ringRx, ringRy, 0, 0, Math.PI * 2);
-    ctx.stroke();
+  // toroidal field coils caging the plasma; each poloidal loop is split into
+  // arcs so segments sort independently and weave correctly through the torus
+  const NC = 16, CSEG = 8, CPTS = 40, CPER = CPTS / CSEG;
+  for (let ci = 0; ci < NC; ci += 1) {
+    const th = (ci / NC) * Math.PI * 2;
+    const loop = [];
+    for (let a = 0; a <= CPTS; a += 1) loop.push(torusPt(th, (a / CPTS) * Math.PI * 2, A_COIL));
+    for (let s = 0; s < CSEG; s += 1) {
+      const slice = loop.slice(s * CPER, s * CPER + CPER + 1);
+      const pr = projectAll(slice);
+      const b = depthBright(pr.depth);
+      const al = (0.16 + 0.40 * b) * (0.55 + bNorm * 0.6);
+      prims.push({ z: pr.depth, d: () => {
+        tracePts(ctx, pr.pts, false);
+        ctx.strokeStyle = `rgba(168,150,255,${clamp(al, 0, 0.9)})`;
+        ctx.lineWidth = 1.4 + b * 1.8;
+        if (b > 0.6) { ctx.shadowColor = "rgba(168,150,255,0.55)"; ctx.shadowBlur = 6 * b; }
+        ctx.stroke(); ctx.shadowBlur = 0;
+      } });
+    }
   }
 
-  // bright separatrix highlight along the tube centerline
-  ctx.strokeStyle = `rgba(${coreColor[0]},${coreColor[1]},${coreColor[2]},${0.35 + intensity * 0.4})`;
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.ellipse(g.cx, g.cy, g.Rx, g.Ry, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-}
+  // plasma body — additive radial-gradient discs along the toroidal centerline,
+  // with a hot white-gold core that brightens with fusion intensity
+  const ND = 56;
+  const hotCore = mixColor(pColor, [255, 255, 245], 0.5);
+  for (let di = 0; di < ND; di += 1) {
+    const th = (di / ND) * Math.PI * 2;
+    const c = project(R * Math.cos(th), 0, R * Math.sin(th));
+    const rad = Math.max(2, A_PLASMA * c.s);
+    prims.push({ z: c.depth - 0.0005, d: () => {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, rad * 1.25);
+      g.addColorStop(0, `rgba(${hotCore[0]},${hotCore[1]},${hotCore[2]},${0.22 + intensity * 0.34})`);
+      g.addColorStop(0.4, `rgba(${pColor[0]},${pColor[1]},${pColor[2]},${0.10 + intensity * 0.16})`);
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(c.x, c.y, rad * 1.25, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    } });
+  }
 
-function drawParticles(ctx, g, intensity, time) {
-  // Ion motion tracks plasma temperature; brightness and trail length track
-  // fusion intensity, so the core is calm/dim at startup and fast/bright near ignition.
-  const speedScale = 0.42 + model.temperature / 9.5;
-  const inner = g.Rx - g.a * 0.78;
-  const span = g.a * 1.56;
-  const streakAmt = (0.5 + intensity * 1.1) * (0.6 + speedScale * 0.4);
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-  ctx.lineCap = "round";
+  // bright separatrix + a couple of surface striations
+  [0.0, Math.PI * 0.5, Math.PI, Math.PI * 1.5].forEach((ph, idx) => {
+    const loop = [];
+    for (let a = 0; a <= 90; a += 1) loop.push(torusPt((a / 90) * Math.PI * 2, ph, A_PLASMA));
+    for (let seg = 0; seg < 6; seg += 1) {
+      const slice = loop.slice(seg * 15, seg * 15 + 16);
+      const pr = projectAll(slice);
+      const b = depthBright(pr.depth);
+      const cc = mixColor([60, 150, 170], pColor, 0.5);
+      const al = (idx === 0 ? 0.30 : 0.12) * (0.4 + b * 0.8) * (0.6 + intensity * 0.6);
+      prims.push({ z: pr.depth - 0.001, d: () => {
+        ctx.save(); ctx.globalCompositeOperation = "lighter";
+        tracePts(ctx, pr.pts, false);
+        ctx.strokeStyle = `rgba(${cc[0]},${cc[1]},${cc[2]},${al})`;
+        ctx.lineWidth = idx === 0 ? 1.6 : 1.0; ctx.stroke(); ctx.restore();
+      } });
+    }
+  });
+
+  // helical magnetic field lines on the plasma surface
+  const NL = 7, Q = 4, SPIN = reduceMotion ? 0 : time * 0.00028;
+  for (let li = 0; li < NL; li += 1) {
+    const ph0 = (li / NL) * Math.PI * 2 + SPIN;
+    const line = [];
+    for (let s = 0; s <= 160; s += 1) { const th = (s / 160) * Math.PI * 2; line.push(torusPt(th, Q * th + ph0, A_PLASMA * 1.04)); }
+    for (let seg = 0; seg < 8; seg += 1) {
+      const slice = line.slice(seg * 20, seg * 20 + 21);
+      const pr = projectAll(slice);
+      const b = depthBright(pr.depth);
+      const al = (0.18 + 0.45 * b) * (0.45 + bNorm * 0.7);
+      prims.push({ z: pr.depth - 0.002, d: () => {
+        ctx.save(); ctx.globalCompositeOperation = "lighter";
+        tracePts(ctx, pr.pts, false);
+        ctx.strokeStyle = `rgba(${90 + Math.round(intensity * 60)},${200},${255},${clamp(al, 0, 0.85)})`;
+        ctx.lineWidth = 1.0 + b * 1.1;
+        if (b > 0.6) { ctx.shadowColor = "rgba(120,210,255,0.5)"; ctx.shadowBlur = 5 * b; }
+        ctx.stroke(); ctx.shadowBlur = 0; ctx.restore();
+      } });
+    }
+  }
+
+  // ions streaming around the torus
+  const speedScale = (reduceMotion ? 0 : 1) * (0.4 + model.temperature / 11);
   for (const p of particles) {
-    p.angle += 0.0047 * p.speed * speedScale;
-    const wobble = Math.sin(time * 0.004 + p.phase) * g.a * 0.12;
-    const rad = inner + span * p.lane + wobble;
-    const cosA = Math.cos(p.angle);
-    const sinA = Math.sin(p.angle);
-    const x = g.cx + cosA * rad;
-    const y = g.cy + sinA * rad * g.tilt;
-    // tangential velocity direction in screen space, for the motion trail
-    const vx = -sinA;
-    const vy = cosA * g.tilt;
-    const vlen = Math.hypot(vx, vy) || 1;
-    const len = (3 + p.speed * 4.8) * streakAmt;
-    const tailX = x - (vx / vlen) * len;
-    const tailY = y - (vy / vlen) * len;
-    const col = p.lane > 0.5 ? "154, 246, 255" : "255, 208, 120";
-    const alpha = 0.22 + intensity * 0.6;
-    // comet trail
-    ctx.strokeStyle = `rgba(${col}, ${alpha * 0.55})`;
-    ctx.lineWidth = (p.size + intensity * 1.1) * 0.9;
-    ctx.beginPath();
-    ctx.moveTo(tailX, tailY);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    // bright head
-    ctx.fillStyle = `rgba(${col}, ${alpha})`;
-    ctx.beginPath();
-    ctx.arc(x, y, p.size + intensity * 1.4, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawNeutrons(ctx, g, intensity, time) {
-  const oRx = g.Rx + g.a;
-  const oRy = g.Ry + g.a * g.tilt;
-  ctx.save();
-  ctx.strokeStyle = `rgba(255, 210, 122, ${0.1 + intensity * 0.38})`;
-  ctx.lineWidth = 1.1;
-  for (const spark of sparks) {
-    spark.life += 0.006 * spark.speed * (0.4 + intensity);
-    if (spark.life > 1) { spark.life = 0; spark.angle = Math.random() * Math.PI * 2; }
-    const ca = Math.cos(spark.angle);
-    const sa = Math.sin(spark.angle);
-    const sX = g.cx + ca * oRx * 0.9;
-    const sY = g.cy + sa * oRy * 0.9;
-    const eX = g.cx + ca * oRx * (1.02 + spark.life * 0.5);
-    const eY = g.cy + sa * oRy * (1.02 + spark.life * 0.5);
-    ctx.globalAlpha = (1 - spark.life) * intensity;
-    ctx.beginPath();
-    ctx.moveTo(sX, sY);
-    ctx.lineTo(eX, eY);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function drawDivertor(ctx, g, intensity, time) {
-  // Attached to the underside of the vessel at the bottom (theta = PI/2).
-  const oRx = g.Rx + g.a;
-  const oRy = g.Ry + g.a * g.tilt;
-  const sweep = model.divertorSweep ? Math.sin(time * 0.006) * 0.22 : 0;
-  const base = Math.PI / 2 + sweep;
-  const span = 0.5;
-  ctx.save();
-  // target plate (dark metallic arc hugging the vessel)
-  ctx.lineCap = "round";
-  ctx.lineWidth = g.a * 0.42;
-  ctx.strokeStyle = "rgba(58, 64, 78, 0.95)";
-  ctx.beginPath();
-  ctx.ellipse(g.cx, g.cy, oRx * 1.04, oRy * 1.04, 0, base - span, base + span);
-  ctx.stroke();
-  // strike-point glow on the plasma-facing side
-  const load = clamp(0.25 + model.wallLoad / 12, 0.25, 1) * intensity;
-  ctx.lineWidth = g.a * 0.2;
-  ctx.strokeStyle = `rgba(255, 122, 102, ${0.35 + load * 0.5})`;
-  ctx.shadowColor = "#ff7a66";
-  ctx.shadowBlur = 12 * load;
-  ctx.beginPath();
-  ctx.ellipse(g.cx, g.cy, oRx * 0.99, oRy * 0.99, 0, base - span * 0.7, base + span * 0.7);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawCoolantPipe(ctx, g, time) {
-  const flow = clamp(model.coolingFlow / 100, 0, 1);
-  const oRx = g.Rx + g.a;
-  const oRy = g.Ry + g.a * g.tilt;
-
-  // Vessel taps on the lower-outboard side.
-  const hot = { x: g.cx + Math.cos(Math.PI * 0.42) * oRx * 1.04, y: g.cy + Math.sin(Math.PI * 0.42) * oRy * 1.04 };
-  const cold = { x: g.cx + Math.cos(Math.PI * 0.28) * oRx * 1.04, y: g.cy + Math.sin(Math.PI * 0.28) * oRy * 1.04 };
-
-  // Steam-generator connection points.
-  const hxL = g.hxX - g.hxW / 2;
-  const hxR = g.hxX + g.hxW / 2;
-  const inletHot = { x: hxL, y: g.hxY + g.hxH * 0.22 };
-  const outletCool = { x: hxL, y: g.hxY - g.hxH * 0.18 };
-  const steamOut = { x: hxR, y: g.hxY - g.hxH * 0.12 };
-  const turbineIn = { x: g.tx - g.turbineR * 1.1, y: g.ty - g.turbineR * 0.2 };
-
-  const strand = (p0, c1, c2, p3, color, speed) => {
-    ctx.beginPath();
-    ctx.moveTo(p0.x, p0.y);
-    ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, p3.x, p3.y);
-    ctx.setLineDash([]);
-    ctx.lineWidth = 7;
-    ctx.strokeStyle = "rgba(36, 42, 54, 0.9)";
-    ctx.stroke();
-    ctx.lineWidth = 3.2;
-    ctx.strokeStyle = color;
-    ctx.setLineDash([15, 12]);
-    ctx.lineDashOffset = -time * speed;
-    ctx.stroke();
-    ctx.setLineDash([]);
-  };
-
-  ctx.save();
-  ctx.lineCap = "round";
-  // Primary hot: blanket -> steam generator (amber)
-  strand(
-    hot,
-    { x: hot.x + 24, y: hot.y + 46 },
-    { x: inletHot.x - 40, y: inletHot.y + 10 },
-    inletHot,
-    `rgba(255, 150, 90, ${0.42 + flow * 0.5})`,
-    0.04 + flow * 0.16
-  );
-  // Primary cooled: steam generator -> blanket (teal)
-  strand(
-    outletCool,
-    { x: outletCool.x - 44, y: outletCool.y - 6 },
-    { x: cold.x + 22, y: cold.y + 46 },
-    cold,
-    `rgba(56, 225, 198, ${0.42 + flow * 0.5})`,
-    0.04 + flow * 0.16
-  );
-  // Secondary steam: steam generator -> turbine (pale, faster)
-  strand(
-    steamOut,
-    { x: steamOut.x + 26, y: steamOut.y - 4 },
-    { x: turbineIn.x - 22, y: turbineIn.y - 18 },
-    turbineIn,
-    `rgba(214, 240, 255, ${0.45 + flow * 0.45})`,
-    0.12 + flow * 0.22
-  );
-
-  // tap flanges
-  ctx.fillStyle = "rgba(196, 204, 224, 0.75)";
-  for (const p of [hot, cold]) {
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 3.4, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawHeatExchanger(ctx, g, time, intensity) {
-  const { hxX, hxY, hxW, hxH } = g;
-  const left = hxX - hxW / 2;
-  const top = hxY - hxH / 2;
-  const heat = clamp(0.3 + intensity * 0.7, 0, 1) * clamp(model.coolingFlow / 60, 0.3, 1);
-
-  ctx.save();
-
-  // outer heat glow
-  const glow = ctx.createRadialGradient(hxX, hxY, hxW * 0.2, hxX, hxY, hxW * 1.6);
-  glow.addColorStop(0, `rgba(255, 150, 90, ${0.18 * heat})`);
-  glow.addColorStop(1, "rgba(255, 150, 90, 0)");
-  ctx.fillStyle = glow;
-  ctx.beginPath();
-  ctx.arc(hxX, hxY, hxW * 1.6, 0, Math.PI * 2);
-  ctx.fill();
-
-  // drum body with hot-to-cool vertical gradient
-  const body = ctx.createLinearGradient(0, top, 0, top + hxH);
-  body.addColorStop(0, "rgba(40, 120, 130, 0.95)");   // cool top
-  body.addColorStop(0.5, "rgba(70, 92, 110, 0.95)");
-  body.addColorStop(1, `rgba(${Math.round(180 + heat * 60)}, ${Math.round(90 + heat * 30)}, 60, 0.97)`); // hot bottom
-  ctx.fillStyle = body;
-  roundedRect(ctx, left, top, hxW, hxH, hxW * 0.32);
-  ctx.fill();
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = "rgba(214, 224, 240, 0.45)";
-  ctx.stroke();
-
-  // internal U-tubes (heat-transfer bundle)
-  ctx.save();
-  roundedRect(ctx, left, top, hxW, hxH, hxW * 0.32);
-  ctx.clip();
-  ctx.lineWidth = 2;
-  const tubes = 3;
-  for (let i = 0; i < tubes; i += 1) {
-    const tx = left + hxW * (0.28 + (i / (tubes - 1)) * 0.44);
-    const tg = ctx.createLinearGradient(0, top, 0, top + hxH);
-    tg.addColorStop(0, "rgba(120, 230, 220, 0.7)");
-    tg.addColorStop(1, "rgba(255, 170, 110, 0.8)");
-    ctx.strokeStyle = tg;
-    ctx.beginPath();
-    ctx.moveTo(tx, top + hxH * 0.92);
-    for (let s = 0; s <= 1; s += 0.1) {
-      const yy = top + hxH * (0.92 - s * 0.78);
-      const xx = tx + Math.sin(s * Math.PI * 3 + time * 0.003) * 2.4;
-      ctx.lineTo(xx, yy);
-    }
-    ctx.stroke();
+    p.th += dt * 0.00016 * p.sp * speedScale;
+    const ph = p.ph + Math.sin(time * 0.0009 + p.lane * 6) * 0.25;
+    const w0 = torusPt(p.th, ph, A_PLASMA * 0.92 * p.lane);
+    const c = project(w0[0], w0[1], w0[2]);
+    const w1 = torusPt(p.th - 0.05 * p.sp, ph, A_PLASMA * 0.92 * p.lane);
+    const tail = project(w1[0], w1[1], w1[2]);
+    const rad = Math.max(0.8, p.size * c.s);
+    const col = p.hot ? "255,210,120" : "150,236,255";
+    const al = 0.22 + intensity * 0.55;
+    prims.push({ z: c.depth - 0.0015, d: () => {
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
+      ctx.strokeStyle = `rgba(${col},${al * 0.5})`; ctx.lineWidth = rad * 0.9;
+      ctx.beginPath(); ctx.moveTo(tail.x, tail.y); ctx.lineTo(c.x, c.y); ctx.stroke();
+      ctx.fillStyle = `rgba(${col},${al})`;
+      ctx.beginPath(); ctx.arc(c.x, c.y, rad, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    } });
   }
 
-  // rising boil bubbles
-  ctx.fillStyle = `rgba(230, 246, 255, ${0.5 + heat * 0.4})`;
-  for (let i = 0; i < 7; i += 1) {
-    const phase = (time * 0.04 * (0.6 + (i % 3) * 0.3) + i * 90) % (hxH * 0.8);
-    const by = top + hxH * 0.85 - phase;
-    const bx = left + hxW * (0.25 + ((i * 37) % 100) / 100 * 0.5);
-    ctx.globalAlpha = clamp((by - top) / (hxH * 0.5), 0, 1) * heat;
-    ctx.beginPath();
-    ctx.arc(bx, by, 1.3 + (i % 2), 0, Math.PI * 2);
-    ctx.fill();
+  // neutrons streaming from the plasma surface into the blanket (80% of fusion energy)
+  for (const nu of neutrons) {
+    nu.life += dt * 0.0016 * nu.sp * (0.4 + intensity);
+    if (nu.life > 1) { nu.life = 0; nu.th = Math.random() * Math.PI * 2; nu.ph = Math.random() * Math.PI * 2; }
+    const r1 = A_PLASMA + (A_VESSEL - A_PLASMA) * nu.life;
+    const a0 = project(...torusPt(nu.th, nu.ph, r1));
+    const a1 = project(...torusPt(nu.th, nu.ph, Math.max(A_PLASMA, r1 - (A_VESSEL - A_PLASMA) * 0.16)));
+    const al = clamp((1 - nu.life) * intensity * 0.7, 0, 0.7);
+    prims.push({ z: a0.depth - 0.0009, d: () => {
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
+      ctx.strokeStyle = `rgba(255,210,140,${al})`;
+      ctx.lineWidth = 1.1;
+      ctx.beginPath(); ctx.moveTo(a1.x, a1.y); ctx.lineTo(a0.x, a0.y); ctx.stroke();
+      ctx.restore();
+    } });
+  }
+
+  // divertor — red exhaust ring at the bottom of the tube (split for occlusion)
+  const sweep = (model.divertorSweep && !reduceMotion) ? Math.sin(time * 0.004) * 0.10 : 0;
+  const dLoad = clamp(0.3 + model.wallLoad / 14, 0.3, 1) * (0.5 + intensity * 0.6);
+  for (let seg = 0; seg < 6; seg += 1) {
+    const slice = [];
+    for (let a = 0; a <= 16; a += 1) { const th = ((seg * 16 + a) / 96) * Math.PI * 2; slice.push(torusPt(th, -Math.PI / 2 + sweep, A_PLASMA * 1.02)); }
+    const pr = projectAll(slice);
+    prims.push({ z: pr.depth - 0.0008, d: () => {
+      ctx.save(); ctx.lineCap = "round"; ctx.globalCompositeOperation = "lighter";
+      tracePts(ctx, pr.pts, false);
+      ctx.strokeStyle = `rgba(255,110,90,${0.3 + dLoad * 0.5})`;
+      ctx.lineWidth = 3.0 + dLoad * 3.0;
+      ctx.shadowColor = "#ff7a66"; ctx.shadowBlur = 10 * dLoad; ctx.stroke();
+      ctx.shadowBlur = 0; ctx.restore();
+    } });
+  }
+
+  // balance of plant (anchored in world space)
+  addBOP(prims, ctx, time, intensity);
+
+  /* ---- paint sorted ---- */
+  prims.sort((a, b) => b.z - a.z);
+  const fogNear = cam.dist - 0.7, fogSpan = 2.2;
+  for (let i = 0; i < prims.length; i += 1) {
+    ctx.globalAlpha = clamp(1 - ((prims[i].z - fogNear) / fogSpan) * 0.6, 0.4, 1);
+    prims[i].d();
   }
   ctx.globalAlpha = 1;
+
+  // foreground bloom at the core
+  const core = project(0, 0, 0);
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const bg = ctx.createRadialGradient(core.x, core.y, 0, core.x, core.y, (A_PLASMA + 0.4) * core.s);
+  bg.addColorStop(0, `rgba(${stateRgb[0]},${stateRgb[1]},${stateRgb[2]},${0.05 + intensity * 0.16})`);
+  bg.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.arc(core.x, core.y, (A_PLASMA + 0.4) * core.s, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 
-  // steam wisps venting from the top
-  ctx.strokeStyle = `rgba(220, 240, 255, ${0.3 * heat})`;
-  ctx.lineWidth = 2;
-  for (let i = 0; i < 3; i += 1) {
-    const sx = left + hxW * (0.3 + i * 0.2);
-    ctx.beginPath();
-    ctx.moveTo(sx, top);
-    for (let s = 0; s <= 1; s += 0.2) {
-      const yy = top - s * hxH * 0.5;
-      const xx = sx + Math.sin(s * Math.PI * 2 + time * 0.004 + i) * 5;
-      ctx.lineTo(xx, yy);
-    }
-    ctx.stroke();
-  }
+  drawVignette(ctx, w, h);
+  drawTitle(ctx, w, h);
+  positionHotspots();
+}
 
-  // label
-  ctx.fillStyle = "rgba(238, 242, 248, 0.7)";
-  ctx.font = "700 10px Inter, system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("STEAM GENERATOR", hxX, top + hxH + 14);
-  ctx.textAlign = "left";
+/* ---- balance of plant ---- */
+function addBOP(prims, ctx, time, intensity) {
+  const flow = clamp(model.coolingFlow / 100, 0, 1);
+  const sg = project(BOP.sg.x, BOP.sg.y, BOP.sg.z);
+  const turb = project(BOP.turb.x, BOP.turb.y, BOP.turb.z);
+  const gen = project(BOP.gen.x, BOP.gen.y, BOP.gen.z);
+  const cond = project(BOP.cond.x, BOP.cond.y, BOP.cond.z);
+  const grid = project(BOP.grid.x, BOP.grid.y, BOP.grid.z);
+  const blanketTap = project((R + A_VESSEL) * Math.cos(Math.PI * 0.35), -A_VESSEL * 0.4, (R + A_VESSEL) * Math.sin(Math.PI * 0.35));
+
+  const pipe = (p0, p1, color, speed, depth, lw) => {
+    prims.push({ z: depth, d: () => {
+      ctx.save(); ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(p0.x, p0.y);
+      const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2 + 18;
+      ctx.quadraticCurveTo(mx, my, p1.x, p1.y);
+      ctx.strokeStyle = "rgba(34,40,52,0.9)"; ctx.lineWidth = lw + 3; ctx.stroke();
+      ctx.strokeStyle = color; ctx.lineWidth = lw;
+      ctx.setLineDash([13, 11]); ctx.lineDashOffset = -time * speed; ctx.stroke();
+      ctx.setLineDash([]); ctx.restore();
+    } });
+  };
+
+  pipe(blanketTap, sg, `rgba(255,150,90,${0.45 + flow * 0.45})`, 0.05 + flow * 0.15, (blanketTap.depth + sg.depth) / 2, 3);
+  pipe(sg, turb, `rgba(214,240,255,${0.5 + flow * 0.4})`, 0.12 + flow * 0.2, (sg.depth + turb.depth) / 2, 2.6);
+  pipe(turb, cond, `rgba(120,200,220,${0.4 + flow * 0.4})`, 0.06 + flow * 0.12, (turb.depth + cond.depth) / 2, 2.4);
+  pipe(cond, sg, `rgba(56,225,198,${0.4 + flow * 0.4})`, 0.05 + flow * 0.12, (cond.depth + sg.depth) / 2, 2.2);
+
+  // steam generator drum
+  prims.push({ z: sg.depth, d: () => {
+    const ww = 26 * sg.s * 0.018, hh = ww * 1.7;
+    const x = sg.x - ww / 2, y = sg.y - hh / 2;
+    const g = ctx.createLinearGradient(0, y, 0, y + hh);
+    g.addColorStop(0, "rgba(40,120,130,0.95)");
+    g.addColorStop(1, `rgba(${Math.round(180 + intensity * 60)},${Math.round(96 + intensity * 24)},60,0.95)`);
+    ctx.fillStyle = g; roundedRect(ctx, x, y, ww, hh, ww * 0.32); ctx.fill();
+    ctx.strokeStyle = "rgba(214,224,240,0.4)"; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.fillStyle = "rgba(238,242,248,0.62)"; ctx.font = `700 ${Math.max(8, 9 * sg.s * 0.02)}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = "center"; ctx.fillText("STEAM GEN", sg.x, y + hh + 12); ctx.textAlign = "left";
+  } });
+
+  // condenser
+  prims.push({ z: cond.depth, d: () => {
+    const ww = 30 * cond.s * 0.018, hh = ww * 0.66;
+    roundedRect(ctx, cond.x - ww / 2, cond.y - hh / 2, ww, hh, hh * 0.3);
+    ctx.fillStyle = "rgba(46,78,98,0.92)"; ctx.fill();
+    ctx.strokeStyle = "rgba(120,200,220,0.4)"; ctx.lineWidth = 1; ctx.stroke();
+  } });
+
+  // generator block
+  prims.push({ z: gen.depth, d: () => {
+    const ww = 22 * gen.s * 0.018, hh = ww * 0.8;
+    roundedRect(ctx, gen.x - ww / 2, gen.y - hh / 2, ww, hh, hh * 0.22);
+    const net = model.netElec;
+    const gg = ctx.createLinearGradient(gen.x - ww / 2, 0, gen.x + ww / 2, 0);
+    gg.addColorStop(0, "rgba(70,80,100,0.95)");
+    gg.addColorStop(1, net > 0 ? "rgba(126,231,135,0.85)" : "rgba(120,128,150,0.8)");
+    ctx.fillStyle = gg; ctx.fill();
+    ctx.strokeStyle = "rgba(214,224,240,0.4)"; ctx.lineWidth = 1; ctx.stroke();
+  } });
+
+  // turbine wheel (spins)
+  prims.push({ z: turb.depth - 0.001, d: () => {
+    const rad = Math.max(10, 0.07 * turb.s);
+    ctx.save(); ctx.translate(turb.x, turb.y);
+    ctx.strokeStyle = "rgba(238,242,248,0.28)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, rad * 1.4, 0, Math.PI * 2); ctx.stroke();
+    ctx.rotate((reduceMotion ? 0 : time * 0.004) * (0.2 + model.turbineLoad / 100));
+    ctx.fillStyle = "rgba(255,194,75,0.85)";
+    for (let i = 0; i < 8; i += 1) {
+      ctx.rotate(Math.PI / 4);
+      ctx.beginPath(); ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(rad * 0.6, -rad * 0.16, rad * 1.25, -rad * 0.05);
+      ctx.quadraticCurveTo(rad * 0.5, rad * 0.24, 0, 0); ctx.fill();
+    }
+    ctx.fillStyle = "#eef2f8"; ctx.beginPath(); ctx.arc(0, 0, rad * 0.18, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  } });
+
+  // power line gen -> grid, plus pylon
+  prims.push({ z: (gen.depth + grid.depth) / 2 - 0.01, d: () => {
+    const net = model.netElec;
+    ctx.save();
+    ctx.strokeStyle = net > 0 ? `rgba(126,231,135,${0.5 + clamp(net / 500, 0, 0.5)})` : "rgba(120,128,150,0.5)";
+    ctx.lineWidth = 1.8; ctx.setLineDash([6, 6]); ctx.lineDashOffset = -time * 0.05;
+    ctx.beginPath(); ctx.moveTo(gen.x, gen.y); ctx.lineTo(grid.x, grid.y); ctx.stroke();
+    ctx.setLineDash([]);
+    const s = Math.max(8, 0.05 * grid.s);
+    ctx.strokeStyle = "rgba(200,210,230,0.5)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(grid.x, grid.y - s); ctx.lineTo(grid.x - s * 0.6, grid.y + s); ctx.lineTo(grid.x + s * 0.6, grid.y + s); ctx.closePath(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(grid.x - s * 0.45, grid.y); ctx.lineTo(grid.x + s * 0.45, grid.y); ctx.stroke();
+    ctx.restore();
+  } });
+}
+
+/* ---- screen-space atmosphere ---- */
+function drawAtmosphere(ctx, w, h, intensity) {
+  ctx.save();
+  const g = ctx.createRadialGradient(w * 0.47, h * 0.45, 0, w * 0.47, h * 0.45, Math.max(w, h) * 0.7);
+  g.addColorStop(0, `rgba(20,40,44,${0.18 + intensity * 0.12})`);
+  g.addColorStop(0.6, "rgba(10,14,20,0.0)");
+  g.addColorStop(1, "rgba(6,8,12,0.35)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  ctx.restore();
+}
+
+function drawCoreShaft(ctx, intensity, rgb) {
+  const top = project(0, SOL_H * 1.25, 0);
+  const bot = project(0, -SOL_H * 1.25, 0);
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const grad = ctx.createLinearGradient(top.x, top.y, bot.x, bot.y);
+  grad.addColorStop(0, "rgba(0,0,0,0)");
+  grad.addColorStop(0.5, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.06 + intensity * 0.16})`);
+  grad.addColorStop(1, "rgba(0,0,0,0)");
+  const ww = Math.max(8, SOL_R * top.s * 1.6);
+  ctx.fillStyle = grad;
+  ctx.fillRect(top.x - ww / 2, Math.min(top.y, bot.y), ww, Math.abs(bot.y - top.y));
+  ctx.restore();
+}
+
+function drawVignette(ctx, w, h) {
+  ctx.save();
+  const g = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.72);
+  g.addColorStop(0, "rgba(0,0,0,0)");
+  g.addColorStop(1, "rgba(0,0,0,0.5)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  ctx.restore();
+}
+
+function drawTitle(ctx, w, h) {
+  ctx.save();
+  ctx.fillStyle = "rgba(238,242,248,0.5)";
+  ctx.font = "700 11px Inter, system-ui, sans-serif";
+  ctx.fillText("MAGNETIC CONFINEMENT VESSEL", Math.max(16, w * 0.05), Math.max(24, h * 0.06));
+  ctx.fillStyle = "rgba(154,164,184,0.42)";
+  ctx.font = "600 9.5px Inter, system-ui, sans-serif";
+  ctx.fillText("DRAG TO ORBIT · SCROLL TO ZOOM · DBL-CLICK TO RESET", Math.max(16, w * 0.05), Math.max(40, h * 0.06) + 16);
   ctx.restore();
 }
 
@@ -889,48 +965,29 @@ function roundedRect(ctx, x, y, w, h, r) {
   ctx.quadraticCurveTo(x, y, x + r, y);
 }
 
-function drawTurbine(ctx, g, time) {
-  const x = g.tx;
-  const y = g.ty;
-  const radius = g.turbineR;
-  const spin = time * 0.004 * (0.2 + model.turbineLoad / 100);
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.strokeStyle = "rgba(238, 242, 248, 0.26)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(0, 0, radius * 1.5, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.rotate(spin);
-  ctx.fillStyle = "rgba(255, 194, 75, 0.8)";
-  for (let i = 0; i < 8; i += 1) {
-    ctx.rotate(Math.PI / 4);
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.quadraticCurveTo(radius * 0.6, -radius * 0.16, radius * 1.26, -radius * 0.05);
-    ctx.quadraticCurveTo(radius * 0.5, radius * 0.24, 0, 0);
-    ctx.fill();
-  }
-  ctx.fillStyle = "#eef2f8";
-  ctx.beginPath();
-  ctx.arc(0, 0, radius * 0.18, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+/* ---- project hotspot anchors onto the moving model ---- */
+const HOTSPOT_ANCHORS = {
+  plasma: () => [0, 0, 0],
+  magnets: () => torusPt(Math.PI * 1.15, Math.PI / 2, A_COIL * 1.05),
+  blanket: () => torusPt(-0.35, 0, A_VESSEL * 1.05),
+  divertor: () => torusPt(Math.PI * 0.5, -Math.PI / 2, A_PLASMA * 1.1),
+  turbine: () => [BOP.turb.x, BOP.turb.y, BOP.turb.z]
+};
+function positionHotspots() {
+  const rect = reactorCanvas.getBoundingClientRect();
+  hotspots.forEach((b) => {
+    const fn = HOTSPOT_ANCHORS[b.dataset.topic];
+    if (!fn) return;
+    const wpt = fn();
+    const p = project(wpt[0], wpt[1], wpt[2]);
+    b.style.left = `${(p.x / rect.width) * 100}%`;
+    b.style.top = `${(p.y / rect.height) * 100}%`;
+    b.style.right = "auto";
+    b.style.bottom = "auto";
+    b.style.transform = "translate(-50%, -50%)";
+    b.style.opacity = `${clamp(0.4 + depthBright(p.depth) * 0.6, 0.4, 1)}`;
+  });
 }
-
-function drawLabels(ctx, w, h) {
-  ctx.save();
-  ctx.fillStyle = "rgba(238, 242, 248, 0.55)";
-  ctx.font = "700 11px Inter, system-ui, sans-serif";
-  ctx.fillText("MAGNETIC CONFINEMENT VESSEL", Math.max(16, w * 0.05), Math.max(26, h * 0.07));
-  ctx.restore();
-}
-
-function hexToRgb(hex) {
-  const m = hex.replace("#", "");
-  return [parseInt(m.slice(0, 2), 16), parseInt(m.slice(2, 4), 16), parseInt(m.slice(4, 6), 16)];
-}
-
 /* ---------- Lawson operating-point map ---------- */
 function drawLawson() {
   const rect = resizeCanvas(lawsonCanvas, lawsonCtx);
