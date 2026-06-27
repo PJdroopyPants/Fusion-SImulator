@@ -1,33 +1,97 @@
 # Fusion Power Generator Simulator
 
-A self-contained, interactive teaching model of a tokamak-style fusion power plant. Open `index.html` in any modern browser to run it. There is no build step and there are no dependencies.
+An interactive, physically grounded teaching model of a tokamak-style fusion power plant. Drive a magnetic-confinement reactor toward ignition, watch a real burning plasma respond, and follow the energy from fusion all the way to the grid.
 
-## What you can do
+It is self-contained and dependency-free: open `index.html` in any modern browser and it runs. No build step, no install, no internet connection required. That makes it easy to run unattended at an outreach booth or hand to a student to keep.
 
-Drive the reactor with six setpoints (plasma temperature, magnetic field, fuel injection, D-T balance, blanket coolant, turbine load) and four auxiliary toggles (neutral beam, pellet pacing, divertor sweep, emergency quench), or jump to a preset: Startup, Cruise, High Gain, Stress, Shutdown.
+## Who it is for
 
-## What it teaches
+Built for STEM outreach across a wide range, from curious high schoolers and families at an open house to undergraduate engineering students. It is being donated to the Rose-Hulman and Purdue fusion outreach programs. Plain-language explanations and "everyday terms" readouts serve newcomers, while the underlying physics, the operating-point map, and the data export give undergraduates real depth to dig into.
 
-The model is simplified but physically motivated, aimed at undergraduate and STEM learners:
+## Quick start
 
-- Fusion triple product `n·T·tau_E` shown as a live figure of merit, with the canonical D-T ignition target of about 3x10^21 keV·s·m^-3.
-- Lawson operating-point map, a log plot of the confinement parameter `n·tau_E` versus temperature, with the ignition and breakeven (Q = 1) curves and your live operating point plus a trail. Watch the point climb toward ignition as you tune the machine.
-- Energy gain Q derived consistently from the triple product via `Q = 5·phi/(1 - phi)`, where `phi` is the fraction of the ignition threshold reached and the 5 reflects alphas carrying about 20% of fusion energy. Q = 1 is breakeven and Q running to infinity is ignition.
-- Power balance, external heating in versus fusion power out, split into alpha self-heating (stays in the plasma) and neutron power (deposited in the blanket).
-- Confinement time `tau_E`, beta-limit driven disruption risk, wall heat load, coolant outlet temperature, and tritium breeding ratio.
-- A contextual coach that reads the current state and explains why the reactor is behaving as it is.
-- Expandable concept panels for the plasma, magnets, blanket, divertor, and turbine, plus a glossary of key terms.
+1. Open `index.html` in a recent version of Chrome, Edge, Firefox, or Safari.
+2. That is it. Everything runs locally.
+
+For a kiosk or projector, press **Present** (top right) for a fullscreen exhibit mode that enlarges the reactor and headline numbers, hides the denser panels, and idles into an automatic demo when untouched. The simulator also works if served over a simple local web server, which lets browser settings such as theme persistence stick between visits, but that is optional.
+
+## Driving the reactor
+
+Six setpoints and four toggles control the machine, or jump to a preset to see a complete operating point at once.
+
+Setpoints: plasma temperature (the heating drive), magnetic field, fuel injection, D-T balance, blanket coolant, and turbine load.
+
+Toggles: neutral beam heating, pellet pacing, divertor sweep, and emergency quench.
+
+Presets: **Startup** (sub-breakeven), **Cruise** (a strong burning plasma), **High Gain** (a clean, self-sustaining ignition), **Stress** (pushes into a disruption), and **Shutdown**.
+
+A note on temperature: it is now a heating drive rather than a fixed dial. See burn-through dynamics below.
+
+## The physics it models
+
+The model is simplified but physically motivated, and calibrated for intuition rather than engineering accuracy.
+
+- **Burn-through dynamics.** The actual core temperature is a real state that evolves over time. Alpha particles from each fusion reaction stay in the plasma and heat it, so once you cross the ignition threshold the temperature climbs on its own and the plant becomes self-sustaining. The temperature slider sets the external heating; alpha self-heating can push the real core hotter than the slider. Push too hard and rising pressure trips a disruption; starve the plasma and the burn collapses. Ignition is something you trigger and then manage.
+- **Fusion triple product** n times T times tau_E, shown as the live figure of merit, against the D-T ignition target of about 3 x 10^21 keV s m^-3.
+- **Lawson operating-point map**, a log plot of confinement parameter n times tau_E versus temperature, with the ignition and breakeven (Q = 1) curves, your live operating point and its trail, and labeled reference points for real machines (ITER, SPARC, JET, EAST).
+- **Energy gain Q**, derived consistently from the triple product. Q = 1 is scientific breakeven and Q running to infinity is ignition.
+- **Power balance**: external heating in versus fusion power out, split into alpha self-heating (stays in the plasma) and neutron power (deposited in the blanket).
+- **Plant telemetry**: confinement time tau_E, beta-limit driven disruption risk, wall heat load, coolant outlet temperature, and tritium breeding ratio.
+- **First wall and materials**: an integrated neutron dose that accrues over a run, with a wall-life indicator. Surviving the neutron and heat flux is one of fusion's defining materials challenges, and the focus of programs like Purdue's.
+- **A contextual coach** that reads the current state and explains why the reactor is behaving as it is.
 
 ## The reactor visualization
 
-The central canvas is a real, dependency-free software-rendered 3D tokamak (perspective camera, depth-sorted painter's pass, atmospheric depth fog). It shows a temperature-colored plasma torus with a hot burning core, toroidal-field coils that correctly weave through the plasma, poloidal-field coils, a central solenoid, vacuum-vessel ribs, helical magnetic field lines wound at a q ≈ 4 safety factor, streaming ions, neutrons firing out to the blanket, and an attached divertor whose strike point sweeps when enabled. Beside it sits a fully 3D balance of plant built from shaded solids on a ground pad: a steam-generator drum, a turbine and coupled generator, a condenser, a hyperboloid cooling tower with a steam plume, and a transmission pylon, all linked by flowing coolant, steam, and power lines.
+The central stage is a dependency-free, software-rendered 3D tokamak (perspective camera, depth-sorted painter's pass, atmospheric fog, multi-pass bloom). It shows a temperature-colored plasma with a hot burning core, toroidal-field coils weaving correctly through the plasma, poloidal-field coils, a central solenoid, vacuum-vessel ribs, helical field lines at a q ≈ 4 safety factor, streaming ions, in-core fusion flashes with the alpha particles they release, neutrons firing out to the blanket, and a divertor whose strike point sweeps when enabled. Beside it is a full 3D balance of plant: steam generator, turbine and generator, condenser, hyperboloid cooling tower with a steam plume, and a transmission pylon, linked by flowing coolant, steam, and power lines.
 
-Drag to orbit, scroll to zoom, shift-drag (or right-drag) to pan, and double-click (or press R) to reset the view. It auto-rotates when idle. All of it responds live to the operating setpoints.
+The plasma core is rendered as a true volumetric glow using a raymarched WebGL shader (written in raw WebGL, no libraries) composited at the correct depth so the coils still pass in front of and behind it. If WebGL is unavailable on a given machine, it automatically falls back to the original software-rendered plasma, so it cannot break.
+
+Extra views and aids on the stage:
+
+- **Cutaway** opens a labeled poloidal cross-section showing the nested shells, from the plasma core out through the separatrix, scrape-off layer, breeding blanket, vacuum vessel, and TF coil.
+- **Scale** drops in a human figure and a size bar so visitors grasp that the machine is building-sized.
+- A **disruption event** makes instability visceral: the stage flashes and shakes when pressure outruns the magnetic field.
+
+Navigate by dragging to orbit, scrolling to zoom, shift-drag or right-drag to pan, and double-click or press R to reset. An orientation gizmo and ISO/TOP/FRONT/SIDE view buttons sit in the corner, with a camera control cluster beside them. The view auto-rotates when idle, and everything responds live to the setpoints.
+
+## Modes and features
+
+- **Guided story** walks a learner from cold gas to ignition one concept at a time, with a live "goal met" check at each step.
+- **Guided tour** runs on first visit (and replays from the **Tour** button), spotlighting the key controls.
+- **Missions** are seven challenges, from First Light to Ignition, each forcing a deliberate tradeoff.
+- **Real-world units** re-expresses the readouts in everyday terms: temperature in millions of degrees and multiples of the Sun's core, net power in homes powered.
+- **Themes**: a control-room dark theme, a light theme for bright rooms and projectors, a high-contrast theme, and a colorblind-safe palette.
+- **Sound** (off by default) adds a reactor hum that tracks fusion power, with chimes on ignition and mission completion and an alarm on disruption.
+- **Export run (CSV)** downloads the current setpoints, key outputs, and the recent history as a lab worksheet.
+- **Present** is the fullscreen kiosk mode described in Quick start.
+
+## Data visualizations
+
+Live, software-drawn panels accompany the reactor: the Lawson operating-point map with real-machine references, the power balance, output over time, D-T reactivity versus temperature, an energy-flow diagram from fusion to the grid, the D-T fuel cycle, and the reactor cross-section.
+
+## Accessibility
+
+The simulator honors the operating system's reduced-motion setting (it stills animation and freezes flicker), ships high-contrast and colorblind-safe themes, supports keyboard reset and touch gestures, and uses ARIA live regions for the key readouts.
+
+## For educators
+
+- The first-wall and materials readout connects the prettiest failure mode in the sim to the real plasma-materials research that programs like Purdue's pursue.
+- The CSV export pairs naturally with a hands-on lab: derive the operating point, hit the missions, export the run, and write it up.
+- Presentation mode plus the offline, single-folder design make it a turnkey booth exhibit on any laptop.
 
 ## Files
 
 - `index.html` is the structure and content.
-- `styles.css` is the dark control-room visual theme.
-- `script.js` holds the physics model, the animated reactor render, and the data visualizations.
+- `styles.css` is the visual theme, including the light, high-contrast, and colorblind variants.
+- `script.js` holds the physics model, the burn-through dynamics, the software 3D renderer, the WebGL plasma shader, and the data visualizations.
+- `Fusion-Simulator-Enhancement-Roadmap.html` is the design and enhancement roadmap.
+- `backups/` holds copies of the files from before the enhancement work.
+- `3D_assets/` holds reference CAD and 3D-print models (STL and STEP). These are not used by the application; they are kept as reference geometry and as printable handouts.
 
-This is a teaching model, not a scientific reactor code. Numbers are illustrative and calibrated for intuition, not engineering accuracy.
+## Disclaimer
+
+This is a teaching model, not a scientific reactor code. The numbers are illustrative and calibrated for intuition, not engineering accuracy.
+
+## Credits
+
+Donated to the Rose-Hulman and Purdue fusion outreach programs. Built as a self-contained educational tool to help students see, drive, and understand magnetic-confinement fusion.

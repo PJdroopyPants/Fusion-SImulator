@@ -94,7 +94,7 @@ const hotspots = document.querySelectorAll("[data-topic]");
 const presetValues = {
   startup: { temperature: 11, magneticField: 5.2, fuelRate: 58, fuelBalance: 50, coolingFlow: 66, turbineLoad: 54, neutralBeam: true, pelletPulse: true, divertorSweep: false, emergencyQuench: false },
   cruise: { temperature: 16.5, magneticField: 6.8, fuelRate: 74, fuelBalance: 50, coolingFlow: 82, turbineLoad: 76, neutralBeam: true, pelletPulse: true, divertorSweep: true, emergencyQuench: false },
-  gain: { temperature: 19.4, magneticField: 7.6, fuelRate: 84, fuelBalance: 51, coolingFlow: 90, turbineLoad: 86, neutralBeam: true, pelletPulse: true, divertorSweep: true, emergencyQuench: false },
+  gain: { temperature: 18, magneticField: 8.2, fuelRate: 73, fuelBalance: 50, coolingFlow: 96, turbineLoad: 78, neutralBeam: true, pelletPulse: true, divertorSweep: true, emergencyQuench: false },
   stress: { temperature: 24, magneticField: 4.6, fuelRate: 94, fuelBalance: 58, coolingFlow: 52, turbineLoad: 92, neutralBeam: true, pelletPulse: false, divertorSweep: false, emergencyQuench: false },
   shutdown: { temperature: 4.2, magneticField: 3.6, fuelRate: 0, fuelBalance: 50, coolingFlow: 92, turbineLoad: 8, neutralBeam: false, pelletPulse: false, divertorSweep: true, emergencyQuench: true }
 };
@@ -202,6 +202,16 @@ function reactivity(T) {
 const SMOOTH_KEYS = ["temperature", "magneticField", "fuelRate", "fuelBalance", "coolingFlow", "turbineLoad"];
 const SMOOTH_TAU = { temperature: 2.4, magneticField: 1.1, fuelRate: 1.6, fuelBalance: 1.2, coolingFlow: 1.5, turbineLoad: 1.0 };
 let smoothed = null;
+
+/* ---------- Phase 3: burn-through dynamics ----------
+   The actual core temperature is a state that self-heats from alpha power. The
+   setpoint slider sets the external heating drive; alpha feedback can push the
+   real temperature above it (ignition) or, when starved, let it collapse. The
+   ceiling reflects the beta limit, past which rising pressure trips a disruption. */
+const BURN_GAIN = 4.0;    // strength of alpha self-heating
+const BURN_TAU = 3.0;     // thermal time constant (s)
+const BURN_TMAX = 55;     // ceiling temperature (keV)
+let burnT = null;
 function rawInputs() {
   const o = {};
   for (const k of SMOOTH_KEYS) o[k] = Number(controls[k].value);
@@ -217,12 +227,25 @@ function advanceDynamics(dt) {
     const a = 1 - Math.exp(-dt / Math.max(0.05, tau));
     smoothed[k] += (raw[k] - smoothed[k]) * a;
   }
+
+  // Burn-through: actual core temperature self-heats from alpha power. Past the
+  // ignition threshold it climbs on its own; starve it and it collapses.
+  if (burnT === null) burnT = smoothed.temperature;
+  const n20 = (smoothed.fuelRate / 100) * (controls.pelletPulse.checked ? 1.05 : 0.9);
+  const tauE = 2.1 * Math.pow(smoothed.magneticField / 8.8, 1.4) * (controls.divertorSweep.checked ? 1.06 : 1.0) * (quench ? 0.12 : 1);
+  const alphaHeat = BURN_GAIN * n20 * reactivity(burnT) * gaussian(smoothed.fuelBalance, 50, 12) *
+    (controls.neutralBeam.checked ? 1.14 : 0.82) * tauE * (quench ? 0.08 : 1);
+  const Teq = clamp(smoothed.temperature + alphaHeat, 3, BURN_TMAX);
+  const bTau = quench ? 0.5 : BURN_TAU;
+  burnT += (Teq - burnT) * (1 - Math.exp(-dt / bTau));
+  burnT = clamp(burnT, 3, BURN_TMAX);
 }
 
 function readState() {
   if (!smoothed) smoothed = rawInputs();
+  if (burnT === null) burnT = smoothed.temperature;
   return {
-    temperature: smoothed.temperature,
+    temperature: burnT,
     magneticField: smoothed.magneticField,
     fuelRate: smoothed.fuelRate,
     fuelBalance: smoothed.fuelBalance,
@@ -673,6 +696,122 @@ function bindInput() {
 }
 
 /* ===========================================================
+   Phase 3: WebGL volumetric plasma (raw WebGL, no library)
+   Raymarches a glowing torus volume on an offscreen canvas, then composites it
+   into the 2D reactor at the core's depth. Falls back to the 2D plasma discs if
+   WebGL is unavailable or the shader fails to compile. Camera matched to project().
+   =========================================================== */
+let glCanvas = null, glx = null, glProg = null, glReady = false, glFailed = false;
+const glLoc = {};
+const PLASMA_VS = `
+attribute vec2 aPos;
+void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }
+`;
+const PLASMA_FS = `
+precision highp float;
+uniform vec2 uRes; uniform float uCx, uCy, uFocal, uTime, uIntensity, uR, uA, uRb;
+uniform vec3 uEye, uColor, uHot; uniform mat3 uInvRot;
+float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float noise(vec3 x){
+  vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(hash(i + vec3(0.0,0.0,0.0)), hash(i + vec3(1.0,0.0,0.0)), f.x),
+                 mix(hash(i + vec3(0.0,1.0,0.0)), hash(i + vec3(1.0,1.0,0.0)), f.x), f.y),
+             mix(mix(hash(i + vec3(0.0,0.0,1.0)), hash(i + vec3(1.0,0.0,1.0)), f.x),
+                 mix(hash(i + vec3(0.0,1.0,1.0)), hash(i + vec3(1.0,1.0,1.0)), f.x), f.y), f.z);
+}
+float fbm(vec3 p){ float v = 0.0, a = 0.5; for(int i = 0; i < 3; i++){ v += a * noise(p); p *= 2.02; a *= 0.5; } return v; }
+float tubeDist(vec3 p){ vec2 q = vec2(length(p.xz) - uR, p.y); return length(q); }
+void main(){
+  float sx = gl_FragCoord.x;
+  float sy = uRes.y - gl_FragCoord.y;
+  vec3 rdCam = normalize(vec3((sx - uCx) / uFocal, (uCy - sy) / uFocal, 1.0));
+  vec3 rd = normalize(uInvRot * rdCam);
+  vec3 ro = uEye;
+  float b = dot(ro, rd);
+  float c = dot(ro, ro) - uRb * uRb;
+  float disc = b * b - c;
+  if(disc < 0.0){ gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
+  float sq = sqrt(disc);
+  float t0 = max(0.0, -b - sq), t1 = -b + sq;
+  float dt = (t1 - t0) / 60.0;
+  float t = t0;
+  float tube = uA * 1.2;
+  vec3 col = vec3(0.0); float alpha = 0.0;
+  for(int i = 0; i < 60; i++){
+    vec3 p = ro + rd * t;
+    float d = tubeDist(p);
+    if(d < tube){
+      float dens = pow(clamp(1.0 - d / tube, 0.0, 1.0), 1.4);
+      float n = fbm(p * 3.1 + vec3(0.0, uTime * 0.0004, uTime * 0.0005));
+      dens *= 0.5 + 0.95 * n;
+      vec3 cc = mix(uColor, uHot, clamp((1.0 - d / tube) * 1.5 - 0.3, 0.0, 1.0));
+      float e = dens * 0.11 * (0.45 + uIntensity);
+      col += cc * e * (1.0 - alpha);
+      alpha += e * (1.0 - alpha);
+    }
+    t += dt;
+  }
+  gl_FragColor = vec4(col * 1.35, 1.0);
+}
+`;
+function glCompile(type, src) {
+  const sh = glx.createShader(type);
+  glx.shaderSource(sh, src); glx.compileShader(sh);
+  if (!glx.getShaderParameter(sh, glx.COMPILE_STATUS)) { console.warn("plasma shader:", glx.getShaderInfoLog(sh)); return null; }
+  return sh;
+}
+function initPlasmaGL() {
+  if (glReady) return true;
+  if (glFailed) return false;
+  try {
+    glCanvas = document.createElement("canvas");
+    const opts = { alpha: false, antialias: true, depth: false, premultipliedAlpha: false, powerPreference: "low-power" };
+    glx = glCanvas.getContext("webgl", opts) || glCanvas.getContext("experimental-webgl", opts);
+    if (!glx) { glFailed = true; return false; }
+    const vs = glCompile(glx.VERTEX_SHADER, PLASMA_VS), fs = glCompile(glx.FRAGMENT_SHADER, PLASMA_FS);
+    if (!vs || !fs) { glFailed = true; return false; }
+    glProg = glx.createProgram();
+    glx.attachShader(glProg, vs); glx.attachShader(glProg, fs); glx.linkProgram(glProg);
+    if (!glx.getProgramParameter(glProg, glx.LINK_STATUS)) { glFailed = true; return false; }
+    glx.useProgram(glProg);
+    const buf = glx.createBuffer();
+    glx.bindBuffer(glx.ARRAY_BUFFER, buf);
+    glx.bufferData(glx.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), glx.STATIC_DRAW);
+    const ap = glx.getAttribLocation(glProg, "aPos");
+    glx.enableVertexAttribArray(ap); glx.vertexAttribPointer(ap, 2, glx.FLOAT, false, 0, 0);
+    ["uRes", "uCx", "uCy", "uFocal", "uTime", "uIntensity", "uR", "uA", "uRb", "uEye", "uColor", "uHot", "uInvRot"].forEach((n) => { glLoc[n] = glx.getUniformLocation(glProg, n); });
+    glx.clearColor(0, 0, 0, 1);
+    glReady = true;
+    return true;
+  } catch (e) { glFailed = true; return false; }
+}
+function renderPlasmaGL(w, h, pColor, hotCore, intensity, time) {
+  if (!glReady) return false;
+  const W = Math.max(2, Math.floor(w)), H = Math.max(2, Math.floor(h));
+  if (glCanvas.width !== W || glCanvas.height !== H) { glCanvas.width = W; glCanvas.height = H; }
+  glx.viewport(0, 0, W, H);
+  glx.clear(glx.COLOR_BUFFER_BIT);
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch), cyw = Math.cos(cam.yaw), syw = Math.sin(cam.yaw);
+  // invRot = Ry(-yaw) * Rx(-pitch), column-major
+  const invRot = [cyw, 0, -syw, -syw * sp, cp, -cyw * sp, syw * cp, sp, cyw * cp];
+  glx.uniform2f(glLoc.uRes, W, H);
+  glx.uniform1f(glLoc.uCx, PROJ.cx);
+  glx.uniform1f(glLoc.uCy, PROJ.cy);
+  glx.uniform1f(glLoc.uFocal, PROJ.focal);
+  glx.uniform1f(glLoc.uTime, reduceMotion ? 0 : time);
+  glx.uniform1f(glLoc.uIntensity, intensity);
+  glx.uniform1f(glLoc.uR, R);
+  glx.uniform1f(glLoc.uA, A_PLASMA);
+  glx.uniform1f(glLoc.uRb, R + A_PLASMA * 1.3 + 0.1);
+  glx.uniform3f(glLoc.uEye, cam.dist * (-cp * syw), cam.dist * (-sp), cam.dist * (-cp * cyw));
+  glx.uniform3f(glLoc.uColor, pColor[0] / 255, pColor[1] / 255, pColor[2] / 255);
+  glx.uniform3f(glLoc.uHot, hotCore[0] / 255, hotCore[1] / 255, hotCore[2] / 255);
+  glx.uniformMatrix3fv(glLoc.uInvRot, false, invRot);
+  glx.drawArrays(glx.TRIANGLES, 0, 3);
+  return true;
+}
+
+/* ===========================================================
    Main reactor render
    =========================================================== */
 function drawReactor(time) {
@@ -759,30 +898,40 @@ function drawReactor(time) {
   // toroidal field coils — solid, shaded D-shaped magnets caging the plasma
   addDCoils(prims, ctx, bNorm);
 
-  // plasma body — additive radial-gradient discs along the toroidal centerline,
-  // with a hot white-gold core that brightens with fusion intensity
-  const ND = 56;
+  // plasma body — WebGL volumetric raymarch if available, else 2D additive discs
   const hotCore = mixColor(pColor, [255, 255, 245], 0.5);
-  for (let di = 0; di < ND; di += 1) {
-    const th = (di / ND) * Math.PI * 2;
-    const c = project(R * Math.cos(th), 0, R * Math.sin(th));
-    // A2: living-plasma turbulence — cheap layered sines make the core churn and flicker
-    const fl = reduceMotion ? 1 : (0.86 + 0.14 * Math.sin(time * 0.0045 + di * 0.7) + 0.09 * Math.sin(time * 0.012 + di * 2.3));
-    const radPulse = reduceMotion ? 1 : (0.97 + 0.05 * Math.sin(time * 0.006 + di * 1.5));
-    const rad = Math.max(2, A_PLASMA * c.s) * radPulse;
-    const coreA = (0.22 + intensity * 0.34) * fl;
-    const midA = (0.10 + intensity * 0.16) * fl;
-    prims.push({ z: c.depth - 0.0005, d: () => {
+  if (initPlasmaGL() && renderPlasmaGL(w, h, pColor, hotCore, intensity, time)) {
+    // composite the GL glow at the core's depth so the coils still weave in front/behind
+    const cDepth = project(0, 0, 0).depth;
+    prims.push({ z: cDepth, d: () => {
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, rad * 1.25);
-      g.addColorStop(0, `rgba(${hotCore[0]},${hotCore[1]},${hotCore[2]},${coreA})`);
-      g.addColorStop(0.4, `rgba(${pColor[0]},${pColor[1]},${pColor[2]},${midA})`);
-      g.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(c.x, c.y, rad * 1.25, 0, Math.PI * 2); ctx.fill();
+      ctx.drawImage(glCanvas, 0, 0, w, h);
       ctx.restore();
     } });
+  } else {
+    const ND = 56;
+    for (let di = 0; di < ND; di += 1) {
+      const th = (di / ND) * Math.PI * 2;
+      const c = project(R * Math.cos(th), 0, R * Math.sin(th));
+      // A2: living-plasma turbulence — cheap layered sines make the core churn and flicker
+      const fl = reduceMotion ? 1 : (0.86 + 0.14 * Math.sin(time * 0.0045 + di * 0.7) + 0.09 * Math.sin(time * 0.012 + di * 2.3));
+      const radPulse = reduceMotion ? 1 : (0.97 + 0.05 * Math.sin(time * 0.006 + di * 1.5));
+      const rad = Math.max(2, A_PLASMA * c.s) * radPulse;
+      const coreA = (0.22 + intensity * 0.34) * fl;
+      const midA = (0.10 + intensity * 0.16) * fl;
+      prims.push({ z: c.depth - 0.0005, d: () => {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, rad * 1.25);
+        g.addColorStop(0, `rgba(${hotCore[0]},${hotCore[1]},${hotCore[2]},${coreA})`);
+        g.addColorStop(0.4, `rgba(${pColor[0]},${pColor[1]},${pColor[2]},${midA})`);
+        g.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(c.x, c.y, rad * 1.25, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      } });
+    }
   }
 
   // bright separatrix + a couple of surface striations
