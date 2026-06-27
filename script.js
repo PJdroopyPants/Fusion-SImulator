@@ -149,9 +149,18 @@ let fusionHistory = Array.from({ length: 120 }, () => 0);
 let trail = [];
 let particles = [];
 let sparks = [];
+let alphas = [];
+let fusionAcc = 0;
 let neutrons = [];
 let lastFrame = performance.now();
 let model = {};
+
+/* ---------- Phase 1 UI state ---------- */
+let scaleRef = false;        // A5: human + scale reference overlay
+let unitMode = false;        // C3: real-world unit translator
+let showMachines = true;     // C2: real-machine points on the Lawson map
+let kioskCycle = 0;          // B1: presentation-mode auto-demo index
+let kioskLast = 0;           // B1: last auto-demo advance time
 
 /* ---------- Math helpers ---------- */
 function gaussian(value, center, width) {
@@ -185,14 +194,40 @@ function reactivity(T) {
   return Math.pow(T / 20, 2) * (1 / (1 + Math.pow(T / 48, 2.4)));
 }
 
+/* ---------- C4: transient dynamics ----------
+   The "actual" continuous inputs chase the dialed setpoints with thermal and
+   engineering time constants, so the plant ramps up and settles over seconds
+   rather than snapping. The physics in calculateModel is unchanged; it simply
+   reads these smoothed values. Setpoint labels still show the dialed value. */
+const SMOOTH_KEYS = ["temperature", "magneticField", "fuelRate", "fuelBalance", "coolingFlow", "turbineLoad"];
+const SMOOTH_TAU = { temperature: 2.4, magneticField: 1.1, fuelRate: 1.6, fuelBalance: 1.2, coolingFlow: 1.5, turbineLoad: 1.0 };
+let smoothed = null;
+function rawInputs() {
+  const o = {};
+  for (const k of SMOOTH_KEYS) o[k] = Number(controls[k].value);
+  return o;
+}
+function advanceDynamics(dt) {
+  const raw = rawInputs();
+  if (!smoothed) { smoothed = raw; return; }
+  const quench = controls.emergencyQuench.checked;
+  for (const k of SMOOTH_KEYS) {
+    let tau = SMOOTH_TAU[k];
+    if (quench && (k === "temperature" || k === "fuelRate")) tau = 0.35; // quench dumps energy fast
+    const a = 1 - Math.exp(-dt / Math.max(0.05, tau));
+    smoothed[k] += (raw[k] - smoothed[k]) * a;
+  }
+}
+
 function readState() {
+  if (!smoothed) smoothed = rawInputs();
   return {
-    temperature: Number(controls.temperature.value),
-    magneticField: Number(controls.magneticField.value),
-    fuelRate: Number(controls.fuelRate.value),
-    fuelBalance: Number(controls.fuelBalance.value),
-    coolingFlow: Number(controls.coolingFlow.value),
-    turbineLoad: Number(controls.turbineLoad.value),
+    temperature: smoothed.temperature,
+    magneticField: smoothed.magneticField,
+    fuelRate: smoothed.fuelRate,
+    fuelBalance: smoothed.fuelBalance,
+    coolingFlow: smoothed.coolingFlow,
+    turbineLoad: smoothed.turbineLoad,
     neutralBeam: controls.neutralBeam.checked,
     pelletPulse: controls.pelletPulse.checked,
     divertorSweep: controls.divertorSweep.checked,
@@ -299,12 +334,13 @@ function calculateModel() {
 function updateReadouts() {
   model = calculateModel();
 
-  outputs.temperatureValue.textContent = `${model.temperature.toFixed(1)} keV`;
-  outputs.magneticFieldValue.textContent = `${model.magneticField.toFixed(1)} T`;
-  outputs.fuelRateValue.textContent = `${Math.round(model.fuelRate)}%`;
-  outputs.fuelBalanceValue.textContent = `${model.fuelBalance} / ${100 - model.fuelBalance}`;
-  outputs.coolingFlowValue.textContent = `${Math.round(model.coolingFlow)}%`;
-  outputs.turbineLoadValue.textContent = `${Math.round(model.turbineLoad)}%`;
+  // Setpoint labels show the dialed value; telemetry/stage show the actual (smoothed) response.
+  outputs.temperatureValue.textContent = `${Number(controls.temperature.value).toFixed(1)} keV`;
+  outputs.magneticFieldValue.textContent = `${Number(controls.magneticField.value).toFixed(1)} T`;
+  outputs.fuelRateValue.textContent = `${Math.round(Number(controls.fuelRate.value))}%`;
+  outputs.fuelBalanceValue.textContent = `${Number(controls.fuelBalance.value)} / ${100 - Number(controls.fuelBalance.value)}`;
+  outputs.coolingFlowValue.textContent = `${Math.round(Number(controls.coolingFlow.value))}%`;
+  outputs.turbineLoadValue.textContent = `${Math.round(Number(controls.turbineLoad.value))}%`;
 
   outputs.reactorState.textContent = model.label;
   outputs.reactorState.style.background = model.stateColor;
@@ -342,6 +378,23 @@ function updateReadouts() {
   updatePowerBalance();
   updateLesson();
   updateCoach();
+  updateRealWorld();
+}
+
+/* ---------- C3: real-world unit translator ---------- */
+function updateRealWorld() {
+  const el = document.getElementById("realWorld");
+  if (!el) return;
+  if (!unitMode) { el.hidden = true; return; }
+  el.hidden = false;
+  const milC = model.temperature * 11.6;          // 1 keV is about 11.6 million degrees C
+  const sun = milC / 15;                            // the Sun's core is about 15 million degrees C
+  const homes = Math.max(0, model.netElec) * 750;   // very roughly 750 US homes per MW of electricity
+  const set = (id, txt) => { const n = document.getElementById(id); if (n) n.textContent = txt; };
+  set("rwTemp", `${Math.round(milC).toLocaleString()} million °C`);
+  set("rwTempSub", `about ${sun.toFixed(1)}x the Sun's core`);
+  set("rwHomes", model.netElec > 0 ? `${Math.round(homes).toLocaleString()} homes` : "not yet net-positive");
+  set("rwHomesSub", model.netElec > 0 ? `${formatMw(model.netElec)} reaching the grid` : "raise Q to send power out");
 }
 
 function setBar(element, amount, warning) {
@@ -399,6 +452,7 @@ function getCoachMessage() {
 /* ---------- Canvas sizing ---------- */
 function resizeCanvas(canvas, ctx) {
   const rect = canvas.getBoundingClientRect();
+  if (rect.width < 1 || rect.height < 1) return rect; // hidden (e.g. presentation mode): keep last size
   const scale = window.devicePixelRatio || 1;
   const width = Math.max(1, Math.floor(rect.width * scale));
   const height = Math.max(1, Math.floor(rect.height * scale));
@@ -563,6 +617,8 @@ function seedParticles() {
     hot: Math.random() < 0.5
   }));
   sparks = [];
+  alphas = [];
+  fusionAcc = 0;
   neutrons = Array.from({ length: 64 }, () => ({
     th: Math.random() * Math.PI * 2,
     ph: Math.random() * Math.PI * 2,
@@ -648,8 +704,10 @@ function drawReactor(time) {
     if (autoSpin && !reduceMotion && !dragOn && velYaw === 0 && time - lastInteract > 3500) cam.yaw += dt * 0.00006;
   }
 
-  PROJ.cx = w * 0.47 + panX;
-  PROJ.cy = h * 0.45 + panY;
+  updateDisruption(dt);
+  const shk = disruptionShake();
+  PROJ.cx = w * 0.47 + panX + (shk ? (Math.random() * 2 - 1) * shk : 0);
+  PROJ.cy = h * 0.45 + panY + (shk ? (Math.random() * 2 - 1) * shk : 0);
   PROJ.focal = size * cam.focalK;
   updateViewDir();
 
@@ -708,13 +766,18 @@ function drawReactor(time) {
   for (let di = 0; di < ND; di += 1) {
     const th = (di / ND) * Math.PI * 2;
     const c = project(R * Math.cos(th), 0, R * Math.sin(th));
-    const rad = Math.max(2, A_PLASMA * c.s);
+    // A2: living-plasma turbulence — cheap layered sines make the core churn and flicker
+    const fl = reduceMotion ? 1 : (0.86 + 0.14 * Math.sin(time * 0.0045 + di * 0.7) + 0.09 * Math.sin(time * 0.012 + di * 2.3));
+    const radPulse = reduceMotion ? 1 : (0.97 + 0.05 * Math.sin(time * 0.006 + di * 1.5));
+    const rad = Math.max(2, A_PLASMA * c.s) * radPulse;
+    const coreA = (0.22 + intensity * 0.34) * fl;
+    const midA = (0.10 + intensity * 0.16) * fl;
     prims.push({ z: c.depth - 0.0005, d: () => {
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
       const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, rad * 1.25);
-      g.addColorStop(0, `rgba(${hotCore[0]},${hotCore[1]},${hotCore[2]},${0.22 + intensity * 0.34})`);
-      g.addColorStop(0.4, `rgba(${pColor[0]},${pColor[1]},${pColor[2]},${0.10 + intensity * 0.16})`);
+      g.addColorStop(0, `rgba(${hotCore[0]},${hotCore[1]},${hotCore[2]},${coreA})`);
+      g.addColorStop(0.4, `rgba(${pColor[0]},${pColor[1]},${pColor[2]},${midA})`);
       g.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(c.x, c.y, rad * 1.25, 0, Math.PI * 2); ctx.fill();
@@ -802,6 +865,9 @@ function drawReactor(time) {
     } });
   }
 
+  // A1: in-core fusion events — flashes and lingering alphas, rate scaled to fusion power
+  updateFusionEvents(prims, ctx, dt, time, intensity);
+
   // divertor — red exhaust ring at the bottom of the tube (split for occlusion)
   const sweep = (model.divertorSweep && !reduceMotion) ? Math.sin(time * 0.004) * 0.10 : 0;
   const dLoad = clamp(0.3 + model.wallLoad / 14, 0.3, 1) * (0.5 + intensity * 0.6);
@@ -821,6 +887,9 @@ function drawReactor(time) {
 
   // balance of plant (anchored in world space)
   addBOP(prims, ctx, time, intensity);
+
+  // A5: optional human + scale reference on the ground pad
+  addScaleReference(prims, ctx);
 
   /* ---- paint sorted ---- */
   prims.sort((a, b) => b.z - a.z);
@@ -844,6 +913,7 @@ function drawReactor(time) {
 
   applyBloom(ctx, w, h, 0.32 + intensity * 0.42);
   drawVignette(ctx, w, h);
+  drawDisruptionFlash(ctx, w, h);
   drawTitle(ctx, w, h);
   positionHotspots();
 }
@@ -1256,14 +1326,125 @@ function applyBloom(ctx, w, h, amount) {
   if (glowCanvas.width !== gw || glowCanvas.height !== gh) { glowCanvas.width = gw; glowCanvas.height = gh; }
   glowCtx.clearRect(0, 0, gw, gh);
   glowCtx.drawImage(reactorCanvas, 0, 0, gw, gh);
+  const base = Math.max(2, Math.round(Math.min(w, h) * 0.013));
+  const a = clamp(amount, 0, 1);
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-  ctx.globalAlpha = clamp(amount, 0, 1);
-  ctx.filter = `blur(${Math.max(2, Math.round(Math.min(w, h) * 0.013))}px)`;
+  // A2: multi-scale bloom — a wide soft halo plus a tighter, brighter core pass
+  ctx.globalAlpha = a * 0.55;
+  ctx.filter = `blur(${base * 2.2}px)`;
+  ctx.drawImage(glowCanvas, 0, 0, w, h);
+  ctx.globalAlpha = a;
+  ctx.filter = `blur(${base}px)`;
   ctx.drawImage(glowCanvas, 0, 0, w, h);
   ctx.filter = "none";
   ctx.globalAlpha = 1;
   ctx.restore();
+}
+
+/* ---- A1: in-core fusion events — bright flashes plus lingering alpha particles,
+   spawned in the hot core at a rate that scales with fusion power. Reuses the
+   previously unused sparks array and an alphas pool. ---- */
+function updateFusionEvents(prims, ctx, dt, time, intensity) {
+  if (!reduceMotion) {
+    const rate = intensity * 26;                 // events per second at full power
+    fusionAcc += (dt / 1000) * rate;
+    let guard = 0;
+    while (fusionAcc >= 1 && guard < 6) {
+      fusionAcc -= 1; guard += 1;
+      const th = Math.random() * Math.PI * 2;
+      const ph = Math.random() * Math.PI * 2;
+      const r = A_PLASMA * (0.12 + Math.random() * 0.5);
+      sparks.push({ th, ph, r, life: 1 });
+      alphas.push({ th, ph, r, life: 1, sp: 0.4 + Math.random() * 0.9, drift: (Math.random() * 2 - 1) * 0.7 });
+    }
+    if (sparks.length > 90) sparks.splice(0, sparks.length - 90);
+    if (alphas.length > 90) alphas.splice(0, alphas.length - 90);
+  }
+
+  // flash of the reaction
+  for (let i = sparks.length - 1; i >= 0; i -= 1) {
+    const s = sparks[i];
+    s.life -= dt * 0.0030;
+    if (s.life <= 0) { sparks.splice(i, 1); continue; }
+    const w = torusPt(s.th, s.ph, s.r);
+    const c = project(w[0], w[1], w[2]);
+    const k = s.life;
+    const rad = Math.max(2.5, A_PLASMA * c.s * 0.55) * (1.25 - k * 0.5);
+    prims.push({ z: c.depth - 0.003, d: () => {
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, rad);
+      g.addColorStop(0, `rgba(255,255,242,${0.85 * k})`);
+      g.addColorStop(0.4, `rgba(255,232,170,${0.5 * k})`);
+      g.addColorStop(1, "rgba(255,180,90,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(c.x, c.y, rad, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    } });
+  }
+
+  // the alpha (helium nucleus) that stays in the plasma and heats it
+  for (let i = alphas.length - 1; i >= 0; i -= 1) {
+    const a = alphas[i];
+    a.life -= dt * 0.00065;
+    if (a.life <= 0) { alphas.splice(i, 1); continue; }
+    if (!reduceMotion) { a.th += dt * 0.00012 * a.sp; a.ph += dt * 0.00026 * a.drift; }
+    const w = torusPt(a.th, a.ph, a.r);
+    const c = project(w[0], w[1], w[2]);
+    const rad = Math.max(1, 0.013 * c.s) * (0.55 + a.life * 0.6);
+    const al = a.life * 0.8;
+    prims.push({ z: c.depth - 0.0016, d: () => {
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = `rgba(255,206,110,${al})`;
+      ctx.beginPath(); ctx.arc(c.x, c.y, rad, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(255,240,206,${al * 0.7})`;
+      ctx.beginPath(); ctx.arc(c.x, c.y, rad * 0.45, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    } });
+  }
+}
+
+/* ---- A5: optional human + scale reference, stood on the ground pad in front of
+   the vessel so visitors grasp that the machine is building-sized. ---- */
+function addScaleReference(prims, ctx) {
+  if (!scaleRef) return;
+  const gy = -0.6, zf = 1.78, xh = 0.0, personH = 0.27;
+  const feet = project(xh, gy, zf);
+  const head = project(xh, gy + personH, zf);
+  prims.push({ z: feet.depth - 0.05, d: () => {
+    const x = feet.x, yb = feet.y, yt = head.y;
+    const hpx = Math.max(10, yb - yt);
+    ctx.save();
+    ctx.fillStyle = "rgba(18,24,34,0.94)";
+    ctx.strokeStyle = "rgba(120,210,255,0.7)"; ctx.lineWidth = 1.4;
+    const bw = hpx * 0.16;
+    ctx.beginPath();
+    ctx.moveTo(x - bw, yb);
+    ctx.lineTo(x - bw * 0.66, yt + hpx * 0.30);
+    ctx.quadraticCurveTo(x, yt + hpx * 0.17, x + bw * 0.66, yt + hpx * 0.30);
+    ctx.lineTo(x + bw, yb);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    const hr = hpx * 0.11;
+    ctx.beginPath(); ctx.arc(x, yt + hr * 1.2, hr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "rgba(200,224,255,0.92)";
+    ctx.font = "700 11px Inter, system-ui, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillText("~1.8 m", x, yt - 4);
+    ctx.restore();
+  } });
+  const b0 = project(xh - 0.72, gy, zf + 0.2);
+  const b1 = project(xh + 0.72, gy, zf + 0.2);
+  prims.push({ z: ((b0.depth + b1.depth) / 2) - 0.04, d: () => {
+    ctx.save();
+    ctx.strokeStyle = "rgba(120,210,255,0.8)"; ctx.lineWidth = 2; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(b0.x, b0.y); ctx.lineTo(b1.x, b1.y); ctx.stroke();
+    [b0, b1].forEach((p) => { ctx.beginPath(); ctx.moveTo(p.x, p.y - 5); ctx.lineTo(p.x, p.y + 5); ctx.stroke(); });
+    ctx.fillStyle = "rgba(200,224,255,0.92)";
+    ctx.font = "700 11px Inter, system-ui, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillText("~10 m", (b0.x + b1.x) / 2, (b0.y + b1.y) / 2 + 6);
+    ctx.restore();
+  } });
 }
 
 function drawCoreShaft(ctx, intensity, rgb) {
@@ -1494,6 +1675,33 @@ function drawLawson() {
   ctx.textAlign = "left";
   ctx.textBaseline = "bottom";
   ctx.fillText("IGNITION", xOf(24), yOf(ignitionNTau(24)) - 4);
+
+  // C2: real machines — labeled reference operating points (illustrative placement).
+  // None of these magnetic devices has crossed the ignition curve; NIF reached it with lasers.
+  if (showMachines) {
+    const machines = [
+      { k: "JET", T: 13, nTau: 4.2e19 },
+      { k: "EAST", T: 9, nTau: 5.0e19 },
+      { k: "SPARC", T: 17, nTau: 1.3e20 },
+      { k: "ITER", T: 13, nTau: 1.6e20 }
+    ];
+    machines.forEach((mc) => {
+      const mx = clamp(xOf(mc.T), padL + 5, w - padR - 5);
+      const my = clamp(yOf(mc.nTau), padT + 5, h - padB - 5);
+      ctx.save();
+      ctx.fillStyle = "rgba(150,190,255,0.95)";
+      ctx.strokeStyle = "rgba(12,16,24,0.9)"; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(mx, my - 4); ctx.lineTo(mx + 4, my); ctx.lineTo(mx, my + 4); ctx.lineTo(mx - 4, my);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "rgba(210,226,250,0.96)";
+      ctx.font = "700 9px Inter, system-ui, sans-serif";
+      ctx.textAlign = mc.T > 19 ? "right" : "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(mc.k, mx + (mc.T > 19 ? -7 : 7), my);
+      ctx.restore();
+    });
+  }
 
   // trail
   trail.forEach((pt, i) => {
@@ -1766,6 +1974,7 @@ function animate(time) {
     drawReactivity();
     drawSankey();
     drawFuelCycle(time);
+    drawCrossSection();
   }
   requestAnimationFrame(animate);
 }
@@ -2006,15 +2215,411 @@ function attachTips() {
   window.addEventListener("scroll", hideTip, true);
 }
 
+/* ---------- Phase 1 controls: themes, real-world units, presentation, scale ---------- */
+const THEMES = ["dark", "light", "contrast", "cb"];
+function applyTheme(name) {
+  const t = THEMES.includes(name) ? name : "dark";
+  if (t === "dark") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", t);
+  try { localStorage.setItem("fusionTheme", t); } catch (e) {}
+  const sel = document.getElementById("themeSelect");
+  if (sel) sel.value = t;
+}
+
+let kioskOn = false;
+function setKiosk(on) {
+  kioskOn = on;
+  document.body.classList.toggle("kiosk", on);
+  const btn = document.getElementById("presentBtn");
+  if (btn) { btn.setAttribute("aria-pressed", String(on)); btn.textContent = on ? "Exit" : "Present"; }
+  if (on) {
+    kioskLast = performance.now();
+    if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+  } else if (document.fullscreenElement && document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {});
+  }
+  setTimeout(() => {
+    resizeCanvas(reactorCanvas, reactorCtx);
+    resizeCanvas(lawsonCanvas, lawsonCtx);
+    resizeCanvas(historyCanvas, historyCtx);
+  }, 90);
+}
+
+function tickKiosk() {
+  if (!kioskOn) return;
+  const now = performance.now();
+  if (now - kioskLast > 12000) {
+    kioskLast = now;
+    const order = ["startup", "cruise", "gain", "stress", "cruise"];
+    kioskCycle = (kioskCycle + 1) % order.length;
+    applyPreset(order[kioskCycle]);
+  }
+}
+
+function initPhase1Controls() {
+  let savedTheme = "dark";
+  try { savedTheme = localStorage.getItem("fusionTheme") || "dark"; } catch (e) {}
+  applyTheme(savedTheme);
+  document.getElementById("themeSelect")?.addEventListener("change", (e) => applyTheme(e.target.value));
+
+  try { unitMode = localStorage.getItem("fusionUnits") === "1"; } catch (e) {}
+  const unitBtn = document.getElementById("unitsToggle");
+  const syncUnit = () => { if (unitBtn) unitBtn.setAttribute("aria-pressed", String(unitMode)); updateRealWorld(); };
+  syncUnit();
+  unitBtn?.addEventListener("click", () => {
+    unitMode = !unitMode;
+    try { localStorage.setItem("fusionUnits", unitMode ? "1" : "0"); } catch (e) {}
+    syncUnit();
+  });
+
+  document.getElementById("presentBtn")?.addEventListener("click", () => setKiosk(!kioskOn));
+  document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && kioskOn) setKiosk(false); });
+  ["pointerdown", "keydown"].forEach((ev) => document.addEventListener(ev, () => { kioskLast = performance.now(); }, { passive: true }));
+
+  const scaleBtn = document.getElementById("scaleToggle");
+  scaleBtn?.addEventListener("click", () => {
+    scaleRef = !scaleRef;
+    scaleBtn.setAttribute("aria-pressed", String(scaleRef));
+  });
+
+  const mac = document.getElementById("showMachines");
+  if (mac) {
+    mac.checked = showMachines;
+    mac.addEventListener("change", () => { showMachines = mac.checked; });
+  }
+}
+
+/* ============================================================
+   PHASE 2 ADDITIONS
+   Disruption FX, cross-section, materials, export, sound, tour, story.
+   ============================================================ */
+
+/* ---- A8: disruption + quench event (screen shake + flash) ---- */
+let disruptFx = { t: 0, prevRisk: 0, prevQuench: false };
+function updateDisruption(dt) {
+  const risk = model.disruptionRisk || 0;
+  const quench = !!model.emergencyQuench;
+  if ((risk > 0.62 && disruptFx.prevRisk <= 0.62) || (quench && !disruptFx.prevQuench)) disruptFx.t = 1;
+  disruptFx.prevRisk = risk; disruptFx.prevQuench = quench;
+  if (disruptFx.t > 0) disruptFx.t = Math.max(0, disruptFx.t - dt * 0.0016);
+}
+function disruptionShake() {
+  if (reduceMotion || disruptFx.t <= 0) return 0;
+  return disruptFx.t * disruptFx.t * 11;
+}
+function drawDisruptionFlash(ctx, w, h) {
+  if (disruptFx.t <= 0) return;
+  const k = disruptFx.t;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const g = ctx.createRadialGradient(w / 2, h * 0.45, 0, w / 2, h * 0.45, Math.max(w, h) * 0.72);
+  g.addColorStop(0, `rgba(255,${120 + Math.round(70 * k)},90,${0.30 * k})`);
+  g.addColorStop(0.5, `rgba(255,90,70,${0.12 * k})`);
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = `rgba(255,70,60,${0.55 * k})`;
+  ctx.lineWidth = 7 * k;
+  ctx.strokeRect(3, 3, w - 6, h - 6);
+  ctx.restore();
+}
+
+/* ---- A3: labeled poloidal cross-section inset ---- */
+function drawCrossSection() {
+  const cv = document.getElementById("crossCanvas");
+  if (!cv || cv.hidden) return;
+  const ctx = cv.getContext("2d");
+  const rect = resizeCanvas(cv, ctx);
+  const w = rect.width, h = rect.height;
+  ctx.clearRect(0, 0, w, h);
+  const cx = w * 0.40, cy = h * 0.52, R0 = Math.min(w, h) * 0.40;
+  const tNorm = clamp((model.temperature - 6) / 22, 0, 1);
+  const wallK = clamp((model.wallLoad || 0) / 14, 0, 1);
+  const inten = clamp((model.fusionPower || 0) / 1200, 0.05, 1);
+  const pcol = plasmaColor(tNorm);
+  const shells = [
+    { r: 1.00, col: [58, 66, 90], lab: "TF coil" },
+    { r: 0.90, col: [92, 106, 132], lab: "Vacuum vessel" },
+    { r: 0.78, col: [120 + Math.round(wallK * 120), 96, 70], lab: "Breeding blanket" },
+    { r: 0.60, col: [66, 138, 150], lab: "Scrape-off layer" },
+    { r: 0.52, col: mixColor([60, 150, 170], pcol, 0.5), lab: "Separatrix" },
+    { r: 0.45, col: pcol, lab: "Plasma" }
+  ];
+  const cc = (v) => clamp(Math.round(v), 0, 255);
+  shells.forEach((s) => {
+    ctx.beginPath(); ctx.arc(cx, cy, R0 * s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgb(${cc(s.col[0])},${cc(s.col[1])},${cc(s.col[2])})`;
+    ctx.fill();
+  });
+  ctx.save(); ctx.globalCompositeOperation = "lighter";
+  const hot = mixColor(pcol, [255, 255, 245], 0.5);
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R0 * 0.45);
+  g.addColorStop(0, `rgba(${hot[0]},${hot[1]},${hot[2]},${0.5 + inten * 0.4})`);
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R0 * 0.45, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  ctx.font = "10px Inter, system-ui, sans-serif"; ctx.textBaseline = "middle";
+  shells.forEach((s, i) => {
+    const ang = -Math.PI * 0.62 + (i - 2.5) * 0.14;
+    const ex = cx + Math.cos(ang) * R0 * s.r, ey = cy + Math.sin(ang) * R0 * s.r;
+    const ly = 24 + i * ((h - 34) / (shells.length - 1));
+    const tw = ctx.measureText(s.lab).width;
+    const lx = w - 8;
+    ctx.strokeStyle = "rgba(150,164,190,0.45)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(lx - tw - 10, ly); ctx.stroke();
+    ctx.fillStyle = `rgb(${cc(s.col[0])},${cc(s.col[1])},${cc(s.col[2])})`;
+    ctx.beginPath(); ctx.arc(lx - tw - 14, ly, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(225,232,244,0.92)"; ctx.textAlign = "right";
+    ctx.fillText(s.lab, lx, ly);
+  });
+  ctx.fillStyle = "rgba(150,164,190,0.85)"; ctx.font = "700 9px Inter, system-ui, sans-serif";
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillText("CROSS-SECTION", 8, 14);
+}
+
+/* ---- D1: first-wall / materials accrual ---- */
+let wallDose = 0;
+function updateMaterials(dt) {
+  const wl = model.wallLoad || 0;
+  wallDose += wl * dt * 0.004; // illustrative displacement-per-atom accrual
+  const dEl = document.getElementById("matDose");
+  const sEl = document.getElementById("matStatus");
+  const bEl = document.getElementById("matLifeBar");
+  if (dEl) dEl.textContent = `${wallDose.toFixed(2)} dpa`;
+  let status = "Nominal", cls = "ok";
+  if (wl > 12) { status = "Over limit"; cls = "bad"; }
+  else if (wl > 8) { status = "Elevated"; cls = "warn"; }
+  if (sEl) { sEl.textContent = status; sEl.className = `mat-status ${cls}`; }
+  if (bEl) {
+    const life = clamp(1 - wallDose / 100, 0, 1);
+    bEl.style.width = `${life * 100}%`;
+    bEl.style.background = life < 0.25 ? "var(--coral)" : "var(--teal)";
+  }
+}
+
+/* ---- C7: export the run as a CSV lab worksheet ---- */
+function exportRun() {
+  const m = model;
+  const L = [];
+  L.push("Fusion Power Generator - run export");
+  L.push(`exported,${new Date().toISOString()}`);
+  L.push("");
+  L.push("Setpoints");
+  L.push(`temperature_keV,${Number(controls.temperature.value)}`);
+  L.push(`magnetic_field_T,${Number(controls.magneticField.value)}`);
+  L.push(`fuel_injection_pct,${Number(controls.fuelRate.value)}`);
+  L.push(`DT_balance,${Number(controls.fuelBalance.value)}`);
+  L.push(`coolant_pct,${Number(controls.coolingFlow.value)}`);
+  L.push(`turbine_load_pct,${Number(controls.turbineLoad.value)}`);
+  L.push(`neutral_beam,${controls.neutralBeam.checked}`);
+  L.push(`pellet_pacing,${controls.pelletPulse.checked}`);
+  L.push(`divertor_sweep,${controls.divertorSweep.checked}`);
+  L.push(`emergency_quench,${controls.emergencyQuench.checked}`);
+  L.push("");
+  L.push("Outputs");
+  L.push(`fusion_power_MW,${Math.round(m.fusionPower || 0)}`);
+  L.push(`energy_gain_Q,${(m.q || 0).toFixed(2)}`);
+  L.push(`net_electric_MW,${Math.round(m.netElec || 0)}`);
+  L.push(`triple_product_e21,${(m.triple || 0).toFixed(2)}`);
+  L.push(`confinement_tauE_s,${(m.tauE || 0).toFixed(2)}`);
+  L.push(`stability_pct,${Math.round(m.stability || 0)}`);
+  L.push(`wall_load_MWm2,${(m.wallLoad || 0).toFixed(1)}`);
+  L.push(`tritium_breeding_ratio,${(m.tritiumRatio || 0).toFixed(2)}`);
+  L.push(`first_wall_dose_dpa,${wallDose.toFixed(2)}`);
+  L.push("");
+  L.push("History (oldest to newest)");
+  L.push("sample,net_electric_MW,fusion_power_MW");
+  for (let i = 0; i < netHistory.length; i += 1) L.push(`${i},${Math.round(netHistory[i])},${Math.round(fusionHistory[i])}`);
+  const blob = new Blob([L.join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "fusion-run.csv";
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+}
+
+/* ---- B7: optional soundscape (off by default) ---- */
+let audioCtx = null, soundOn = false, humOsc = null, humGain = null;
+let sndPrevPhi = 0, sndPrevDisr = 0, sndPrevMissions = 0;
+function initAudio() {
+  if (audioCtx) return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AC();
+    humOsc = audioCtx.createOscillator(); humOsc.type = "sine"; humOsc.frequency.value = 60;
+    humGain = audioCtx.createGain(); humGain.gain.value = 0;
+    humOsc.connect(humGain); humGain.connect(audioCtx.destination);
+    humOsc.start();
+  } catch (e) { audioCtx = null; }
+}
+function blip(freq, dur, type, vol) {
+  if (!audioCtx || !soundOn) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = type || "sine"; o.frequency.value = freq;
+  o.connect(g); g.connect(audioCtx.destination);
+  const t = audioCtx.currentTime;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol || 0.12, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + (dur || 0.3));
+  o.start(t); o.stop(t + (dur || 0.3) + 0.03);
+}
+function chimeUp() { blip(523, 0.18, "triangle", 0.12); setTimeout(() => blip(784, 0.32, "triangle", 0.12), 120); }
+function alarmTone() { blip(175, 0.5, "sawtooth", 0.14); setTimeout(() => blip(140, 0.5, "sawtooth", 0.12), 150); }
+function setSound(on) {
+  soundOn = on;
+  if (on) {
+    initAudio();
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+    sndPrevMissions = Number(document.getElementById("missionCount")?.textContent || 0);
+  }
+  if (humGain && audioCtx) humGain.gain.setTargetAtTime(on ? 0.02 : 0, audioCtx.currentTime, 0.15);
+  const btn = document.getElementById("soundToggle");
+  if (btn) btn.setAttribute("aria-pressed", String(on));
+  try { localStorage.setItem("fusionSound", on ? "1" : "0"); } catch (e) {}
+}
+function updateSound() {
+  if (!soundOn || !audioCtx) return;
+  const target = clamp((model.fusionPower || 0) / 2000, 0, 1);
+  if (humGain) humGain.gain.setTargetAtTime(0.012 + target * 0.05, audioCtx.currentTime, 0.3);
+  if (humOsc) humOsc.frequency.setTargetAtTime(46 + target * 92, audioCtx.currentTime, 0.3);
+  const phi = model.phi || 0;
+  if (phi >= 0.95 && sndPrevPhi < 0.95) chimeUp();
+  sndPrevPhi = phi;
+  const dr = model.disruptionRisk || 0;
+  if (dr > 0.62 && sndPrevDisr <= 0.62) alarmTone();
+  sndPrevDisr = dr;
+  const mc = Number(document.getElementById("missionCount")?.textContent || 0);
+  if (mc > sndPrevMissions) { chimeUp(); sndPrevMissions = mc; }
+}
+
+/* ---- B4: guided tour + power-up ---- */
+const TOUR = [
+  { sel: ".preset-row", title: "Start with a preset", body: "Jump to Cruise or High Gain, then fine-tune the sliders from there." },
+  { sel: "#temperature", title: "Heat the fuel", body: "Temperature sets how fast deuterium and tritium fuse. Slide it up and watch the core brighten." },
+  { sel: "#magneticField", title: "Hold it together", body: "A stronger magnetic field confines the plasma longer, lifting the triple product toward ignition." },
+  { sel: ".reactor-stage", title: "The reactor", body: "Drag to orbit, scroll to zoom. Try the Scale and Cutaway buttons at the lower left." },
+  { sel: "#qPlasma", title: "Energy gain Q", body: "Fusion power out divided by heating in. Above 1 is breakeven; keep climbing toward ignition." },
+  { sel: "#lawsonCanvas", title: "Where you stand", body: "Your operating point against the ignition curve and real machines like ITER and SPARC." }
+];
+let tourStep = -1;
+function showTourStep(i) {
+  const card = document.getElementById("tourCard");
+  const ring = document.getElementById("tourRing");
+  if (!card || !ring) return;
+  if (i < 0 || i >= TOUR.length) { endTour(); return; }
+  tourStep = i;
+  const step = TOUR[i];
+  const el = document.querySelector(step.sel);
+  if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  setTimeout(() => {
+    const r = el ? el.getBoundingClientRect() : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 0, height: 0 };
+    ring.style.left = `${r.left - 6}px`; ring.style.top = `${r.top - 6}px`;
+    ring.style.width = `${r.width + 12}px`; ring.style.height = `${r.height + 12}px`;
+    ring.hidden = false;
+    const set = (id, t) => { const n = document.getElementById(id); if (n) n.textContent = t; };
+    set("tourTitle", step.title); set("tourBody", step.body); set("tourProg", `${i + 1} / ${TOUR.length}`);
+    const nb = document.getElementById("tourNext"); if (nb) nb.textContent = i === TOUR.length - 1 ? "Done" : "Next";
+    let cx2 = r.left, cy2 = r.top + r.height + 12;
+    if (cy2 + 170 > window.innerHeight) cy2 = Math.max(12, r.top - 176);
+    card.style.left = `${clamp(cx2, 12, Math.max(12, window.innerWidth - 332))}px`;
+    card.style.top = `${clamp(cy2, 12, Math.max(12, window.innerHeight - 176))}px`;
+    card.hidden = false;
+  }, 240);
+}
+function startTour() { const o = document.getElementById("tourOverlay"); if (o) o.hidden = false; showTourStep(0); }
+function endTour() {
+  ["tourOverlay", "tourCard", "tourRing"].forEach((id) => { const e = document.getElementById(id); if (e) e.hidden = true; });
+  tourStep = -1;
+  try { localStorage.setItem("fusionTourDone", "1"); } catch (e) {}
+}
+function runPowerUp() {
+  const ov = document.getElementById("powerup");
+  let firstVisit = false;
+  try { firstVisit = !localStorage.getItem("fusionTourDone"); } catch (e) {}
+  if (ov) {
+    if (reduceMotion) ov.hidden = true;
+    else { ov.hidden = false; ov.classList.add("run"); setTimeout(() => { ov.hidden = true; }, 1900); }
+  }
+  if (firstVisit) setTimeout(() => startTour(), reduceMotion ? 400 : 2200);
+}
+
+/* ---- C1: guided story mode ---- */
+const STORY = [
+  { title: "1. Just cold gas", body: "Right now the deuterium and tritium are too cold to fuse, so nothing happens. Let us change that.", hint: "Watch the core stay dark.", test: () => true },
+  { title: "2. Heat the fuel", body: "Raise plasma temperature. Hotter ions collide hard enough to fuse, and the reaction rate climbs steeply.", hint: "Set temperature to about 15 keV.", test: () => Number(controls.temperature.value) >= 14 },
+  { title: "3. Hold it with the field", body: "Heat leaks out unless you confine it. Raise the magnetic field to keep the energy in long enough to matter.", hint: "Set magnetic field near 7 T.", test: () => Number(controls.magneticField.value) >= 6.8 },
+  { title: "4. Feed the fire", body: "More fuel means more reactions. Increase injection and watch fusion power climb.", hint: "Get fusion power above 400 MW.", test: (m) => (m.fusionPower || 0) >= 400 },
+  { title: "5. Cross breakeven", body: "When fusion power passes the heating you supply, Q passes 1. You now get more out than you put in.", hint: "Push Q above 1.", test: (m) => (m.q || 0) >= 1 },
+  { title: "6. Ignition", body: "Near ignition the plasma heats itself and Q runs away. This is the goal of fusion energy.", hint: "Reach the ignition state.", test: (m) => (m.phi || 0) >= 0.95 }
+];
+let storyOn = false, storyStep = 0;
+function renderStory() {
+  const panel = document.getElementById("storyPanel");
+  if (!panel) return;
+  panel.hidden = !storyOn;
+  if (!storyOn) return;
+  const s = STORY[storyStep];
+  const set = (id, t) => { const n = document.getElementById(id); if (n) n.textContent = t; };
+  set("storyTitle", s.title); set("storyBody", s.body); set("storyHint", s.hint);
+  set("storyProg", `Step ${storyStep + 1} of ${STORY.length}`);
+  const pv = document.getElementById("storyPrev"); if (pv) pv.disabled = storyStep === 0;
+  const nx = document.getElementById("storyNext"); if (nx) nx.textContent = storyStep === STORY.length - 1 ? "Finish" : "Next";
+}
+function updateStory() {
+  if (!storyOn) return;
+  const met = !!STORY[storyStep].test(model);
+  const badge = document.getElementById("storyCheck");
+  if (badge) { badge.textContent = met ? "Goal met" : "Try it"; badge.className = `story-check ${met ? "met" : ""}`; }
+}
+function setStory(on) {
+  storyOn = on; storyStep = 0;
+  const btn = document.getElementById("storyToggle");
+  if (btn) btn.setAttribute("aria-pressed", String(on));
+  renderStory();
+}
+function storyNav(d) {
+  if (storyOn && storyStep === STORY.length - 1 && d > 0) { setStory(false); return; }
+  storyStep = clamp(storyStep + d, 0, STORY.length - 1);
+  renderStory();
+}
+
+function initPhase2Controls() {
+  const cut = document.getElementById("cutawayToggle");
+  cut?.addEventListener("click", () => {
+    const cv = document.getElementById("crossCanvas");
+    if (!cv) return;
+    const on = cv.hidden;
+    cv.hidden = !on;
+    cut.setAttribute("aria-pressed", String(on));
+  });
+  document.getElementById("soundToggle")?.addEventListener("click", () => setSound(!soundOn));
+  document.getElementById("tourBtn")?.addEventListener("click", () => startTour());
+  document.getElementById("tourNext")?.addEventListener("click", () => showTourStep(tourStep + 1));
+  document.getElementById("tourSkip")?.addEventListener("click", () => endTour());
+  document.getElementById("tourOverlay")?.addEventListener("click", (e) => { if (e.target.id === "tourOverlay") endTour(); });
+  document.getElementById("exportBtn")?.addEventListener("click", () => exportRun());
+  document.getElementById("storyToggle")?.addEventListener("click", () => setStory(!storyOn));
+  document.getElementById("storyNext")?.addEventListener("click", () => storyNav(1));
+  document.getElementById("storyPrev")?.addEventListener("click", () => storyNav(-1));
+  document.getElementById("storyClose")?.addEventListener("click", () => setStory(false));
+  runPowerUp();
+}
+
 seedParticles();
 updateReadouts();
 initNavHud();
 buildMissions();
 attachTips();
+initPhase1Controls();
+initPhase2Controls();
 setInterval(() => {
+  advanceDynamics(0.36);
   model = calculateModel();
   tickHistory();
   updateReadouts();
   updateMissions();
+  tickKiosk();
+  updateMaterials(0.36);
+  updateSound();
+  updateStory();
 }, 360);
 requestAnimationFrame(animate);

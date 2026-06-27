@@ -17,36 +17,19 @@
           <h1>Fusion Power Generator</h1>
           <p class="subtitle">Drive a magnetic-confinement reactor toward ignition and watch the physics respond.</p>
         </div>
-        <div class="topbar-right">
-          <div class="topbar-tools">
-            <label class="tool-select">
-              <span>Theme</span>
-              <select id="themeSelect" aria-label="Color theme">
-                <option value="dark">Control room</option>
-                <option value="light">Light</option>
-                <option value="contrast">High contrast</option>
-                <option value="cb">Colorblind</option>
-              </select>
-            </label>
-            <button class="tool-btn" id="unitsToggle" type="button" aria-pressed="false" title="Show readouts in everyday units">Real-world units</button>
-            <button class="tool-btn" id="soundToggle" type="button" aria-pressed="false" title="Toggle reactor sound">Sound</button>
-            <button class="tool-btn" id="tourBtn" type="button" title="Take a guided tour">Tour</button>
-            <button class="tool-btn" id="presentBtn" type="button" aria-pressed="false" title="Fullscreen exhibit mode">Present</button>
-          </div>
-          <div class="status-strip" aria-live="polite">
-            <span class="status-block">
-              <span class="status-caption">Reactor state</span>
-              <span id="reactorState" class="state-pill">Startup</span>
-            </span>
-            <span class="status-block">
-              <span class="status-caption">Net electric</span>
-              <span id="netPowerBadge" class="power-badge">0 MW</span>
-            </span>
-            <span class="status-block">
-              <span class="status-caption">Energy gain Q</span>
-              <span id="qBadge" class="q-badge">0.0</span>
-            </span>
-          </div>
+        <div class="status-strip" aria-live="polite">
+          <span class="status-block">
+            <span class="status-caption">Reactor state</span>
+            <span id="reactorState" class="state-pill">Startup</span>
+          </span>
+          <span class="status-block">
+            <span class="status-caption">Net electric</span>
+            <span id="netPowerBadge" class="power-badge">0 MW</span>
+          </span>
+          <span class="status-block">
+            <span class="status-caption">Energy gain Q</span>
+            <span id="qBadge" class="q-badge">0.0</span>
+          </span>
         </div>
       </header>
 
@@ -57,11 +40,6 @@
             <p class="panel-kicker">Control Room</p>
             <h2>Operating Setpoints</h2>
           </div>
-
-          <button type="button" class="story-launch" id="storyToggle" aria-pressed="false">
-            <span class="story-launch-icon" aria-hidden="true">&#9654;</span>
-            <span><strong>Guided story</strong><small>From cold gas to ignition, step by step</small></span>
-          </button>
 
           <div class="preset-row" aria-label="Preset operating modes">
             <button class="preset active" type="button" data-preset="startup">Startup</button>
@@ -164,12 +142,6 @@
             <span><em id="stageField">5.2</em> T</span>
             <span><em id="stageDensity">0.61</em>×10²⁰ m⁻³</span>
           </div>
-
-          <div class="stage-toggles">
-            <button type="button" class="stage-toggle" id="scaleToggle" aria-pressed="false" title="Show a person and scale bar for size">Scale</button>
-            <button type="button" class="stage-toggle" id="cutawayToggle" aria-pressed="false" title="Show a labeled cross-section">Cutaway</button>
-          </div>
-          <canvas id="crossCanvas" class="cross-inset" hidden aria-label="Reactor cross-section"></canvas>
 
           <!-- Orientation gizmo + view snaps (top-right) -->
           <div class="nav-gizmo" aria-label="View orientation">
@@ -274,42 +246,6 @@
             </div>
           </div>
 
-          <section class="realworld" id="realWorld" hidden aria-live="polite">
-            <p class="rw-kicker">In everyday terms</p>
-            <div class="rw-grid">
-              <div class="rw-item">
-                <span class="rw-label">Plasma temperature</span>
-                <strong id="rwTemp">.</strong>
-                <span class="rw-sub" id="rwTempSub">.</span>
-              </div>
-              <div class="rw-item">
-                <span class="rw-label">Net electricity</span>
-                <strong id="rwHomes">.</strong>
-                <span class="rw-sub" id="rwHomesSub">.</span>
-              </div>
-            </div>
-          </section>
-
-          <section class="materials" aria-label="First wall and materials">
-            <div class="mat-head">
-              <p class="mat-kicker">First wall &amp; materials</p>
-              <span class="mat-status ok" id="matStatus">Nominal</span>
-            </div>
-            <div class="mat-row">
-              <span>Integrated neutron dose</span>
-              <strong id="matDose">0.00 dpa</strong>
-            </div>
-            <div class="mat-row">
-              <span>First-wall life</span>
-              <div class="bar"><span id="matLifeBar"></span></div>
-            </div>
-            <p class="mat-note">Tungsten plasma-facing surfaces take the neutron and heat flux. Surviving it is a central materials challenge, and the focus of programs like Purdue's.</p>
-          </section>
-
-          <div class="tele-actions">
-            <button type="button" class="tool-btn wide" id="exportBtn" title="Download this run as a CSV">Export run (CSV)</button>
-          </div>
-
           <section class="coach" aria-live="polite">
             <p class="coach-kicker">Operator's read</p>
             <p id="coachText">Bring the plasma up to temperature with confinement to match, then watch the operating point climb toward the ignition curve.</p>
@@ -343,10 +279,7 @@
             <span class="legend-item"><i class="swatch swatch-ignite"></i>Ignition curve</span>
             <span class="legend-item"><i class="swatch swatch-breakeven"></i>Breakeven (Q = 1)</span>
             <span class="legend-item"><i class="swatch swatch-point"></i>Your operating point</span>
-            <span class="legend-item"><i class="swatch swatch-machine"></i>Real machines</span>
-            <label class="viz-toggle"><input type="checkbox" id="showMachines" checked> Show real machines</label>
           </div>
-          <p class="viz-foot">Real devices placed for scale (illustrative). None has yet crossed the ignition curve by magnetic confinement; NIF reached ignition with lasers.</p>
         </article>
 
         <article class="panel viz-panel">
@@ -372,158 +305,4 @@
           </div>
           <div class="balance-legend">
             <span class="legend-item"><i class="swatch swatch-ext"></i>Heating input</span>
-            <span class="legend-item"><i class="swatch swatch-alpha"></i>α self-heating (stays)</span>
-            <span class="legend-item"><i class="swatch swatch-neutron"></i>Neutrons → blanket</span>
-          </div>
-          <div class="balance-foot">
-            <span>Gain factor</span>
-            <strong id="qBig">Q = 0.0</strong>
-          </div>
-        </article>
-
-        <article class="panel viz-panel">
-          <div class="panel-heading">
-            <p class="panel-kicker">History</p>
-            <h2>Output Over Time</h2>
-          </div>
-          <p class="viz-caption">Net electrical output (teal) and fusion power (amber) over the last ~40 seconds of simulated time.</p>
-          <canvas id="historyCanvas"></canvas>
-          <div class="chart-title">
-            <span>Peak net electric</span>
-            <strong id="chartPeak">0 MW</strong>
-          </div>
-        </article>
-      </section>
-
-      <!-- PHYSICS LAB ROW -->
-      <section class="analysis-grid" aria-label="Fusion physics graphs">
-        <article class="panel viz-panel">
-          <div class="panel-heading">
-            <p class="panel-kicker">Why so hot?</p>
-            <h2>D-T Reactivity</h2>
-          </div>
-          <p class="viz-caption">How fast deuterium and tritium fuse as the plasma heats up. The rate climbs steeply, peaks near 65 keV, then eases, but reactors run cooler (~10-20 keV) because confinement there is achievable.</p>
-          <canvas id="reactivityCanvas" aria-label="D-T reactivity versus temperature"></canvas>
-          <div class="legend">
-            <span class="legend-item"><i class="swatch swatch-react"></i>Reaction rate ⟨σv⟩</span>
-            <span class="legend-item"><i class="swatch swatch-point"></i>Your temperature</span>
-          </div>
-        </article>
-
-        <article class="panel viz-panel">
-          <div class="panel-heading">
-            <p class="panel-kicker">Follow the energy</p>
-            <h2>Energy Flow</h2>
-          </div>
-          <p class="viz-caption">Where the power goes: heating and fusion in, through the blanket and turbine to gross electricity, minus the plant's own draw, leaving the net that reaches the grid.</p>
-          <canvas id="sankeyCanvas" aria-label="Energy flow diagram"></canvas>
-        </article>
-
-        <article class="panel viz-panel">
-          <div class="panel-heading">
-            <p class="panel-kicker">The reaction</p>
-            <h2>D-T Fuel Cycle</h2>
-          </div>
-          <p class="viz-caption">Deuterium and tritium fuse into helium and a fast neutron; the neutron breeds fresh tritium from lithium in the blanket, closing the fuel loop.</p>
-          <canvas id="fuelCycleCanvas" aria-label="Deuterium-tritium fuel cycle"></canvas>
-        </article>
-      </section>
-
-      <!-- LEARNING ROW -->
-      <section class="learn-grid" aria-label="Educational concepts">
-        <article class="panel lesson-panel">
-          <div class="panel-heading">
-            <p class="panel-kicker" id="lessonTopic">Plasma core</p>
-            <h2 id="lessonTitle">A hot charged gas does the work.</h2>
-          </div>
-          <p id="lessonBody">
-            Heat deuterium and tritium until their nuclei move fast enough to fuse. The goal is a dense, stable plasma that releases more heat than the injectors consume.
-          </p>
-          <details class="deeper">
-            <summary>Go deeper</summary>
-            <p id="lessonDeeper">Select a component on the reactor to see the physics behind it.</p>
-            <p class="formula" id="lessonFormula"></p>
-          </details>
-          <p class="lesson-note" id="lessonNote">Raise temperature and confinement together to move toward ignition.</p>
-        </article>
-
-        <article class="panel glossary-panel">
-          <div class="panel-heading">
-            <p class="panel-kicker">Reference</p>
-            <h2>Glossary</h2>
-          </div>
-          <dl class="glossary">
-            <div>
-              <dt>Triple product (nT&tau;<sub>E</sub>)</dt>
-              <dd>Density times temperature times energy confinement time, the single figure of merit for fusion progress. D-T ignition needs about 3×10²¹ keV·s·m⁻³.</dd>
-            </div>
-            <div>
-              <dt>Lawson criterion</dt>
-              <dd>The threshold where fusion self-heating balances energy losses. Above it, the plasma can sustain itself without external heating.</dd>
-            </div>
-            <div>
-              <dt>Energy gain (Q)</dt>
-              <dd>Fusion power produced ÷ external heating power supplied. Q = 1 is scientific breakeven; Q → ∞ is ignition.</dd>
-            </div>
-            <div>
-              <dt>Confinement time (&tau;<sub>E</sub>)</dt>
-              <dd>How long the plasma holds its energy before it leaks out. Stronger magnetic fields and larger devices increase it.</dd>
-            </div>
-            <div>
-              <dt>Alpha heating</dt>
-              <dd>Each D-T reaction makes a 3.5 MeV helium nucleus (alpha, ~20% of the energy) that stays in the plasma and heats it. The 14.1 MeV neutron (~80%) escapes.</dd>
-            </div>
-            <div>
-              <dt>Tritium breeding ratio</dt>
-              <dd>Tritium bred in the lithium blanket per tritium burned. Above 1.0 the plant replaces its own fuel.</dd>
-            </div>
-            <div>
-              <dt>Divertor</dt>
-              <dd>The component that exhausts helium ash and heat from the plasma edge, protecting the vessel wall.</dd>
-            </div>
-            <div>
-              <dt>Disruption</dt>
-              <dd>A sudden loss of confinement when plasma pressure outruns the magnetic field, dumping energy onto the walls.</dd>
-            </div>
-          </dl>
-        </article>
-      </section>
-    </main>
-
-    <!-- Power-up intro -->
-    <div id="powerup" class="powerup" aria-hidden="true" hidden><span>Reactor online</span></div>
-
-    <!-- Guided tour -->
-    <div id="tourOverlay" class="tour-overlay" hidden></div>
-    <div id="tourRing" class="tour-ring" hidden aria-hidden="true"></div>
-    <div id="tourCard" class="tour-card" hidden role="dialog" aria-label="Guided tour">
-      <p class="tour-prog" id="tourProg">1 / 6</p>
-      <h3 id="tourTitle">Welcome</h3>
-      <p id="tourBody"></p>
-      <div class="tour-actions">
-        <button type="button" class="tour-skip" id="tourSkip">Skip</button>
-        <button type="button" class="tour-next" id="tourNext">Next</button>
-      </div>
-    </div>
-
-    <!-- Guided story mode -->
-    <section id="storyPanel" class="story-panel" hidden role="dialog" aria-label="Guided story">
-      <button type="button" class="story-close" id="storyClose" aria-label="Close story">&times;</button>
-      <div class="story-top">
-        <p class="story-prog" id="storyProg">Step 1 of 6</p>
-        <span class="story-check" id="storyCheck">Try it</span>
-      </div>
-      <h3 id="storyTitle">Just cold gas</h3>
-      <p id="storyBody"></p>
-      <p class="story-hint" id="storyHint"></p>
-      <div class="story-actions">
-        <button type="button" class="story-prev" id="storyPrev">Back</button>
-        <button type="button" class="story-next" id="storyNext">Next</button>
-      </div>
-    </section>
-
-    <div id="tipPop" class="tip-pop" role="tooltip" hidden></div>
-
-    <script src="script.js"></script>
-  </body>
-</html>
+            <span class="legend-it
