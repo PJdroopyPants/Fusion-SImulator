@@ -3021,7 +3021,7 @@ const PREDICT_Q = [
   { q: "Turning on the divertor sweep mainly...", choices: ["lowers peak wall heat", "raises fusion power", "cools the grid"], answer: 0, why: "It spreads the exhaust load over a larger area, easing the peak heat flux." },
   { q: "To send real power to the grid you need roughly...", choices: ["Q well above 1", "any Q above 0", "Q below 1"], answer: 0, why: "The plant must cover its own recirculating power, so net electricity needs a high Q." }
 ];
-let predictIdx = -1, predictAnswered = false;
+let predictIdx = -1, predictAnswered = false, predictOrder = [];
 function renderPredict() {
   const qEl = document.getElementById("predictQ"), choicesEl = document.getElementById("predictChoices"), fbEl = document.getElementById("predictFeedback");
   if (!qEl || !choicesEl) return;
@@ -3030,9 +3030,15 @@ function renderPredict() {
   if (fbEl) { fbEl.hidden = true; fbEl.textContent = ""; }
   predictAnswered = false;
   choicesEl.innerHTML = "";
-  item.choices.forEach((c, i) => {
+  // Shuffle so the correct answer is not always in the same slot.
+  predictOrder = item.choices.map((text, i) => ({ text, correct: i === item.answer }));
+  for (let k = predictOrder.length - 1; k > 0; k -= 1) {
+    const j = Math.floor(Math.random() * (k + 1));
+    [predictOrder[k], predictOrder[j]] = [predictOrder[j], predictOrder[k]];
+  }
+  predictOrder.forEach((c, i) => {
     const btn = document.createElement("button");
-    btn.type = "button"; btn.className = "predict-choice"; btn.textContent = c;
+    btn.type = "button"; btn.className = "predict-choice"; btn.textContent = c.text;
     btn.addEventListener("click", () => answerPredict(i));
     choicesEl.appendChild(btn);
   });
@@ -3043,11 +3049,11 @@ function answerPredict(i) {
   const item = PREDICT_Q[predictIdx];
   const fbEl = document.getElementById("predictFeedback");
   document.querySelectorAll("#predictChoices .predict-choice").forEach((b, idx) => {
-    if (idx === item.answer) b.classList.add("correct");
+    if (predictOrder[idx] && predictOrder[idx].correct) b.classList.add("correct");
     else if (idx === i) b.classList.add("wrong");
     b.disabled = true;
   });
-  const right = i === item.answer;
+  const right = !!(predictOrder[i] && predictOrder[i].correct);
   if (fbEl) {
     fbEl.hidden = false;
     fbEl.className = `predict-feedback ${right ? "right" : "miss"}`;
