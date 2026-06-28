@@ -85,8 +85,9 @@ The simulator honors the operating system's reduced-motion setting (it stills an
 - `index.html` is the structure and content.
 - `styles.css` is the visual theme, including the light, high-contrast, and colorblind variants.
 - `script.js` holds the physics model, the burn-through dynamics, the software 3D renderer, the WebGL plasma shader, and the data visualizations.
-- `Fusion-Simulator-Enhancement-Roadmap.html` is the design and enhancement roadmap.
-- `backups/` holds copies of the files from before the enhancement work.
+- `Fusion-Lab-Worksheet.html` is the one-page student lab handout; `Fusion-Lab-Instructor-Key.html` is the matching instructor answer key (marked "do not distribute").
+- `Fusion-Simulator-Enhancement-Roadmap.html` is the current status-and-roadmap document: what is already shipped and a prioritized, verified list of next steps.
+- `backups/` holds copies of the files from before the enhancement work. It is reference only and need not ship with the donated bundle.
 - `3D_assets/` holds reference CAD and 3D-print models (STL and STEP). These are not used by the application; they are kept as reference geometry and as printable handouts.
 
 ## Disclaimer

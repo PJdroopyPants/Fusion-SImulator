@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fusion Simulator - Enhancement Roadmap</title>
+<title>Fusion Simulator — Status &amp; Roadmap</title>
+<meta name="description" content="Current build status and a prioritized, verified roadmap for the Fusion Power Generator Simulator, scoped for a campus-outreach donation.">
 <style>
   :root{
     --bg:#0b0d12; --bg2:#0e1117; --panel:rgba(22,26,34,.82); --panel2:rgba(31,37,48,.6);
@@ -16,10 +17,7 @@
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
-  body{
-    margin:0; background:var(--bg); color:var(--text); line-height:1.6;
-    -webkit-font-smoothing:antialiased;
-  }
+  body{margin:0; background:var(--bg); color:var(--text); line-height:1.6; -webkit-font-smoothing:antialiased;}
   .ambient{position:fixed; inset:0; z-index:0; pointer-events:none;
     background:
       radial-gradient(60% 50% at 16% 8%, rgba(56,225,198,.10), transparent 70%),
@@ -27,49 +25,38 @@
       radial-gradient(70% 60% at 50% 100%, rgba(255,122,102,.07), transparent 70%),
       var(--bg);}
   .wrap{position:relative; z-index:1; width:min(1020px,100%); margin:0 auto; padding:56px clamp(16px,4vw,40px) 90px;}
-
-  /* ---- type ---- */
   .kicker{margin:0 0 10px; color:var(--teal); font-size:.74rem; font-weight:800; letter-spacing:.16em; text-transform:uppercase;}
-  h1{margin:0; font-size:clamp(2rem,5vw,3.3rem); line-height:1.03; letter-spacing:-.015em;
+  h1{margin:0; font-size:clamp(2rem,5vw,3.2rem); line-height:1.04; letter-spacing:-.015em;
      background:linear-gradient(118deg,#fff 18%,var(--teal) 128%); -webkit-background-clip:text; background-clip:text; color:transparent;}
-  .lede{margin:18px 0 0; max-width:64ch; color:var(--muted); font-size:1.06rem;}
+  .lede{margin:18px 0 0; max-width:66ch; color:var(--muted); font-size:1.06rem;}
   h2{font-size:1.5rem; letter-spacing:-.01em; margin:0;}
-  h3{font-size:1.06rem; margin:0;}
+  h3{font-size:1.04rem; margin:0;}
   a{color:var(--teal); text-decoration:none;} a:hover{text-decoration:underline;}
   code{font-family:var(--mono); font-size:.84em; color:var(--teal); background:rgba(56,225,198,.08);
        border:1px solid rgba(56,225,198,.18); border-radius:5px; padding:1px 6px;}
   strong{color:#fff;}
-
-  /* ---- hero meta ---- */
   .meta{display:flex; flex-wrap:wrap; gap:10px; margin-top:26px;}
   .chip{display:inline-flex; align-items:center; gap:7px; padding:7px 13px; border:1px solid var(--line2);
         border-radius:999px; background:var(--panel2); color:var(--muted); font-size:.8rem; font-weight:600;}
   .chip b{color:var(--text); font-weight:700;}
-
-  /* ---- section scaffolding ---- */
   section{position:relative; z-index:1; margin-top:54px;}
   .sec-head{display:flex; align-items:baseline; gap:14px; margin-bottom:6px; padding-bottom:14px; border-bottom:1px solid var(--line);}
   .sec-num{font-family:var(--mono); font-size:.92rem; color:var(--teal); font-weight:700;}
-  .sec-sub{margin:14px 0 26px; color:var(--muted); max-width:70ch;}
-
-  /* ---- panels / cards ---- */
+  .sec-sub{margin:14px 0 26px; color:var(--muted); max-width:74ch;}
   .panel{border:1px solid var(--line); border-radius:16px; background:var(--panel);
-         box-shadow:0 22px 48px var(--shadow), inset 0 1px 0 rgba(255,255,255,.04); padding:26px clamp(18px,3vw,30px);}
+         box-shadow:0 22px 48px var(--shadow), inset 0 1px 0 rgba(255,255,255,.04); padding:24px clamp(18px,3vw,30px);}
   .grid{display:grid; gap:16px;}
   @media(min-width:760px){ .grid.two{grid-template-columns:1fr 1fr;} }
-
   .card{border:1px solid var(--line); border-radius:14px; background:var(--panel2); padding:20px 20px 18px;
-        transition:border-color .18s ease, transform .18s ease;}
+        transition:border-color .18s ease;}
   .card:hover{border-color:var(--line2);}
   .card-top{display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:9px;}
-  .card h3{font-size:1.04rem;}
+  .card h3{font-size:1.02rem;}
   .card .idnum{font-family:var(--mono); font-size:.78rem; color:var(--faint); white-space:nowrap; padding-top:3px;}
   .card p{margin:.5rem 0 0; color:var(--muted); font-size:.93rem;}
   .card p.why{color:#c8d0de;}
   .hook{margin-top:13px; padding-top:12px; border-top:1px dashed var(--line2); font-size:.85rem; color:var(--muted);}
   .hook b{color:var(--teal); font-weight:700;}
-
-  /* ---- badges ---- */
   .badges{display:flex; flex-wrap:wrap; gap:6px; margin-top:12px;}
   .badge{font-size:.68rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
          padding:4px 9px; border-radius:6px; border:1px solid transparent; white-space:nowrap;}
@@ -78,56 +65,52 @@
   .pri-amb{color:#160d33; background:var(--violet);}
   .ef{background:transparent; border-color:var(--line2); color:var(--muted);}
   .imp{background:rgba(126,231,135,.12); border-color:rgba(126,231,135,.4); color:var(--green);}
+  .block{background:rgba(255,93,93,.12); border-color:rgba(255,93,93,.42); color:var(--danger);}
+  .done{background:rgba(126,231,135,.14); border-color:rgba(126,231,135,.45); color:var(--green);}
   .aud{background:rgba(92,200,255,.10); border-color:rgba(92,200,255,.35); color:var(--blue); text-transform:none; letter-spacing:0;}
-
-  /* ---- legend ---- */
   .legend{display:grid; gap:18px; grid-template-columns:1fr;}
   @media(min-width:720px){ .legend{grid-template-columns:repeat(3,1fr);} }
   .legend h4{margin:0 0 9px; font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; color:var(--faint);}
   .legend .row{display:flex; align-items:center; gap:9px; margin:7px 0; font-size:.86rem; color:var(--muted);}
-
-  /* ---- at a glance table ---- */
   .table-scroll{overflow-x:auto; border-radius:14px; border:1px solid var(--line);}
-  table{border-collapse:collapse; width:100%; min-width:560px; font-size:.9rem;}
-  th,td{text-align:left; padding:12px 15px; border-bottom:1px solid var(--line);}
+  table{border-collapse:collapse; width:100%; min-width:640px; font-size:.9rem;}
+  th,td{text-align:left; padding:12px 15px; border-bottom:1px solid var(--line); vertical-align:top;}
   thead th{background:rgba(8,10,14,.5); color:var(--faint); font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; font-weight:800;}
   tbody tr:last-child td{border-bottom:0;}
   tbody tr:hover{background:rgba(56,225,198,.04);}
   td .dot{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:8px; vertical-align:middle;}
-
-  /* ---- demos ---- */
-  .demo-gradient{height:46px; border-radius:9px; margin:14px 0 4px;
-    background:linear-gradient(90deg,#78285f,#e85c46,#ffb670,#ffecb6,#b6ecff);}
-  .demo-labels{display:flex; justify-content:space-between; font-size:.72rem; color:var(--faint);}
-  .swatches{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px;}
-  .sw{width:38px; height:38px; border-radius:9px; border:1px solid rgba(255,255,255,.12);}
-
   .callout{border-left:3px solid var(--gold); background:linear-gradient(180deg,rgba(255,194,75,.08),rgba(255,194,75,.02));
     border-radius:10px; padding:16px 18px; margin-top:18px;}
   .callout .kicker{color:var(--gold); margin-bottom:6px;}
   .callout p{margin:0; color:#dfe5ef; font-size:.92rem;}
-
+  .callout.teal{border-left-color:var(--teal); background:linear-gradient(180deg,rgba(56,225,198,.08),rgba(56,225,198,.02));}
+  .callout.teal .kicker{color:var(--teal);}
+  .callout.danger{border-left-color:var(--danger); background:linear-gradient(180deg,rgba(255,93,93,.09),rgba(255,93,93,.02));}
+  .callout.danger .kicker{color:var(--danger);}
+  ul.clean{margin:.4rem 0 0; padding-left:1.1rem;} ul.clean li{margin:.34rem 0; color:var(--muted);}
+  ul.check{list-style:none; margin:.4rem 0 0; padding:0;}
+  ul.check li{position:relative; padding-left:1.7rem; margin:.5rem 0; color:var(--muted);}
+  ul.check li::before{content:"\2713"; position:absolute; left:0; top:-1px; color:var(--teal); font-weight:800;
+    border:1px solid var(--line2); border-radius:5px; width:1.15rem; height:1.15rem; display:inline-flex; align-items:center; justify-content:center; font-size:.7rem;}
+  ul.shipped{list-style:none; margin:.4rem 0 0; padding:0;}
+  ul.shipped li{position:relative; padding-left:1.7rem; margin:.42rem 0; color:var(--muted);}
+  ul.shipped li::before{content:"\2713"; position:absolute; left:0; top:0; color:#062b25; font-weight:800; background:var(--green);
+    border-radius:5px; width:1.15rem; height:1.15rem; display:inline-flex; align-items:center; justify-content:center; font-size:.72rem;}
   .phase{display:flex; gap:16px; align-items:flex-start; padding:18px 0; border-bottom:1px solid var(--line);}
   .phase:last-child{border-bottom:0;}
-  .phase .tag{flex:none; width:104px; font-weight:800; font-size:.82rem;}
+  .phase .tag{flex:none; width:128px; font-weight:800; font-size:.82rem;}
   .phase .tag span{display:block; font-size:.7rem; font-weight:600; color:var(--faint); margin-top:2px;}
   .phase p{margin:0; color:var(--muted); font-size:.92rem;}
-
-  ul.clean{margin:.4rem 0 0; padding-left:1.1rem;} ul.clean li{margin:.3rem 0; color:var(--muted);}
-
   footer{position:relative; z-index:1; margin-top:64px; padding-top:22px; border-top:1px solid var(--line);
-    color:var(--faint); font-size:.82rem;}
-
-  /* ---- print: ink-friendly ---- */
+    color:var(--faint); font-size:.82rem; width:min(1020px,100%); margin-left:auto; margin-right:auto; padding-left:clamp(16px,4vw,40px); padding-right:clamp(16px,4vw,40px);}
   @media print{
     .ambient{display:none;}
     body{background:#fff; color:#13161c;}
     h1{-webkit-text-fill-color:#0a7c6c; color:#0a7c6c;}
     .panel,.card{box-shadow:none; background:#fff; border-color:#cdd3dc; break-inside:avoid;}
-    .lede,.card p,.sec-sub,.phase p,ul.clean li{color:#3a4150;}
+    .lede,.card p,.sec-sub,.phase p,ul.clean li,ul.check li,ul.shipped li{color:#3a4150;}
     strong{color:#000;} code{color:#0a7c6c; background:#eef7f5; border-color:#cfe7e2;}
-    a{color:#0a7c6c;}
-    section{break-inside:avoid;}
+    a{color:#0a7c6c;} section{break-inside:avoid;}
   }
 </style>
 </head>
@@ -135,427 +118,371 @@
 <div class="ambient" aria-hidden="true"></div>
 <div class="wrap">
 
-  <!-- ============ HERO ============ -->
-  <header>
-    <p class="kicker">Enhancement Roadmap &middot; Prepared for the Tokamak Learning Lab</p>
-    <h1>Fusion Power Generator Simulator</h1>
-    <p class="lede">A prioritized set of ideas to push the visuals and the teaching value further, scoped for a donation to the Rose-Hulman and Purdue fusion outreach programs and an audience that runs from curious high schoolers to engineering undergraduates.</p>
-    <div class="meta">
-      <span class="chip"><b>Goal</b> Greatly enhance visuals + education</span>
-      <span class="chip"><b>Audience</b> High school &middot; Undergrad &middot; Public</span>
-      <span class="chip"><b>Form</b> Ideas &amp; roadmap, not a code change</span>
-      <span class="chip"><b>Base</b> Vanilla JS, single portable folder</span>
-    </div>
-  </header>
+  <p class="kicker">Status &amp; Roadmap &middot; Prepared for the Tokamak Learning Lab</p>
+  <h1>Fusion Power Generator Simulator</h1>
+  <p class="lede">A single, current planning document for the campus-outreach donation. It supersedes the original enhancement roadmap (now essentially delivered) and the first form-and-function review (now largely implemented), folding both into one living source of truth: <strong>what is already shipped</strong>, and a <strong>prioritized, verified set of next steps</strong> — each re-checked against the live build, not a stale wishlist.</p>
 
-  <!-- ============ WHAT'S ALREADY STRONG ============ -->
-  <section id="strong">
-    <div class="sec-head"><span class="sec-num">00</span><h2>What you are starting from</h2></div>
-    <p class="sec-sub">Worth saying plainly, because the roadmap builds on it rather than replacing it: this is already a serious piece of work. The recommendations below are additive.</p>
+  <div class="meta">
+    <span class="chip">Status <b>Donation-prep, near ship-ready</b></span>
+    <span class="chip">Reviewed <b>Live build, June 2026</b></span>
+    <span class="chip">Method <b>8-lens review, every finding verified</b></span>
+    <span class="chip">Base <b>Vanilla JS, one portable folder</b></span>
+  </div>
+
+  <!-- 00 -->
+  <section id="shipped">
+    <div class="sec-head"><span class="sec-num">00</span><h2>What is already shipped</h2></div>
+    <p class="sec-sub">Said first because it reframes everything below: the original roadmap has, in effect, been built. Almost every idea it listed is now a working feature. This document is therefore a fresh roadmap for the <em>remaining</em> work, not a re-statement of the old one.</p>
     <div class="panel">
       <div class="grid two">
         <div>
-          <ul class="clean">
-            <li>A genuine dependency-free 3D engine on a 2D canvas: perspective camera, painter's depth sort, atmospheric fog, additive bloom, vignette.</li>
-            <li>A physically motivated model: triple product, a real Lawson ignition curve, energy gain <code>Q</code>, power balance, breeding ratio.</li>
-            <li>Six live data views, including a Lawson operating-point map, a Sankey energy flow, and an animated D-T fuel cycle.</li>
+          <p class="kicker" style="color:var(--green)">Reactor &amp; visuals</p>
+          <ul class="shipped">
+            <li>Software 3D tokamak with a raymarched <strong>WebGL volumetric plasma core</strong> that falls back safely to software</li>
+            <li>On-screen fusion events: core flashes, alpha particles, neutrons fired to the blanket</li>
+            <li>Multi-pass bloom, living-plasma turbulence, atmospheric fog, vignette</li>
+            <li>Cutaway cross-section, human/scale reference, neutron wall-heat map</li>
+            <li>Visible disruption event (shake + flash), divertor strike-point sweep</li>
           </ul>
         </div>
         <div>
-          <ul class="clean">
-            <li>A mission system with seven constraint puzzles that force real tradeoffs.</li>
-            <li>Teachable tooltips, expandable lessons, a glossary, and a contextual operator coach.</li>
-            <li>A full navigation HUD: orientation gizmo, view snaps, camera cluster, reduced-motion support.</li>
+          <p class="kicker" style="color:var(--green)">Teaching, UI &amp; robustness</p>
+          <ul class="shipped">
+            <li>Guided story, guided tour, seven missions, predict-then-test, contextual coach</li>
+            <li>Four themes (control-room, light, high-contrast, colorblind), reduced-motion path</li>
+            <li>Real-world units, model-assumptions card, glossary, Balance-of-Plant flow</li>
+            <li>Kiosk/Present mode, idle watchdog, tab-hide pause, lite-GPU path, WebGL context-loss recovery</li>
+            <li>CSV export, <strong>QR takeaway card</strong>, web-app manifest + icon, student worksheet + instructor key</li>
           </ul>
         </div>
       </div>
-      <div class="callout">
-        <p class="kicker">The strategic call</p>
-        <p>The zero-dependency design is itself an asset for a donation: it runs offline at a booth by opening one file, and a student can maintain it. The roadmap therefore keeps that core intact and treats a WebGL rewrite as an optional, clearly-scoped track rather than the default path.</p>
+      <div class="callout teal">
+        <p class="kicker">What that leaves on the old roadmap</p>
+        <p>Only the three "ambitious" bets remain genuinely unbuilt: a full <strong>Three.js render track</strong> (the raw-WebGL plasma already captures much of its payoff), a <strong>two-player race-to-ignition</strong>, and a <strong>WebXR booth mode</strong>. They are carried forward into Section 06 as optional ceiling-raisers.</p>
       </div>
     </div>
   </section>
 
-  <!-- ============ HOW TO READ ============ -->
-  <section id="legend">
+  <!-- 01 -->
+  <section id="howto">
     <div class="sec-head"><span class="sec-num">01</span><h2>How to read this</h2></div>
-    <p class="sec-sub">Every idea carries three tags so you can pick by appetite, not just by area: a priority tier, a build effort, and the audience it serves most. Pick a row, not the whole list.</p>
+    <p class="sec-sub">Every item carries a priority tier, a build effort, and a flag. Start at the top: Section 03 holds the three things that actually block a donation, and most are an hour or less.</p>
     <div class="panel legend">
       <div>
         <h4>Priority tier</h4>
-        <div class="row"><span class="badge pri-quick">Quick win</span> high payoff, low risk, fits the current engine</div>
-        <div class="row"><span class="badge pri-high">High impact</span> a meaningful feature, a week or so of work</div>
-        <div class="row"><span class="badge pri-amb">Ambitious</span> a larger bet that changes the ceiling</div>
+        <div class="row"><span class="badge pri-quick">Quick win</span> High payoff, low risk</div>
+        <div class="row"><span class="badge pri-high">High impact</span> A meaningful feature</div>
+        <div class="row"><span class="badge pri-amb">Ambitious</span> A larger, optional bet</div>
       </div>
       <div>
         <h4>Build effort</h4>
-        <div class="row"><span class="badge ef">Effort - Low</span> hours, localized change</div>
-        <div class="row"><span class="badge ef">Effort - Med</span> days, one new subsystem</div>
-        <div class="row"><span class="badge ef">Effort - High</span> weeks, or a new dependency</div>
+        <div class="row"><span class="badge ef">Effort · Low</span> Hours, localized</div>
+        <div class="row"><span class="badge ef">Effort · Med</span> Days, one subsystem</div>
+        <div class="row"><span class="badge ef">Effort · High</span> Weeks, or a dependency</div>
       </div>
       <div>
-        <h4>Audience served</h4>
-        <div class="row"><span class="badge aud">HS</span> high school and family / public</div>
-        <div class="row"><span class="badge aud">UG</span> engineering undergraduates</div>
-        <div class="row"><span class="badge aud">All</span> lands across the whole range</div>
+        <h4>Flags</h4>
+        <div class="row"><span class="badge block">Blocker</span> Stops a program adopting it</div>
+        <div class="row"><span class="badge imp">Polish</span> Looks or feels better</div>
+        <div class="row"><span class="badge aud">audience</span> Who it serves most</div>
       </div>
     </div>
   </section>
 
-  <!-- ============ AT A GLANCE ============ -->
+  <!-- 02 -->
   <section id="glance">
-    <div class="sec-head"><span class="sec-num">02</span><h2>The roadmap at a glance</h2></div>
-    <p class="sec-sub">The full set, sorted by tier. Detailed cards follow in sections 03 to 06. If you only do the green rows, the simulator still takes a visible leap.</p>
+    <div class="sec-head"><span class="sec-num">02</span><h2>The remaining work at a glance</h2></div>
+    <p class="sec-sub">Sorted by what a careful campus reviewer hits first. If you do only the blockers and the quick-win batch, the build crosses from "impressive demo" to "adoptable gift."</p>
     <div class="table-scroll">
       <table>
-        <thead>
-          <tr><th>Enhancement</th><th>Area</th><th>Tier</th><th>Effort</th><th>For</th></tr>
-        </thead>
+        <thead><tr><th>ID</th><th>Item</th><th>Area</th><th>Tier</th><th>Effort</th></tr></thead>
         <tbody>
-          <tr><td><span class="dot" style="background:var(--teal)"></span>Fusion events: real flashes, alphas, neutrons</td><td>Canvas</td><td>Quick win</td><td>Low</td><td>All</td></tr>
-          <tr><td><span class="dot" style="background:var(--teal)"></span>Multi-pass bloom + living-plasma turbulence</td><td>Canvas</td><td>Quick win</td><td>Low</td><td>All</td></tr>
-          <tr><td><span class="dot" style="background:var(--teal)"></span>Human + bus scale reference</td><td>Canvas</td><td>Quick win</td><td>Low</td><td>HS</td></tr>
-          <tr><td><span class="dot" style="background:var(--teal)"></span>Neutron wall-heat map on the blanket</td><td>Canvas</td><td>Quick win</td><td>Low</td><td>UG</td></tr>
-          <tr><td><span class="dot" style="background:var(--teal)"></span>Presentation / kiosk mode</td><td>UI</td><td>Quick win</td><td>Low</td><td>All</td></tr>
-          <tr><td><span class="dot" style="background:var(--teal)"></span>Light + high-contrast + colorblind themes</td><td>UI</td><td>Quick win</td><td>Low</td><td>All</td></tr>
-          <tr><td><span class="dot" style="background:var(--teal)"></span>Animated value transitions</td><td>UI</td><td>Quick win</td><td>Low</td><td>All</td></tr>
-          <tr><td><span class="dot" style="background:var(--teal)"></span>Real-machine presets (ITER, SPARC, JET, EAST)</td><td>Education</td><td>Quick win</td><td>Low</td><td>All</td></tr>
-          <tr><td><span class="dot" style="background:var(--teal)"></span>Real-world unit translators</td><td>Education</td><td>Quick win</td><td>Low</td><td>HS</td></tr>
-          <tr><td><span class="dot" style="background:var(--gold)"></span>Cutaway / cross-section mode</td><td>Canvas</td><td>High impact</td><td>Med</td><td>All</td></tr>
-          <tr><td><span class="dot" style="background:var(--gold)"></span>Visible disruption + quench event</td><td>Canvas</td><td>High impact</td><td>Med</td><td>All</td></tr>
-          <tr><td><span class="dot" style="background:var(--gold)"></span>Guided story mode (cold gas to ignition)</td><td>Education</td><td>High impact</td><td>Med</td><td>HS</td></tr>
-          <tr><td><span class="dot" style="background:var(--gold)"></span>Transient time-dynamics model</td><td>Physics</td><td>High impact</td><td>Med</td><td>UG</td></tr>
-          <tr><td><span class="dot" style="background:var(--gold)"></span>First-wall / materials layer (Purdue tie-in)</td><td>Education</td><td>High impact</td><td>Med</td><td>UG</td></tr>
-          <tr><td><span class="dot" style="background:var(--gold)"></span>Data export + lab worksheet</td><td>Education</td><td>High impact</td><td>Med</td><td>UG</td></tr>
-          <tr><td><span class="dot" style="background:var(--gold)"></span>Guided tour + reactor power-up intro</td><td>UI</td><td>High impact</td><td>Med</td><td>All</td></tr>
-          <tr><td><span class="dot" style="background:var(--gold)"></span>Optional reactor soundscape</td><td>UI</td><td>High impact</td><td>Med</td><td>All</td></tr>
-          <tr><td><span class="dot" style="background:var(--violet)"></span>WebGL / Three.js render track</td><td>Canvas</td><td>Ambitious</td><td>High</td><td>All</td></tr>
-          <tr><td><span class="dot" style="background:var(--violet)"></span>Two-player race-to-ignition</td><td>Education</td><td>Ambitious</td><td>High</td><td>HS</td></tr>
-          <tr><td><span class="dot" style="background:var(--violet)"></span>WebXR booth mode</td><td>Canvas</td><td>Ambitious</td><td>High</td><td>All</td></tr>
+          <tr><td>T0&middot;1</td><td>No LICENSE file — "free to run and share" grants no legal rights</td><td>Packaging</td><td><span class="dot" style="background:var(--danger)"></span>Blocker</td><td>Low</td></tr>
+          <tr><td>T0&middot;2</td><td>No global keyboard focus ring; one rule actively removes the outline</td><td>A11y</td><td><span class="dot" style="background:var(--danger)"></span>Blocker</td><td>Low</td></tr>
+          <tr><td>T0&middot;3</td><td>Learning-flow truth slips (instructor-key Cruise Q, story step 1, README tour claim)</td><td>Teaching</td><td><span class="dot" style="background:var(--danger)"></span>Blocker</td><td>Low</td></tr>
+          <tr><td>F1</td><td>Cold-open reads as a failing reactor (red −265 MW first)</td><td>Form</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>F2</td><td>Hero status numbers (state / net / Q) are the smallest type on screen</td><td>Form</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>F3</td><td>WebGL plasma renders at 1/DPR and upscales — soft on retina tablets</td><td>Form</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Low</td></tr>
+          <tr><td>F4</td><td>Annunciator lamps ~10px in the faintest color when off</td><td>Form</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>F5</td><td>Reactor hotspot labels overlap the plasma / clip at the 2-col breakpoint</td><td>Form</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>U1</td><td>Nothing greets a first-time visitor; first-run flag is dead code</td><td>UX</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>U2</td><td>Mobile scroll-trap: swiping the reactor orbits it, page can't scroll</td><td>UX</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Low</td></tr>
+          <tr><td>U3</td><td>Missions are below the fold, hint-less, reward toast far from controls</td><td>UX</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+          <tr><td>U4</td><td>Guided story doesn't spotlight the control it names</td><td>UX</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+          <tr><td>A1</td><td>Modals (Tour / Story / Card) don't move, trap, or restore focus</td><td>A11y</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+          <tr><td>A2</td><td>Sliders announce unitless numbers; charts/meters expose no data to SR</td><td>A11y</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+          <tr><td>A3</td><td>aria-live status strip announces a continuous telemetry firehose</td><td>A11y</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>A4</td><td>3D stage cannot be orbited by keyboard</td><td>A11y</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+          <tr><td>P1</td><td>Promote/brand: BRAND config so a host can make it "theirs"</td><td>Packaging</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+          <tr><td>P2</td><td>Facilitator guide, curriculum metadata, version/changelog, trim backups/</td><td>Packaging</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>R1</td><td>All-day kiosk: frame cap, suspend audio on hide, broaden lite-mode blur removal</td><td>Robustness</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>C1</td><td>Copy consistency (14 vs 14.1 MeV, operating-window range, "no waste")</td><td>Content</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>D1</td><td>Physics depth: reactivity rollover, bremsstrahlung, density limit</td><td>Physics</td><td><span class="dot" style="background:var(--violet)"></span>Amb</td><td>Med</td></tr>
+          <tr><td>D2</td><td>Three.js render track / two-player race / WebXR (old roadmap leftovers)</td><td>Canvas</td><td><span class="dot" style="background:var(--violet)"></span>Amb</td><td>High</td></tr>
+          <tr><td>M1</td><td>Maintainability: de-duplicate physics constants, smoke test, maintainer map</td><td>Code</td><td><span class="dot" style="background:var(--violet)"></span>Amb</td><td>Med</td></tr>
         </tbody>
       </table>
     </div>
   </section>
 
-  <!-- ============ SECTION A: CANVAS ============ -->
-  <section id="canvas">
-    <div class="sec-head"><span class="sec-num">03</span><h2>Main canvas: the reactor</h2></div>
-    <p class="sec-sub">The 3D stage is the first thing anyone sees and the thing they will photograph. These ideas raise the spectacle and, just as importantly, make the physics legible inside the picture itself.</p>
+  <!-- 03 BLOCKERS -->
+  <section id="blockers">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Donation blockers — a reviewer's first gate</h2></div>
+    <p class="sec-sub">These three are cheap and decisive. They are what an institutional legal/accessibility/curriculum check catches within minutes, regardless of how good the rest is.</p>
 
+    <div class="callout danger">
+      <p class="kicker">Do these before anything else</p>
+      <p>A program's adoption decision can fail on any one of these in isolation. None is a large build; together they are an afternoon.</p>
+    </div>
+
+    <div class="grid two" style="margin-top:18px;">
+      <div class="card">
+        <div class="card-top"><h3>Add a LICENSE file</h3><span class="idnum">T0·1</span></div>
+        <p>The About panel and the takeaway card both promise <em>"Donated for educational use, free to run and share,"</em> but with no license the default is all-rights-reserved — so the promise is technically false and a careful program cannot legally adopt, modify, or rebrand it.</p>
+        <p class="why"><b>Why it matters:</b> undefined reuse terms are a routine auto-reject for institutional software. This is the single biggest legal blocker.</p>
+        <div class="hook"><b>Hook:</b> MIT or Apache-2.0 for the code, CC BY 4.0 for the worksheet/key/assets; name the copyright holder; add a README "License" section. The in-app copy at <code>index.html</code> (About) and <code>script.js</code> (takeaway card) becomes true the moment the file exists.</div>
+        <div class="badges"><span class="badge block">Blocker</span><span class="badge ef">Effort · Low</span><span class="badge aud">All</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>Add a global keyboard focus ring</h3><span class="idnum">T0·2</span></div>
+        <p>Only <code>button.plant-stage</code> has a real <code>:focus-visible</code> style; ~40 controls fall back to a near-invisible default on the dark glass, and <code>.tip-dot:focus-visible</code> sets <code>outline:none</code> with no substitute.</p>
+        <p class="why"><b>Why it matters:</b> an invisible focus indicator is the most common WCAG 2.4.7 failure and is disqualifying on most campus accessibility checklists — a disability office runs a keyboard-only pass first.</p>
+        <div class="hook"><b>Hook:</b> one token rule, e.g. <code>:where(button,[role=button],input,select,summary,.hotspot,.tool-btn,.nav-btn,.gizmo-btn,.preset,.predict-choice):focus-visible{outline:2px solid var(--teal);outline-offset:2px;box-shadow:0 0 0 4px rgba(56,225,198,.25)}</code> plus a range-thumb ring; restore an outline on <code>.tip-dot</code>.</div>
+        <div class="badges"><span class="badge block">Blocker</span><span class="badge ef">Effort · Low</span><span class="badge aud">All</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>Fix the learning-flow truth slips</h3><span class="idnum">T0·3</span></div>
+        <p>Three small contradictions that the most scrutinizing readers — teachers — catch:</p>
+        <ul class="clean">
+          <li><strong>Instructor key Cruise Q</strong> says "Q of a few"; the model settles at <strong>Q ≈ 20</strong> (verified live, ~+311 MW). Off by ~5×.</li>
+          <li><strong>README</strong> says the tour "runs on first visit," but <code>fusionTourDone</code> is written and never read, and <code>startTour()</code> only fires from the button.</li>
+          <li><strong>Guided story step 1</strong> ("too cold to fuse, watch the core stay dark") opens over a glowing 11&nbsp;keV reactor because the story never applies a cold baseline.</li>
+        </ul>
+        <p class="why"><b>Why it matters:</b> the answer key and the guided flow are exactly what an educator trusts the exhibit on. A value off by 5× or a step that contradicts the screen makes them doubt the whole tool.</p>
+        <div class="hook"><b>Hook:</b> correct the key to a model-matched range; either wire the first-run flag or fix the doc line; apply a cold preset when the story opens (and reuse the tour spotlight for U4).</div>
+        <div class="badges"><span class="badge block">Blocker</span><span class="badge ef">Effort · Low</span><span class="badge aud">UG / educators</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 FORM -->
+  <section id="form">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Form — the booth first impression</h2></div>
+    <p class="sec-sub">The spectacle is already there. These remove the small frictions that quietly undercut it in the first two seconds, and make the payoff readable from across a room.</p>
     <div class="grid two">
 
       <div class="card">
-        <div class="card-top"><h3>Make fusion actually happen on screen</h3><span class="idnum">A1</span></div>
-        <p class="why">Right now ions stream around the torus but never react. Spawn real fusion events in the hot core: when fuel ions meet, emit a bright flash, a gold alpha that stays and spirals, and a fast neutron that fires outward. Rate scales with fusion power, so the core visibly "boils" harder as you climb toward ignition.</p>
-        <p>This is the single most motivating canvas change. It turns an abstract glow into a story a 12-year-old reads instantly: that is the reaction, and that is its energy leaving.</p>
-        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort - Low</span><span class="badge imp">High impact</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> you already declare <code>sparks = []</code> in <code>seedParticles()</code> and never use it. Populate it on a probabilistic core collision, tie spawn rate to <code>model.fusionPower</code>, and reuse the existing <code>neutrons</code> render path for the ejecta.</p>
+        <div class="card-top"><h3>Warm up the cold-open</h3><span class="idnum">F1</span></div>
+        <p>First load sits at a red <strong>−265 MW</strong>. It is physically honest (sub-breakeven Startup, deliberately teaching that Q&nbsp;&gt;&nbsp;1 ≠ net power), but a passer-by reads red-negative as <em>broken</em> two seconds before they would ever see ignition.</p>
+        <p class="why"><b>Why it matters:</b> the first beat decides whether someone stops. Keep the lesson; soften the open.</p>
+        <div class="hook"><b>Hook:</b> label the state "Warming up," seed a gentler near-breakeven default, or let the first load briefly auto-ramp to a net-positive moment.</div>
+        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort · Low</span><span class="badge aud">HS / public</span></div>
       </div>
 
       <div class="card">
-        <div class="card-top"><h3>A living plasma and a richer bloom</h3><span class="idnum">A2</span></div>
-        <p class="why">Modulate the core brightness with cheap layered noise so it churns and flickers like a real burning plasma instead of a steady lamp. Pair it with a two or three step threshold bloom (bright-pass, then blur at a couple of scales) for the star-like halo that sells "hotter than the Sun."</p>
-        <p>Both are screen-space and stay inside your current pipeline. The plasma reads as alive even when the controls are untouched.</p>
-        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort - Low</span><span class="badge imp">Looks premium</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> extend <code>applyBloom()</code> (currently a single downscaled pass) to a bright-pass plus multi-scale blur, and drive <code>plasmaColor()</code> intensity with a time-based noise term.</p>
-        <div class="demo-gradient" aria-hidden="true"></div>
-        <div class="demo-labels"><span>120 M&deg;C edge</span><span>core</span><span>radiative</span></div>
+        <div class="card-top"><h3>Promote the hero numbers</h3><span class="idnum">F2</span></div>
+        <p>Reactor state, Net electric, and Energy gain Q render at <code>0.92rem</code> in a quiet strip — smaller than the in-panel metrics, and only nudged to ~<code>1.04rem</code> in kiosk. The single most important live results are the least prominent numbers on screen.</p>
+        <p class="why"><b>Why it matters:</b> the wow moment is "a kid 8&nbsp;ft away sees Q jump when they crank a slider." Make the trio the visual hero.</p>
+        <div class="hook"><b>Hook:</b> raise the badge values to <code>clamp(1.1rem,1.6vw,1.6rem)</code> and ~1.8rem in <code>body.kiosk</code>; tint the Q and net badges by state.</div>
+        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort · Low</span><span class="badge aud">All</span></div>
       </div>
 
       <div class="card">
-        <div class="card-top"><h3>Cutaway / cross-section mode</h3><span class="idnum">A3</span></div>
-        <p class="why">A toggle that slices the torus on a plane and reveals the nested shells the way a textbook does: plasma core, separatrix, breeding blanket, vacuum vessel, then the coils caging it all. Label each layer in place. Students finally see that the machine is shells within shells, not a solid donut.</p>
-        <p>This is the highest teaching-per-pixel idea on the canvas. It answers "what is it actually made of" without a single slide.</p>
-        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort - Med</span><span class="badge imp">Top teaching value</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> in the painter's pass, cull primitives on one side of a world-space plane (drop any whose projected point sits beyond the cut), and draw rim rings where each shell meets the plane. Your geometry is already parametric, so the cut is a depth test, not new models.</p>
+        <div class="card-top"><h3>Sharpen the hero plasma on retina tablets</h3><span class="idnum">F3</span></div>
+        <p>The WebGL core is sized in CSS px, then stretched across the DPR-scaled 2D canvas, so the 60-step raymarch runs at 1/4–1/9 the pixels and looks soft on exactly the iPads/Surfaces a booth uses — while the 2D coils beside it are crisp.</p>
+        <p class="why"><b>Why it matters:</b> the volumetric plasma is the most photographed thing in the app; it should be the sharpest.</p>
+        <div class="hook"><b>Hook:</b> <code>const s = Math.min(devicePixelRatio||1, 2)</code>; render at <code>w*s × h*s</code>, keep the <code>drawImage</code> target at <code>w,h</code>, lower the cap under <code>liteMode</code>.</div>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Low</span><span class="badge aud">All</span></div>
       </div>
 
       <div class="card">
-        <div class="card-top"><h3>Neutron wall-heat map</h3><span class="idnum">A4</span></div>
-        <p class="why">Where neutrons strike the blanket, accumulate a heat signature that warms the vessel ribs from amber to white and cools when the divertor sweep is on. The abstract "wall load 8 MW/m squared" readout becomes a glowing surface you can point at.</p>
-        <p>It also makes the divertor toggle feel consequential, because you watch the peak load spread and fade.</p>
-        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort - Low</span><span class="badge imp">Ties UI to 3D</span><span class="badge aud">UG</span></div>
-        <p class="hook"><b>Code hook:</b> accumulate a per-rib intensity where the existing <code>neutrons</code> terminate, color the vessel loop strokes by it, and relax it toward zero each frame scaled by <code>model.wallLoad</code> and <code>divertorSweep</code>.</p>
+        <div class="card-top"><h3>Make the annunciator legible</h3><span class="idnum">F4</span></div>
+        <p>The six status lamps are <code>0.62rem</code> (~10px) uppercase in <code>--faint</code> on near-black when off — they read as dead pixels until lit, losing the "control room" metaphor most of the time.</p>
+        <p class="why"><b>Why it matters:</b> an annunciator wall is one of the strongest "this is real" cues; it has to be readable to land.</p>
+        <div class="hook"><b>Hook:</b> bump to ~0.7rem, raise off-state text to <code>--muted</code>, and add a leading LED dot so on/off reads by shape as well as color.</div>
+        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort · Low</span><span class="badge aud">All</span></div>
       </div>
 
       <div class="card">
-        <div class="card-top"><h3>Give it human scale</h3><span class="idnum">A5</span></div>
-        <p class="why">Drop a one-meter scale bar and a small human silhouette beside the vessel, with an optional school-bus outline for the whole plant. Almost no one realizes a tokamak is the size of a building. A single figure standing next to it reframes the entire image.</p>
-        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort - Low</span><span class="badge imp">Memorable</span><span class="badge aud">HS</span></div>
-        <p class="hook"><b>Code hook:</b> add a couple of billboarded primitives at fixed world coordinates near the vessel, faded by <code>depthBright()</code> like your hotspots, behind a "Scale" toggle.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>Field lines and ions that teach</h3><span class="idnum">A6</span></div>
-        <p class="why">Animate a flowing dash along the helical field lines so direction of the winding is obvious, and density that thickens with <code>B</code>. Color ions by species: deuterium, tritium, the alpha ash, electrons. The screen stops being decorative motion and starts being a particle key.</p>
-        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort - Low</span><span class="badge imp">Clarifies physics</span><span class="badge aud">UG</span></div>
-        <p class="hook"><b>Code hook:</b> add a <code>lineDashOffset</code> march to the field-line strokes, and give each entry in <code>particles</code> a species field that picks both color and size.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>Stand it in a room</h3><span class="idnum">A7</span></div>
-        <p class="why">The plant currently floats in black. A subtle reflective floor grid, a soft horizon gradient, and faint contact reflections under the reactor give a sense of place and depth without stealing focus. It reads as a facility, not a logo.</p>
-        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort - Med</span><span class="badge imp">Production polish</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> you already draw a ground pad and contact shadows in <code>addBOP()</code>. Extend that to a larger projected grid plane and a mirrored, dimmed re-draw of the nearest solids.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>Show a disruption, do not just label it</h3><span class="idnum">A8</span></div>
-        <p class="why">When pressure outruns the field, make it visceral: the plasma kinks and wobbles, field lines tangle, a bright energy dump flashes onto the wall, and the stage shudders before the state pill turns red. Failure becomes the most memorable thing a visitor sees, and it is a safe way to teach why control matters.</p>
-        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort - Med</span><span class="badge imp">Unforgettable</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> when <code>model.disruptionRisk</code> crosses threshold, add a transient wobble to the torus poloidal angle, a white wall flash, and a brief canvas shake, gated by your <code>reduceMotion</code> flag.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>The big bet: a WebGL render track</h3><span class="idnum">A9</span></div>
-        <p class="why">For the largest pure-visual leap, add an optional renderer using a single vendored Three.js file: a true depth buffer with no painter's artifacts, a raymarched volumetric plasma, thousands of GPU particles, physically based metal coils, real HDR bloom, and shadows. Keep the current canvas engine as the default so the offline, zero-dependency promise holds.</p>
-        <p>Recommended as a parallel "v2" you can switch to, not a replacement. The honest tradeoff: much higher ceiling, materially more code to maintain.</p>
-        <div class="badges"><span class="badge pri-amb">Ambitious</span><span class="badge ef">Effort - High</span><span class="badge imp">Ceiling raise</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> wrap the renderer behind a flag so <code>drawReactor()</code> and a new <code>drawReactorGL()</code> are interchangeable; ship <code>three.min.js</code> in the folder to stay portable for booths with no network.</p>
+        <div class="card-top"><h3>Keep hotspot labels inside the stage</h3><span class="idnum">F5</span></div>
+        <p>The reactor hotspot labels sit on top of the plasma, and at the ~2-column breakpoint (stage column ≈520px — a common laptop/tablet width) the "Blanket" label clips off the right edge; on phones the "Magnetic Confinement Vessel" title runs under the "?" button.</p>
+        <p class="why"><b>Why it matters:</b> clipped/overlapping labels are the small tells that separate "exhibit" from "student project."</p>
+        <div class="hook"><b>Hook:</b> clamp hotspot label positions to the stage with a small inset, nudge labels off the core, and give the stage title room to the right of the help button.</div>
+        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort · Low</span><span class="badge aud">All</span></div>
       </div>
 
     </div>
   </section>
 
-  <!-- ============ SECTION B: UI / UX ============ -->
-  <section id="ui">
-    <div class="sec-head"><span class="sec-num">04</span><h2>The interface around it</h2></div>
-    <p class="sec-sub">Outreach is a hostile environment for software: bright rooms, projectors, touch screens, and visitors who will not read a manual. These changes make the UI survive a booth and look polished doing it.</p>
-
+  <!-- 05 FUNCTION -->
+  <section id="function">
+    <div class="sec-head"><span class="sec-num">05</span><h2>Function — engagement &amp; accessibility</h2></div>
+    <p class="sec-sub">The features exist; these make them <em>found</em> and usable by everyone, including the keyboard, screen-reader, and phone visitors a campus will expect you to serve.</p>
     <div class="grid two">
 
       <div class="card">
-        <div class="card-top"><h3>Presentation / kiosk mode</h3><span class="idnum">B1</span></div>
-        <p class="why">One toggle that goes fullscreen, enlarges the reactor and the three headline numbers, hides the denser developer-facing panels, and idles into a gentle auto-demo when no one touches it. This is the difference between a tool and an exhibit.</p>
-        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort - Low</span><span class="badge imp">Booth-ready</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> a <code>body.kiosk</code> class plus the Fullscreen API; reuse your existing auto-spin idle timer to trigger a scripted preset cycle.</p>
+        <div class="card-top"><h3>Greet the first-time visitor</h3><span class="idnum">U1</span></div>
+        <p>Nothing prompts a newcomer facing a three-column control room, and the <code>fusionTourDone</code> first-run flag is written but never read — so the tour never auto-offers.</p>
+        <p class="why"><b>Why it matters:</b> at a booth, median dwell is seconds; one zero-friction prompt is the difference between bouncing and entering the loop.</p>
+        <div class="hook"><b>Hook:</b> on load, if the flag is absent, show a single dismissible "New here? Take the 30-second tour / Just let me play" over the reactor.</div>
+        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort · Low</span><span class="badge aud">All</span></div>
       </div>
 
       <div class="card">
-        <div class="card-top"><h3>Themes: light, high-contrast, colorblind-safe</h3><span class="idnum">B2</span></div>
-        <p class="why">Dark looks great on a laptop and can wash out on a projector in a lit gym. Ship a light theme, a high-contrast theme, and a colorblind-safe palette so the teal, gold, and coral stay distinguishable. Your CSS is already fully variable-driven, so this is mostly new variable sets.</p>
-        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort - Low</span><span class="badge imp">Accessibility</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> the <code>:root</code> custom properties in <code>styles.css</code> are the whole theme. Swap them under <code>[data-theme]</code> and remember the choice (a tiny preference store).</p>
-        <div class="swatches" aria-hidden="true">
-          <span class="sw" style="background:#38e1c6"></span>
-          <span class="sw" style="background:#ffc24b"></span>
-          <span class="sw" style="background:#ff7a66"></span>
-          <span class="sw" style="background:#a896ff"></span>
-          <span class="sw" style="background:#5cc8ff"></span>
-          <span class="sw" style="background:#7ee787"></span>
-        </div>
+        <div class="card-top"><h3>Fix the mobile scroll-trap</h3><span class="idnum">U2</span></div>
+        <p>The reactor canvas uses a <code>passive:false</code> <code>touchmove</code> with an unconditional <code>preventDefault()</code> and no <code>touch-action</code>. Since the reactor fills the first phone screen, a visitor who scans the QR and swipes to scroll just orbits the reactor and gets stuck.</p>
+        <p class="why"><b>Why it matters:</b> the QR follow-up audience is mostly on phones — the exact people outreach wants to convert.</p>
+        <div class="hook"><b>Hook:</b> set <code>touch-action</code>, only <code>preventDefault</code> once a real drag threshold is crossed, or let near-vertical swipes pass through to the page.</div>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Low</span><span class="badge aud">All</span></div>
       </div>
 
       <div class="card">
-        <div class="card-top"><h3>Numbers that move</h3><span class="idnum">B3</span></div>
-        <p class="why">Metrics currently snap to new values. Tween them so they count up and down, and let a meaningful crossing (going net-positive, reaching breakeven) pulse briefly. A dashboard that animates feels alive and draws the eye to what just changed.</p>
-        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort - Low</span><span class="badge imp">Feels alive</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> interpolate displayed values toward <code>model</code> targets inside the existing animation loop rather than writing them directly in <code>updateReadouts()</code>.</p>
+        <div class="card-top"><h3>Surface missions, and hint them</h3><span class="idnum">U3</span></div>
+        <p>The seven missions sit below both the sim grid and the Balance-of-Plant panel, carry no starting hint, and their completion toast is hidden in kiosk and far from the controls — so the strongest replay loop is undiscoverable and feels unwinnable.</p>
+        <p class="why"><b>Why it matters:</b> missions feed the takeaway card's "missions completed" stat and are the best reason to keep playing.</p>
+        <div class="hook"><b>Hook:</b> add a "0 of 7 challenges" chip in the status strip that scrolls to the panel; give each puzzle an optional hint (start preset + the one knob to trade); flash the chip on completion.</div>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Med</span><span class="badge aud">All</span></div>
       </div>
 
       <div class="card">
-        <div class="card-top"><h3>A guided tour and a power-up intro</h3><span class="idnum">B4</span></div>
-        <p class="why">On first load, run a short reactor power-up sequence, then a four or five step coached tour: click Cruise, now raise temperature, watch the operating point climb. It converts a wall of unfamiliar controls into a friendly on-ramp for unattended visitors.</p>
-        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort - Med</span><span class="badge imp">Self-serve</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> extend the existing <code>navLegend</code> dismiss logic into a step sequence that spotlights one control at a time.</p>
+        <div class="card-top"><h3>Make the guided story point at the control</h3><span class="idnum">U4</span></div>
+        <p>Story steps name a slider ("set temperature to ~15 keV") but never highlight or scroll to it — the tour has spotlight targets, the story does not — so "guided" interaction degrades to a slideshow.</p>
+        <p class="why"><b>Why it matters:</b> directing the eye to the left-panel control is what makes predict-observe actually happen.</p>
+        <div class="hook"><b>Hook:</b> add a <code>sel</code> target to each STORY step and reuse the tour's spotlight ring + <code>scrollIntoView</code>; pairs with the cold-baseline fix in T0·3.</div>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Med</span><span class="badge aud">HS</span></div>
       </div>
 
       <div class="card">
-        <div class="card-top"><h3>A control-room annunciator strip</h3><span class="idnum">B5</span></div>
-        <p class="why">Add a row of status lamps that light and softly blink on the conditions you already compute: disruption risk, thermal limit, breeding below one, ignition achieved. It deepens the control-room fantasy and teaches operational awareness, reading a board at a glance, which is its own engineering skill.</p>
-        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort - Low</span><span class="badge imp">On-theme</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> the conditions are already branched in <code>calculateModel()</code> for the state label; surface those same booleans as lamps.</p>
+        <div class="card-top"><h3>Manage focus in the modals</h3><span class="idnum">A1</span></div>
+        <p>Tour, Story, and the Takeaway card don't move focus in, trap Tab, or restore it on close; only About handles Escape. The card is marked <code>aria-modal="true"</code> but implements none of that behavior.</p>
+        <p class="why"><b>Why it matters:</b> these dialogs are the primary guided paths; for keyboard/SR visitors they are currently a dead end.</p>
+        <div class="hook"><b>Hook:</b> one shared <code>openDialog(panel, firstFocus, onClose)</code> helper: focus in, trap, restore, Escape-to-close.</div>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Med</span><span class="badge aud">All</span></div>
       </div>
 
       <div class="card">
-        <div class="card-top"><h3>Touch and tablet polish</h3><span class="idnum">B6</span></div>
-        <p class="why">Booths run on tablets. The sliders and tooltip dots are small for fingers. Enlarge touch targets, add plus and minus steppers beside each slider, and make the info dots tap-friendly. The orbit gestures already work on touch, so this is the last mile to a true kiosk.</p>
-        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort - Med</span><span class="badge imp">Reach</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> larger hit areas on <code>.control input</code> and <code>.tip-dot</code>, plus optional stepper buttons that nudge the same range inputs.</p>
+        <div class="card-top"><h3>Speak units; expose chart data</h3><span class="idnum">A2 · A3</span></div>
+        <p>Sliders announce raw unitless numbers ("5", not "5.2 T"); the six <code>&lt;meter&gt;</code> bars and the canvas charts expose names but no data to a screen reader; and the <code>aria-live</code> status strip re-announces continuously changing telemetry — a firehose that makes the page unusable with a reader.</p>
+        <p class="why"><b>Why it matters:</b> units are the entire point of a physics simulator; a blind undergraduate needs to hear "7.0 T."</p>
+        <div class="hook"><b>Hook:</b> set each slider's <code>aria-valuetext</code> from the formatted <code>&lt;output&gt;</code> you already build; add <code>aria-label</code> to the meters; drop <code>aria-live</code> from the numeric badges and keep one hidden region that fires only on discrete state changes; (larger) a visually-hidden text summary per chart, updated on redraw.</p>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Med</span><span class="badge aud">All</span></div>
       </div>
 
-      <div class="card">
-        <div class="card-top"><h3>An optional reactor soundscape</h3><span class="idnum">B7</span></div>
-        <p class="why">A low hum that rises in pitch with fusion power, a soft alarm on disruption, and a chime at ignition or mission complete. Sound is disproportionately effective at a noisy event for pulling people to the table. Must be muted by default and one click to enable.</p>
-        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort - Med</span><span class="badge imp">Draws a crowd</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> a small Web Audio oscillator whose frequency tracks <code>model.fusionPower</code>; trigger one-shots from the same mission and state transitions you already detect. No audio code exists yet, so this is clean to add.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>Micro-illustrations on the controls</h3><span class="idnum">B8</span></div>
-        <p class="why">A tiny inline icon by each setpoint, a coil, a fuel pellet, a thermometer, a turbine, helps younger and non-native-English visitors parse the panel without reading every label. Small touch, large gain in approachability.</p>
-        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort - Low</span><span class="badge imp">Approachable</span><span class="badge aud">HS</span></div>
-        <p class="hook"><b>Code hook:</b> inline SVG in each <code>.control</code> heading, matching the stroke style you already use in the camera cluster buttons.</p>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- ============ SECTION C: EDUCATION ============ -->
-  <section id="education">
-    <div class="sec-head"><span class="sec-num">05</span><h2>Teaching value and new features</h2></div>
-    <p class="sec-sub">The sim already teaches by letting people drive. These add structure for those who want it, depth for those ready for it, and motivation for everyone, without turning it into homework.</p>
-
-    <div class="grid two">
-
-      <div class="card">
-        <div class="card-top"><h3>Guided story mode</h3><span class="idnum">C1</span></div>
-        <p class="why">A narrated path from cold gas to a self-sustaining burn. Each step unlocks one control and explains it: first heat the fuel, now hold it with the field, now feed it, now catch the energy. Five minutes, and a visitor leaves understanding the whole chain rather than having wiggled some sliders.</p>
-        <p>Free play stays the default. Story mode is the on-ramp for the many who want to be led.</p>
-        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort - Med</span><span class="badge imp">Best for HS / public</span><span class="badge aud">HS</span></div>
-        <p class="hook"><b>Code hook:</b> your <code>lessons</code> object and <code>MISSIONS</code> array are already the content spine; sequence them with a "next" control and a soft spotlight.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>Real machines, and where you stand</h3><span class="idnum">C2</span></div>
-        <p class="why">Preset buttons that load the operating regime of real devices and plot them on your Lawson map next to the visitor's point: ITER, SPARC, JET, EAST, with NIF shown as the contrasting laser approach. The payoff line writes itself: here is where you got the plasma, and here is where ITER is aiming.</p>
-        <p>It makes the sim current and credible, and it is the natural bridge to "these are real projects you could work on."</p>
-        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort - Low</span><span class="badge imp">Current + credible</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> add named points to the <code>drawLawson()</code> overlay and a preset row beside your existing one. Section 06 has vetted 2024 to 2025 numbers to seed it.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>Real-world unit translators</h3><span class="idnum">C3</span></div>
-        <p class="why">A toggle that re-expresses the abstract readouts in human terms: temperature as "X times the Sun's core," net power as "homes powered," fuel as "grams of seawater deuterium per day." The physics stays; the meaning lands for a general audience.</p>
-        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort - Low</span><span class="badge imp">Makes it tangible</span><span class="badge aud">HS</span></div>
-        <p class="hook"><b>Code hook:</b> a formatting layer over the same <code>model</code> values feeding <code>updateReadouts()</code>; no model changes needed.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>Make it move through time</h3><span class="idnum">C4</span></div>
-        <p class="why">The model is quasi-static: it jumps straight to equilibrium. Add light time dynamics so temperature and density ramp with thermal inertia, the burn can run away into ignition or slide into a quench over a few seconds, and the history charts show real transients. This is the biggest jump in physical realism and it makes ignition feel earned.</p>
-        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort - Med</span><span class="badge imp">Deeper physics</span><span class="badge aud">UG</span></div>
-        <p class="hook"><b>Code hook:</b> evolve a small state vector (stored energy, density) toward the targets <code>calculateModel()</code> computes, integrated in the existing 360 ms tick, instead of displaying equilibrium instantly.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>Scenario challenges and an operator exam</h3><span class="idnum">C5</span></div>
-        <p class="why">Extend the mission system into timed scenarios with events: a sudden density drop, a partial coil quench, a cooling fault. The student has to diagnose and recover. For undergraduates this turns the toy into a genuine control exercise and pairs naturally with a quench-and-recover lab.</p>
-        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort - Med</span><span class="badge imp">Rigor for UG</span><span class="badge aud">UG</span></div>
-        <p class="hook"><b>Code hook:</b> builds directly on <code>MISSIONS</code> and <code>updateMissions()</code>; add scripted disturbances that perturb the inputs on a timer.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>Predict, then test</h3><span class="idnum">C6</span></div>
-        <p class="why">Short inline prompts that ask before they let you act: "If you raise the field, what happens to Q?" The visitor guesses, then changes the slider and sees. Prediction-first is one of the most effective teaching patterns there is, and the sim is the perfect answer key.</p>
-        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort - Low</span><span class="badge imp">Proven pedagogy</span><span class="badge aud">HS</span></div>
-        <p class="hook"><b>Code hook:</b> a small prompt component that reads the relevant <code>model</code> field before and after a change to confirm the prediction.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>Export the run as a lab worksheet</h3><span class="idnum">C7</span></div>
-        <p class="why">Let a student export their operating point and history as a CSV or a one-page report: setpoints, triple product, Q, net power. It plugs the simulator straight into a classroom assignment and matches a hands-on, lab-report teaching style well.</p>
-        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort - Med</span><span class="badge imp">Classroom-ready</span><span class="badge aud">UG</span></div>
-        <p class="hook"><b>Code hook:</b> you already keep <code>netHistory</code>, <code>fusionHistory</code>, and <code>trail</code>; serialize them to a Blob download. No backend required.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>A "why fusion" context panel</h3><span class="idnum">C8</span></div>
-        <p class="why">A short, optional framing module: the fuel comes from seawater and lithium, the energy density dwarfs chemical fuels, there is no long-lived high-level waste stream like fission, and it cannot melt down. For a public audience this is the motivation that makes the rest worth caring about.</p>
-        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort - Low</span><span class="badge imp">The "so what"</span><span class="badge aud">HS</span></div>
-        <p class="hook"><b>Code hook:</b> a new collapsible panel in the learning row, same pattern as your glossary and lesson panels.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>A reading-level switch</h3><span class="idnum">C9</span></div>
-        <p class="why">One control that swaps the wording of lessons, the coach, and tooltips between plain language and technical. The same simulator then serves a middle-schooler and a junior engineering student without dumbing down for either. It is how one tool covers your whole audience range.</p>
-        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort - Med</span><span class="badge imp">Covers all ages</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> give the <code>lessons</code>, <code>TIPS</code>, and coach strings two variants keyed by a level flag.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>Step through the energy ledger</h3><span class="idnum">C10</span></div>
-        <p class="why">Your Sankey is excellent. Add a step-through that pauses on each conversion, heat to thermal, thermal to gross, minus recirculating, and annotates it with the governing relation and the efficiency at that stage. It turns a static diagram into a guided derivation of net electric.</p>
-        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort - Med</span><span class="badge imp">Closes the loop</span><span class="badge aud">UG</span></div>
-        <p class="hook"><b>Code hook:</b> stage the ribbon draws in <code>drawSankey()</code> behind a step index, each with a caption from the same intermediate values you already compute.</p>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- ============ SECTION D: TIE-INS ============ -->
-  <section id="tieins">
-    <div class="sec-head"><span class="sec-num">06</span><h2>Real-world and program tie-ins</h2></div>
-    <p class="sec-sub">A donated tool lands harder when it points back at the people receiving it and at the real machines in the news. This section is ready-to-use content, not just ideas.</p>
-
-    <h3 style="margin-bottom:6px">Seed data for the "real machines" feature (C2)</h3>
-    <p class="sec-sub" style="margin-top:8px">Vetted against current sources, mid-2026. Use these to place named points on the Lawson map and to write the comparison copy.</p>
-    <div class="table-scroll">
-      <table>
-        <thead>
-          <tr><th>Machine</th><th>Approach</th><th>Headline figure (2024 to 2025)</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>JET</strong> (UK, retired 2023)</td><td>Magnetic, tokamak</td><td>Held the magnetic-fusion energy record: 69 MJ released over a ~5 s pulse in its final deuterium-tritium campaign. Q of roughly 0.3.</td></tr>
-          <tr><td><strong>EAST</strong> (China)</td><td>Magnetic, tokamak</td><td>Sustained plasma for 1,066 seconds in January 2025, a world record for long-pulse confinement; runs above 100 million &deg;C.</td></tr>
-          <tr><td><strong>ITER</strong> (France, building)</td><td>Magnetic, tokamak</td><td>Revised 2024 baseline: full plasma current in 2034, deuterium-tritium operation from 2039. Designed for Q of 10, about 500 MW out from 50 MW of heating.</td></tr>
-          <tr><td><strong>SPARC</strong> (US, building)</td><td>Magnetic, compact HTS tokamak</td><td>High-temperature superconducting magnets being installed through 2025; aims to show net energy gain (Q above 1) around 2027.</td></tr>
-          <tr><td><strong>NIF</strong> (US) <span style="color:var(--faint)">- shown as contrast</span></td><td>Inertial, lasers</td><td>Repeated ignition since 2022; a February 2025 shot reached a target gain of 2.44 (2.05 MJ in, 5.0 MJ out), and an April 2025 shot yielded 8.6 MJ. Note this is yield over laser energy on target, not whole-plant gain.</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="grid two" style="margin-top:18px">
-      <div class="card">
-        <div class="card-top"><h3>Purdue: make materials the hero</h3><span class="idnum">D1</span></div>
-        <p class="why">Purdue's fusion work centers on plasma-material interaction, how the hot edge erodes and reshapes the first wall, the exact problem your blanket and divertor already model. Add a "first wall" layer: a tungsten divertor view, a neutron-damage meter that accrues over a run, and a note that surviving these fluxes is one of the field's defining challenges.</p>
-        <p>It connects the prettiest failure mode in the sim to the actual research a Purdue visitor might join.</p>
-        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort - Med</span><span class="badge imp">Purdue-aligned</span><span class="badge aud">UG</span></div>
-        <p class="hook"><b>Pairs with:</b> the neutron wall-heat map (A4) and disruption event (A8). The physics is already half-built in <code>wallLoad</code> and the divertor logic.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>Rose-Hulman: ship it as a lab module</h3><span class="idnum">D2</span></div>
-        <p class="why">Rose-Hulman is undergraduate-first and hands-on, with a nuclear physics and radiation course that already covers fusion and reactors. Package the sim with a short worksheet and the data export (C7) so it drops into a lab period: derive the Lawson point, hit the missions, export your run, write it up. The reading-level switch (C9) lets the same file serve a campus open house and a sophomore lab.</p>
-        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort - Med</span><span class="badge imp">Curriculum fit</span><span class="badge aud">UG</span></div>
-        <p class="hook"><b>Pairs with:</b> data export (C7), predict-then-test (C6), and the energy-ledger walkthrough (C10).</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>A takeaway card with a QR</h3><span class="idnum">D3</span></div>
-        <p class="why">When a visitor reaches a milestone, offer a printable or on-screen card: "I reached Q = X at the fusion booth," with a QR to the Rose-Hulman or Purdue fusion pages. It turns a 90-second interaction into a follow-up, which is the whole point of outreach.</p>
-        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort - Low</span><span class="badge imp">Recruiting hook</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> render the card to an offscreen canvas from the current <code>model</code> and offer it as an image download.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-top"><h3>A credits and donation panel</h3><span class="idnum">D4</span></div>
-        <p class="why">A small "about this exhibit" panel that names the donation to both programs, with room for their logos and links, plus a one-line model disclaimer. It makes the gift feel official and gives the hosting program a sense of ownership.</p>
-        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort - Low</span><span class="badge imp">Makes it a gift</span><span class="badge aud">All</span></div>
-        <p class="hook"><b>Code hook:</b> a footer or modal; your <code>disclaimer</code> copy is a good starting seed.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ SECTION E: PHASING ============ -->
-  <section id="phasing">
-    <div class="sec-head"><span class="sec-num">07</span><h2>A suggested order of attack</h2></div>
-    <p class="sec-sub">If it were mine to sequence, I would chase visible wins first to build momentum, then the features that deepen the teaching, and treat the rendering rewrite as an optional finale.</p>
-    <div class="panel">
-      <div class="phase">
-        <div class="tag" style="color:var(--teal)">Phase 1<span>A weekend</span></div>
-        <p>The quick wins that change the first impression: fusion events (A1), multi-pass bloom and living plasma (A2), scale reference (A5), presentation mode (B1), themes (B2), real-machine presets (C2), and unit translators (C3). Mostly hours each, all inside the current engine.</p>
-      </div>
-      <div class="phase">
-        <div class="tag" style="color:var(--gold)">Phase 2<span>A few weeks</span></div>
-        <p>The depth: cutaway mode (A3), the disruption event (A8), guided story mode (C1), transient time dynamics (C4), the materials layer (D1), data export (C7), the guided tour (B4), and the soundscape (B7). This is where it becomes a teaching instrument, not just a demo.</p>
-      </div>
-      <div class="phase">
-        <div class="tag" style="color:var(--violet)">Phase 3<span>When you want the ceiling</span></div>
-        <p>The big bets: the WebGL render track (A9), two-player race-to-ignition, and a WebXR booth mode. High effort, high reward, and entirely optional. The sim is already excellent without them.</p>
-      </div>
     </div>
     <div class="callout">
-      <p class="kicker">Three things to protect along the way</p>
-      <p><strong>Portability:</strong> keep the default build openable from one folder with no network, so it always works at a booth. <strong>Accessibility:</strong> honor the reduced-motion path you already have, and keep the new colorblind and high-contrast themes first-class. <strong>Performance:</strong> the canvas redraws every frame, so gate heavy additions behind the same idle and reduced-motion checks you use today.</p>
+      <p class="kicker">One more, when you reach it</p>
+      <p><strong>A4 — keyboard orbit of the 3D stage.</strong> The reactor is the centerpiece; on a focusable canvas, map arrow keys to <code>cam.yaw/pitch</code> and <code>+/−</code> to zoom — the same state the drag handlers already mutate — so a keyboard-only visitor can look around it too.</p>
     </div>
   </section>
 
-  <footer>
-    <p><strong>Sources for the figures in Section 06</strong> (verified mid-2026): NIF / Lawrence Livermore National Laboratory ignition and yield records; reporting on the EAST 1,066-second record; the ITER 2024 updated baseline; Commonwealth Fusion Systems SPARC status; and JET's final deuterium-tritium campaign. Full links accompany the chat message that delivered this document.</p>
-    <p style="margin-top:12px">This roadmap is a set of recommendations for the Fusion Power Generator Simulator. It proposes no changes to your code by itself. The simulator remains a simplified teaching model; the enhancements here are calibrated for intuition and outreach, not engineering accuracy.</p>
-  </footer>
+  <!-- 06 CEILING -->
+  <section id="ceiling">
+    <div class="sec-head"><span class="sec-num">06</span><h2>Raise the ceiling — optional depth</h2></div>
+    <p class="sec-sub">None of this is required to donate. It is where the curious undergraduate and the next maintainer are rewarded, and it absorbs the three leftover "ambitious" bets from the original roadmap.</p>
+    <div class="grid two">
+
+      <div class="card">
+        <div class="card-top"><h3>Physics depth that closes loops you already hint at</h3><span class="idnum">D1</span></div>
+        <p>Within the reachable range, hotter is always better — the famous reactivity rollover is never felt. There is no bremsstrahlung loss, so the Lawson low-temperature branch is asserted but not explainable, and density is decoupled from T/B (no Greenwald limit; only the beta wall bites).</p>
+        <p class="why"><b>Why it matters:</b> any one of these turns a "magic number" into a discussion prompt and deepens the UG lab.</p>
+        <div class="hook"><b>Hook:</b> add a P<sub>rad</sub> term to the power balance; let the effective rate roll over past its peak; evolve a density/Greenwald check alongside <code>burnT</code>.</div>
+        <div class="badges"><span class="badge pri-amb">Ambitious</span><span class="badge ef">Effort · Med</span><span class="badge aud">UG</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>The leftover big bets</h3><span class="idnum">D2</span></div>
+        <p>From the original roadmap, three items remain genuinely unbuilt: a full <strong>Three.js render track</strong> behind a flag (keep the current engine as the offline default), a <strong>two-player race-to-ignition</strong> for events, and a <strong>WebXR booth mode</strong>.</p>
+        <p class="why"><b>Why it matters:</b> each raises the ceiling; none is needed for the gift, and each adds real maintenance the host program then owns.</p>
+        <div class="hook"><b>Hook:</b> gate any new renderer behind an interchangeable <code>drawReactor()</code> / <code>drawReactorGL()</code> flag and vendor the dependency so booths with no network still run.</div>
+        <div class="badges"><span class="badge pri-amb">Ambitious</span><span class="badge ef">Effort · High</span><span class="badge aud">All</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>Maintainability for rotating student volunteers</h3><span class="idnum">M1</span></div>
+        <p>The burn-through constants are duplicated verbatim across two functions, the <code>0.36</code>s timestep is a magic literal in several call sites, and regime thresholds and semantic colors are repeated across the model, annunciator, coach, and canvas. There is no smoke test for a heavily-tuned model, and the README points reviewers at <code>backups/</code>.</p>
+        <p class="why"><b>Why it matters:</b> a student is meant to inherit this; small extractions make a well-meaning future edit safe.</p>
+        <div class="hook"><b>Hook:</b> hoist shared physics constants and a <code>TICK_S</code>; centralize thresholds/colors; add a tiny <code>?selftest</code> harness that runs <code>calculateModel()</code> across a grid and asserts the invariants; add a "For maintainers" README map. Keep the single-folder, zero-dependency portability intact.</p>
+        <div class="badges"><span class="badge pri-amb">Ambitious</span><span class="badge ef">Effort · Med</span><span class="badge aud">UG / maintainer</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>Make it the host program's own</h3><span class="idnum">P1 · P2</span></div>
+        <p>"Tokamak Learning Lab" is hard-coded across the markup and inside canvas-draw code, and a "Purdue" reference is baked into shipped copy — yet About invites a host to add its name. There is also no facilitator guide, no curriculum metadata (grade band, time, standards), and no version/changelog.</p>
+        <p class="why"><b>Why it matters:</b> adoption depends on a program putting its own name on the exhibit cheaply, and on a volunteer being able to staff it confidently.</p>
+        <div class="hook"><b>Hook:</b> a single <code>const BRAND = { program, logoUrl, siteUrl }</code> read by the topbar, About, and the card; neutralize the hard-coded program reference; add a half-page facilitator run-of-show, worksheet metadata, an <code>APP_VERSION</code> + CHANGELOG, and trim <code>backups/</code> from the shipped bundle.</p>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Med</span><span class="badge aud">All</span></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 07 QUICK WINS -->
+  <section id="quick">
+    <div class="sec-head"><span class="sec-num">07</span><h2>The quick-win batch</h2></div>
+    <p class="sec-sub">Low-effort, high-credibility items that can land in an afternoon. Several change the first impression or flip an accessibility check for the cost of a few lines.</p>
+    <div class="panel">
+      <ul class="check">
+        <li>Add a <code>LICENSE</code> file and a README "License" section <em>(T0·1)</em>.</li>
+        <li>Add the global <code>:focus-visible</code> ring and restore the <code>.tip-dot</code> outline <em>(T0·2)</em>.</li>
+        <li>Correct the instructor-key Cruise Q to a model-matched range (~15–20) <em>(T0·3)</em>.</li>
+        <li>Reconcile the README "tour runs on first visit" claim — wire the flag or fix the line <em>(T0·3 / U1)</em>.</li>
+        <li>Set each slider's <code>aria-valuetext</code> from its existing formatted output <em>(A2)</em>.</li>
+        <li>Remove <code>aria-live</code> from the numeric badges; route discrete state changes through one hidden region <em>(A3)</em>.</li>
+        <li>Suspend <code>audioCtx</code> on <code>document.hidden</code>; add a ~60fps frame cap; broaden the lite-mode blur removal <em>(R1)</em>.</li>
+        <li>Promote the status-strip hero numbers via <code>clamp()</code> sizing + a kiosk bump <em>(F2)</em>.</li>
+        <li>Add a leading LED dot and a brighter off-state to the annunciator lamps <em>(F4)</em>.</li>
+        <li>Standardize "14.1 MeV" and one operating-window range across all copy; soften "no long-lived waste" / "no meltdown" to precise wording <em>(C1)</em>.</li>
+        <li>Neutralize the hard-coded "Purdue" reference; add an <code>APP_VERSION</code> surfaced in About + manifest <em>(P2)</em>.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 08 ORDER -->
+  <section id="order">
+    <div class="sec-head"><span class="sec-num">08</span><h2>Suggested order of attack</h2></div>
+    <p class="sec-sub">Blockers first, then the first-impression and accessibility work that makes the gift land, then the optional ceiling.</p>
+    <div class="panel">
+      <div class="phase"><div class="tag">First<span>Unblock the donation</span></div>
+        <p>T0·1 LICENSE, T0·2 focus ring, T0·3 truth slips. Cheap, and they flip the legal, accessibility, and curriculum gates from fail to pass.</p></div>
+      <div class="phase"><div class="tag">Next<span>Win the first 5 seconds</span></div>
+        <p>F1 warm-start, F2 hero numbers, U1 welcome prompt, F4 lamps, plus the A2/A3 a11y one-liners and R1 robustness batch. This is what converts booth dwell-time into engagement.</p></div>
+      <div class="phase"><div class="tag">Then<span>Usable by everyone</span></div>
+        <p>U2 mobile scroll-trap, A1 modal focus, A4 keyboard orbit, F3 retina plasma, U3 missions chip + hints, U4 story spotlight, F5 label clamps.</p></div>
+      <div class="phase"><div class="tag">Package<span>Make it adoptable</span></div>
+        <p>P1 BRAND config, P2 facilitator guide + curriculum metadata + version/changelog, trim <code>backups/</code> from the shipped bundle, update the README materials list.</p></div>
+      <div class="phase"><div class="tag">When you want depth<span>Raise the ceiling</span></div>
+        <p>M1 maintainability + smoke test, then D1 physics depth, and finally the D2 leftover bets (Three.js track, two-player race, WebXR) as appetite allows.</p></div>
+    </div>
+    <div class="callout">
+      <p class="kicker">Three things to protect</p>
+      <p><strong>Portability</strong> — keep it openable from one folder with no network. <strong>Accessibility</strong> — keep the reduced-motion, contrast, and colorblind paths first-class as you add features. <strong>Performance</strong> — gate every new heavy addition behind the same idle/visibility/lite checks, so it stays smooth on the weakest machine in the room.</p>
+    </div>
+  </section>
+
+  <!-- 09 QA -->
+  <section id="qa">
+    <div class="sec-head"><span class="sec-num">09</span><h2>Pre-donation QA checklist</h2></div>
+    <p class="sec-sub">Independent of the work above, run this pass before handing it over — the difference between "works on my machine" and "works at the event."</p>
+    <div class="panel">
+      <ul class="check">
+        <li>Open <code>index.html</code> directly from the folder (<code>file://</code>) with no server, in current Chrome, Edge, Firefox, and Safari.</li>
+        <li>Run on a real mid-range tablet for at least an hour: watch for heat, throttling, and frame-rate decay.</li>
+        <li>Open it on a phone, scan-to-run style: confirm you can scroll the whole page past the reactor (U2).</li>
+        <li>Project it in a bright room and read the hero numbers and lamps from across the room (F2, F4).</li>
+        <li>Drive each preset and each mission to completion; confirm state labels, lamps, and coach text all agree — and re-verify the instructor key against the live values (T0·3).</li>
+        <li>Do a keyboard-only and a screen-reader pass (T0·2, A1–A4).</li>
+        <li>Toggle OS reduced-motion and confirm the stilled experience is still coherent.</li>
+        <li>Leave it idle for several minutes and confirm it returns to a friendly state.</li>
+        <li>Re-verify the real-machine figures (ITER/SPARC/EAST move) at donation time.</li>
+      </ul>
+    </div>
+  </section>
 
 </div>
+<footer>
+  Status &amp; roadmap for the Fusion Power Generator Simulator, prepared for a campus-outreach donation. It supersedes the earlier enhancement roadmap and form-and-function review, both of which are now largely implemented. Line and function references point at the live build (<code>index.html</code>, <code>script.js</code>, <code>styles.css</code>) so each item is actionable. The simulator remains a simplified teaching model — calibrated for intuition and outreach, not engineering accuracy.
+</footer>
 </body>
 </html>
