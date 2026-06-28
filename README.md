@@ -57,7 +57,7 @@ Navigate by dragging to orbit, scrolling to zoom, shift-drag or right-drag to pa
 ## Modes and features
 
 - **Guided story** walks a learner from cold gas to ignition one concept at a time, with a live "goal met" check at each step.
-- **Guided tour** runs on first visit (and replays from the **Tour** button), spotlighting the key controls.
+- **Guided tour** spotlights the key controls; start it any time from the **Tour** button.
 - **Missions** are seven challenges, from First Light to Ignition, each forcing a deliberate tradeoff.
 - **Real-world units** re-expresses the readouts in everyday terms: temperature in millions of degrees and multiples of the Sun's core, net power in homes powered.
 - **Themes**: a control-room dark theme, a light theme for bright rooms and projectors, a high-contrast theme, and a colorblind-safe palette.
@@ -93,6 +93,10 @@ The simulator honors the operating system's reduced-motion setting (it stills an
 ## Disclaimer
 
 This is a teaching model, not a scientific reactor code. The numbers are illustrative and calibrated for intuition, not engineering accuracy.
+
+## License
+
+Released under the MIT License (see `LICENSE`) — free to run, share, modify, and adapt, including for a host program's own branding, with attribution preserved. The paired worksheet and instructor key may be reproduced for classroom and outreach use. Update the copyright holder in `LICENSE` to the donating party if it is not the Tokamak Learning Lab.
 
 ## Credits
 

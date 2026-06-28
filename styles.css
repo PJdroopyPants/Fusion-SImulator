@@ -26,6 +26,38 @@
   box-sizing: border-box;
 }
 
+/* Keyboard focus: one high-visibility ring for every interactive control.
+   Pointer/mouse users never see it (:focus-visible); keyboard and assistive-tech
+   users always do. Works across all four themes via the teal accent. */
+:where(a, button, [role="button"], input, select, textarea, summary,
+       .hotspot, .tool-btn, .nav-btn, .gizmo-btn, .preset, .stage-toggle,
+       .predict-choice, .plant-stage, .story-launch, .legend-close,
+       .gizmo-views button):focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(56, 225, 198, 0.28);
+}
+
+/* Range sliders: ring the whole control so the focused slider is unmistakable. */
+input[type="range"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(56, 225, 198, 0.45);
+}
+
+/* Screen-reader-only content (live regions, hidden labels). */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
 body {
   position: relative;
   min-height: 100vh;
@@ -1234,7 +1266,6 @@ meter::-moz-meter-bar {
 .tip-dot:focus-visible {
   color: var(--teal);
   border-color: var(--teal);
-  outline: none;
 }
 
 .tip-pop {

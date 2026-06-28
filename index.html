@@ -19,6 +19,8 @@
   </head>
   <body>
     <div class="ambient" aria-hidden="true"></div>
+    <!-- Screen-reader announcements: only discrete reactor-state changes, not the live number stream. -->
+    <div id="srStatus" class="visually-hidden" role="status" aria-live="polite"></div>
 
     <main class="sim-shell">
       <header class="topbar">
@@ -46,7 +48,7 @@
             <button class="tool-btn" id="presentBtn" type="button" aria-pressed="false" title="Fullscreen exhibit mode">Present</button>
             <button class="tool-btn" id="aboutBtn" type="button" aria-haspopup="dialog" title="About this exhibit">About</button>
           </div>
-          <div class="status-strip" aria-live="polite">
+          <div class="status-strip">
             <span class="status-block">
               <span class="status-caption">Reactor state</span>
               <span id="reactorState" class="state-pill">Startup</span>
@@ -303,7 +305,7 @@
             </div>
           </div>
 
-          <section class="realworld" id="realWorld" hidden aria-live="polite">
+          <section class="realworld" id="realWorld" hidden>
             <p class="rw-kicker">In everyday terms</p>
             <div class="rw-grid">
               <div class="rw-item">

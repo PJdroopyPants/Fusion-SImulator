@@ -89,6 +89,7 @@ const fuelCycleCanvas = $("#fuelCycleCanvas");
 const fuelCycleCtx = fuelCycleCanvas ? fuelCycleCanvas.getContext("2d") : null;
 const presets = document.querySelectorAll("[data-preset]");
 const hotspots = document.querySelectorAll("[data-topic]");
+const srStatus = $("#srStatus");   // A11y: polite live region for discrete reactor-state changes
 
 /* ---------- Presets ---------- */
 const presetValues = {
@@ -193,6 +194,7 @@ let neutrons = [];
 let wallHeat = [];           // A4: per-rib neutron heat accumulation
 let lastFrame = performance.now();
 let model = {};
+let lastAnnouncedState = "";   // A11y: last reactor state spoken to screen readers (announce only on change)
 let chartsDirty = true;     // C1: redraw the static charts only when their data changes
 const vis = new Set();      // C1: canvases currently on screen (off-screen ones are skipped)
 
@@ -410,7 +412,20 @@ function updateReadouts() {
   outputs.coolingFlowValue.textContent = `${Math.round(Number(controls.coolingFlow.value))}%`;
   outputs.turbineLoadValue.textContent = `${Math.round(Number(controls.turbineLoad.value))}%`;
 
+  // A11y: give each slider a spoken value with units (screen readers otherwise read a bare number).
+  controls.temperature.setAttribute("aria-valuetext", outputs.temperatureValue.textContent);
+  controls.magneticField.setAttribute("aria-valuetext", outputs.magneticFieldValue.textContent);
+  controls.fuelRate.setAttribute("aria-valuetext", outputs.fuelRateValue.textContent);
+  controls.fuelBalance.setAttribute("aria-valuetext", `${outputs.fuelBalanceValue.textContent} deuterium to tritium`);
+  controls.coolingFlow.setAttribute("aria-valuetext", outputs.coolingFlowValue.textContent);
+  controls.turbineLoad.setAttribute("aria-valuetext", outputs.turbineLoadValue.textContent);
+
   outputs.reactorState.textContent = model.label;
+  // A11y: announce only discrete reactor-state changes (not the continuous number stream).
+  if (srStatus && model.label !== lastAnnouncedState) {
+    lastAnnouncedState = model.label;
+    srStatus.textContent = `Reactor state: ${model.label}. Net electric ${Math.round(model.netElec)} megawatts.`;
+  }
   outputs.reactorState.style.background = model.stateColor;
   outputs.reactorState.style.boxShadow = `0 0 18px ${model.stateColor}66`;
   outputs.netPowerBadge.style.color = model.netElec > 0 ? "var(--green)" : "var(--coral)";
@@ -2978,6 +2993,20 @@ function updateStory() {
 }
 function setStory(on) {
   storyOn = on; storyStep = 0;
+  if (on) {
+    // Step 1 ("just cold gas") must match the screen: snap the plasma genuinely cold
+    // so the core stays dark until the learner heats it themselves in step 2.
+    const cold = { temperature: 3.5, magneticField: 3.0, fuelRate: 32, fuelBalance: 50,
+      coolingFlow: 66, turbineLoad: 30, neutralBeam: false, pelletPulse: false,
+      divertorSweep: false, emergencyQuench: false };
+    Object.entries(cold).forEach(([k, v]) => {
+      if (typeof v === "boolean") controls[k].checked = v; else controls[k].value = v;
+    });
+    clearPresetHighlight();
+    smoothed = null; burnT = null;   // reset dynamics so the cold state is immediate, not a slow ramp-down
+    trail = [];
+    updateReadouts();
+  }
   const btn = document.getElementById("storyToggle");
   if (btn) btn.setAttribute("aria-pressed", String(on));
   renderStory();
