@@ -570,6 +570,24 @@
         </article>
       </section>
 
+      <!-- MODEL ASSUMPTIONS (B3) -->
+      <section class="panel model-card" aria-label="Model assumptions">
+        <div class="panel-heading">
+          <p class="panel-kicker">Under the hood</p>
+          <h2>What this model assumes</h2>
+        </div>
+        <p class="viz-caption">A simplified but physically motivated teaching model, calibrated for intuition rather than engineering accuracy. The core relations it uses:</p>
+        <dl class="model-dl">
+          <div><dt>Figure of merit</dt><dd>The fusion triple product <strong>n&middot;T&middot;&tau;<sub>E</sub></strong>; D-T ignition sits near <strong>3&times;10²¹ keV&middot;s&middot;m⁻³</strong> (the Lawson criterion).</dd></div>
+          <div><dt>Energy gain</dt><dd><strong>Q = 5&phi; / (1 &minus; &phi;)</strong>, where &phi; is how far you are toward ignition. The 5 is 1/f<sub>&alpha;</sub> &mdash; alphas carry ~20% of the fusion energy.</dd></div>
+          <div><dt>Confinement</dt><dd>Energy confinement time climbs strongly with field, roughly <strong>&tau;<sub>E</sub> &prop; B<sup>1.4</sup></strong>, and improves with the divertor sweep.</dd></div>
+          <div><dt>Power split</dt><dd><strong>~20%</strong> of fusion power is alpha particles that stay and heat the plasma; <strong>~80%</strong> is neutrons that deposit in the blanket.</dd></div>
+          <div><dt>Burn-through</dt><dd>Core temperature is a real, evolving state: past the ignition threshold, alpha self-heating drives it higher on its own; starve it and the burn collapses.</dd></div>
+          <div><dt>Stability limit</dt><dd>When plasma pressure (&prop; n&middot;T / B&sup2;, the &beta; limit) outruns the magnetic field, confinement is lost &mdash; a disruption.</dd></div>
+        </dl>
+        <p class="model-note">Numbers are illustrative. This is a teaching tool, not a reactor design code.</p>
+      </section>
+
       <!-- MOTIVATION + PRACTICE ROW -->
       <section class="learn-grid" aria-label="Motivation and practice">
         <article class="panel why-panel" aria-label="Why fusion">

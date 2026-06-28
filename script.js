@@ -205,6 +205,7 @@ let kioskCycle = 0;          // B1: presentation-mode auto-demo index
 let kioskLast = 0;           // B1: last auto-demo advance time
 let lastUserAction = performance.now();  // C4: last real interaction (idle watchdog)
 const WATCHDOG_MS = 180000;  // C4: normal-mode idle reset after 3 minutes
+let liteMode = !!((navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2) || (navigator.deviceMemory && navigator.deviceMemory <= 2));  // C3: weak-GPU lite path
 
 /* ---------- Math helpers ---------- */
 function gaussian(value, center, width) {
@@ -713,7 +714,7 @@ function tracePts(ctx, pts, close) {
 
 /* ---- particles ---- */
 function seedParticles() {
-  particles = Array.from({ length: 168 }, () => {
+  particles = Array.from({ length: liteMode ? 96 : 168 }, () => {
     const r = Math.random();
     const species = r < 0.38 ? "D" : r < 0.76 ? "T" : r < 0.88 ? "alpha" : "electron";
     const sizeMul = species === "electron" ? 0.6 : species === "alpha" ? 1.4 : 1;
@@ -730,7 +731,7 @@ function seedParticles() {
   sparks = [];
   alphas = [];
   fusionAcc = 0;
-  neutrons = Array.from({ length: 64 }, () => ({
+  neutrons = Array.from({ length: liteMode ? 28 : 64 }, () => ({
     th: Math.random() * Math.PI * 2,
     ph: Math.random() * Math.PI * 2,
     life: Math.random(),
@@ -1585,6 +1586,7 @@ function drawAtmosphere(ctx, w, h, intensity) {
 /* ---- cheap additive bloom: blur a downscaled copy of the frame back over itself ---- */
 let glowCanvas = null, glowCtx = null;
 function applyBloom(ctx, w, h, amount) {
+  if (liteMode) return;   // C3: skip the bloom passes on weak GPUs
   if (reduceMotion && amount < 0.2) return;
   const gw = Math.max(1, Math.floor(w * 0.34)), gh = Math.max(1, Math.floor(h * 0.34));
   if (!glowCanvas) { glowCanvas = document.createElement("canvas"); glowCtx = glowCanvas.getContext("2d"); }
@@ -3092,6 +3094,7 @@ function initBatchControls() {
   addSteppers();
 }
 
+if (liteMode) document.body.classList.add("lite");   // C3
 seedParticles();
 updateReadouts();
 initNavHud();
@@ -3100,6 +3103,22 @@ attachTips();
 initPhase1Controls();
 initPhase2Controls();
 initBatchControls();
+
+// ---- A4: show a scroll cue when a side panel hides controls below the fold ----
+function initScrollCues() {
+  document.querySelectorAll(".controls-panel, .telemetry-panel").forEach((panel) => {
+    const cue = document.createElement("button");
+    cue.type = "button"; cue.className = "scroll-cue"; cue.setAttribute("aria-label", "Scroll for more controls");
+    cue.textContent = "\u25be";
+    panel.appendChild(cue);
+    const update = () => { cue.classList.toggle("show", panel.scrollHeight - panel.clientHeight - panel.scrollTop > 14); };
+    cue.addEventListener("click", () => panel.scrollBy({ top: panel.clientHeight * 0.7, behavior: "smooth" }));
+    panel.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    setTimeout(update, 250);
+  });
+}
+initScrollCues();
 
 // ---- D1: About / credits modal open-close ----
 (function initAbout() {
@@ -3159,3 +3178,18 @@ function stopLoops() {
 }
 document.addEventListener("visibilitychange", () => { if (document.hidden) stopLoops(); else startLoops(); });
 startLoops();
+
+// ---- C3: FPS safety net — drop to the lite path if early frames are slow ----
+(function fpsProbe() {
+  if (liteMode) return;
+  let frames = 0, t0 = 0;
+  const tick = (t) => {
+    if (t0 === 0) { t0 = t; requestAnimationFrame(tick); return; }
+    const dt = t - t0;
+    if (dt < 600) { requestAnimationFrame(tick); return; }
+    frames++;
+    if (dt < 2100) { requestAnimationFrame(tick); return; }
+    if (frames * 1000 / (dt - 600) < 32) { liteMode = true; document.body.classList.add("lite"); seedParticles(); }
+  };
+  requestAnimationFrame(tick);
+})();

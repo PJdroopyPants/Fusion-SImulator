@@ -1907,3 +1907,28 @@ button.plant-stage:focus-visible { outline: 2px solid var(--teal); outline-offse
 .about-block p:not(.about-label) { margin: 0; color: var(--text); font-size: 0.92rem; }
 .about-note { display: block; margin-top: 4px; color: var(--muted); font-size: 0.8rem; }
 .about-disclaimer { margin: 4px 0 0; color: var(--faint); font-size: 0.78rem; line-height: 1.5; }
+
+/* ---------- A4: scroll cue for tall side panels ---------- */
+.scroll-cue {
+  position: sticky; bottom: 6px; z-index: 6;
+  display: none; margin: 4px auto 0; padding: 0;
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--line-strong); background: var(--panel-solid); color: var(--teal);
+  font-size: 1rem; line-height: 27px; text-align: center; cursor: pointer;
+  box-shadow: 0 6px 16px var(--shadow); animation: cueBob 1.7s ease-in-out infinite;
+}
+.scroll-cue.show { display: block; }
+.scroll-cue:hover { color: var(--text); border-color: var(--teal); }
+@keyframes cueBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+
+/* ---------- B3: model-assumptions card ---------- */
+.model-dl { display: grid; gap: 14px 24px; margin: 12px 0 0; }
+@media (min-width: 720px) { .model-dl { grid-template-columns: 1fr 1fr; } }
+.model-dl dt { color: var(--teal); font-weight: 700; font-size: 0.86rem; margin-bottom: 3px; }
+.model-dl dd { margin: 0; color: var(--muted); font-size: 0.87rem; line-height: 1.5; }
+.model-note { margin: 14px 0 0; color: var(--faint); font-size: 0.8rem; }
+
+/* ---------- C3: lite render path for weak GPUs ---------- */
+body.lite .panel, body.lite .reactor-stage { backdrop-filter: none; box-shadow: 0 8px 22px var(--shadow); }
+body.lite .ambient::after { display: none; }
+@media (prefers-reduced-motion: reduce) { .scroll-cue { animation: none; } }
