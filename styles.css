@@ -1774,7 +1774,7 @@ input[type="range"].vol-slider[hidden] { display: none; }
 
 /* ---- A6: ion species key ---- */
 .ion-key {
-  position: absolute; left: 16px; top: 40px; z-index: 4;
+  position: absolute; left: 18px; bottom: 96px; z-index: 4;
   display: flex; gap: 10px; padding: 5px 9px;
   border: 1px solid var(--line); border-radius: 8px;
   background: rgba(11, 13, 18, 0.5); backdrop-filter: blur(6px);
