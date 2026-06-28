@@ -444,6 +444,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .hotspot-core { left: 50%; top: 45%; transform: translate(-50%, -50%); }
+.hotspot-solenoid { left: 50%; top: 30%; transform: translate(-50%, -50%); }
 .hotspot-magnets { left: 6%; top: 14%; }
 .hotspot-blanket { right: 7%; top: 20%; }
 .hotspot-divertor { left: 50%; bottom: 22%; transform: translateX(-50%); }
@@ -1685,4 +1686,196 @@ html[data-theme="cb"] {
 
 @media (prefers-reduced-motion: reduce) {
   .powerup { display: none !important; }
+  .lamp.warn.on { animation: none !important; }
+}
+
+/* ============================================================
+   Batch additions
+   Control icons, annunciator lamps, why-fusion, predict-then-test,
+   reading-level (plain) mode.
+   ============================================================ */
+
+/* ---- B8: control icons ---- */
+.ctl-ico {
+  width: 15px; height: 15px;
+  margin-right: 7px;
+  vertical-align: -2px;
+  fill: none;
+  stroke: var(--teal);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
+}
+
+/* ---- B5: annunciator lamps ---- */
+.annunciator { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.lamp {
+  flex: 1 1 auto;
+  text-align: center;
+  padding: 5px 6px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(8, 10, 14, 0.5);
+  color: var(--faint);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.lamp.on { color: #07120f; background: var(--teal); border-color: var(--teal); box-shadow: 0 0 12px var(--glow-teal); }
+.lamp.warn.on { color: #1a0606; background: var(--danger); border-color: var(--danger); box-shadow: 0 0 14px rgba(255, 93, 93, 0.5); animation: lampBlink 0.9s steps(1, end) infinite; }
+@keyframes lampBlink { 50% { opacity: 0.45; } }
+
+/* ---- C8: why-fusion panel ---- */
+.why-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.why-item strong { display: block; color: var(--text); font-size: 0.92rem; margin-bottom: 3px; }
+.why-item p { margin: 0; color: var(--muted); font-size: 0.84rem; line-height: 1.45; }
+@media (max-width: 560px) { .why-grid { grid-template-columns: 1fr; } }
+
+/* ---- C6: predict-then-test ---- */
+.predict-q { margin: 0 0 14px; color: var(--text); font-size: 0.96rem; line-height: 1.45; font-weight: 600; }
+.predict-choices { display: grid; gap: 8px; }
+.predict-choice {
+  text-align: left;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 0.88rem;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.predict-choice:hover:not(:disabled) { border-color: var(--teal); background: rgba(56, 225, 198, 0.12); }
+.predict-choice:disabled { cursor: default; }
+.predict-choice.correct { border-color: var(--green); background: rgba(126, 231, 135, 0.16); }
+.predict-choice.wrong { border-color: var(--danger); background: rgba(255, 93, 93, 0.14); }
+.predict-feedback { margin: 12px 0 0; font-size: 0.86rem; line-height: 1.5; color: var(--muted); }
+.predict-feedback.right { color: var(--green); }
+.predict-feedback.miss { color: var(--gold); }
+.predict-next { margin-top: 14px; }
+
+/* ---- C9: plain reading level hides the technical extras ---- */
+body.plain .deeper { display: none; }
+
+/* ---- B7: sound volume slider in the topbar ---- */
+input[type="range"].vol-slider { width: 78px; height: 20px; margin: 0; flex: 0 0 auto; vertical-align: middle; }
+input[type="range"].vol-slider[hidden] { display: none; }
+
+/* ---- Mobile HUD declutter: drop the decorative gizmo cube and stack the camera
+   cluster directly under the view-snap buttons so the two no longer overlap ---- */
+@media (max-width: 920px) {
+  #gizmoCanvas { display: none; }
+  .nav-gizmo { top: 10px; right: 10px; padding: 6px; }
+  .nav-cluster { top: 84px; bottom: auto; right: 10px; transform: none; gap: 6px; }
+  .nav-btn { width: 36px; height: 36px; }
+}
+
+/* ---- A6: ion species key ---- */
+.ion-key {
+  position: absolute; left: 16px; top: 40px; z-index: 4;
+  display: flex; gap: 10px; padding: 5px 9px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: rgba(11, 13, 18, 0.5); backdrop-filter: blur(6px);
+  font-size: 0.66rem; font-weight: 700; color: var(--muted); pointer-events: none;
+}
+.ion-key span { display: inline-flex; align-items: center; gap: 4px; }
+.ion-key i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+/* ---- B6: setpoint steppers ---- */
+.stepper { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
+.stepper input[type="range"] { grid-column: auto; flex: 1 1 auto; width: auto; margin: 0; }
+.step-btn {
+  flex: none; width: 30px; height: 30px; padding: 0;
+  border: 1px solid var(--line-strong); border-radius: 8px;
+  background: var(--panel-2); color: var(--text);
+  font-size: 1.05rem; line-height: 1; display: grid; place-items: center;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.step-btn:hover { border-color: var(--teal); color: var(--teal); }
+
+/* ---- B6: bigger touch targets on touch devices ---- */
+@media (pointer: coarse) {
+  input[type="range"] { height: 34px; }
+  input[type="range"]::-webkit-slider-thumb { width: 24px; height: 24px; margin-top: -9px; }
+  input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
+  input[type="range"].vol-slider { height: 26px; }
+  .step-btn { width: 40px; height: 40px; font-size: 1.2rem; }
+  .tip-dot { width: 20px; height: 20px; font-size: 11px; }
+  .preset { min-height: 46px; }
+  .gizmo-btn { padding: 7px 0; }
+}
+
+/* ---- Balance of Plant panel (reactor-to-grid flow) ---- */
+.plant-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 14px;
+}
+.plant-stage {
+  flex: 1 1 0;
+  min-width: 116px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  text-align: center;
+  font: inherit;
+  color: var(--text);
+}
+.plant-ico { color: var(--teal); line-height: 0; }
+.plant-ico svg { width: 26px; height: 26px; }
+.plant-name {
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.plant-stage strong {
+  font-size: 1.16rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.plant-stage small { font-size: 0.64rem; color: var(--muted); }
+.plant-arrow {
+  flex: none;
+  align-self: center;
+  width: 11px;
+  height: 11px;
+  border-top: 2px solid var(--line-strong);
+  border-right: 2px solid var(--line-strong);
+  transform: rotate(45deg);
+  opacity: 0.65;
+}
+/* clickable stages map to a lesson */
+button.plant-stage {
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+button.plant-stage .plant-name::after { content: " \203A"; color: var(--teal); font-weight: 700; }
+button.plant-stage:hover {
+  border-color: var(--teal);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+}
+button.plant-stage:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.plant-stage.grid-stage {
+  border-color: color-mix(in srgb, var(--green) 45%, var(--line));
+  background: color-mix(in srgb, var(--green) 8%, var(--panel-2));
+}
+.plant-stage.grid-stage .plant-ico { color: var(--green); }
+@media (max-width: 760px) {
+  .plant-arrow { display: none; }
+  .plant-stage { flex: 1 1 42%; min-width: 0; }
 }

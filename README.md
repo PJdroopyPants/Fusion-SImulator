@@ -6,7 +6,7 @@ It is self-contained and dependency-free: open `index.html` in any modern browse
 
 ## Who it is for
 
-Built for STEM outreach across a wide range, from curious high schoolers and families at an open house to undergraduate engineering students. It is being donated to the Rose-Hulman and Purdue fusion outreach programs. Plain-language explanations and "everyday terms" readouts serve newcomers, while the underlying physics, the operating-point map, and the data export give undergraduates real depth to dig into.
+Built for STEM outreach across a wide range, from curious high schoolers and families at an open house to undergraduate engineering students. Plain-language explanations and "everyday terms" readouts serve newcomers, while the underlying physics, the operating-point map, and the data export give undergraduates real depth to dig into.
 
 ## Quick start
 
@@ -37,12 +37,12 @@ The model is simplified but physically motivated, and calibrated for intuition r
 - **Energy gain Q**, derived consistently from the triple product. Q = 1 is scientific breakeven and Q running to infinity is ignition.
 - **Power balance**: external heating in versus fusion power out, split into alpha self-heating (stays in the plasma) and neutron power (deposited in the blanket).
 - **Plant telemetry**: confinement time tau_E, beta-limit driven disruption risk, wall heat load, coolant outlet temperature, and tritium breeding ratio.
-- **First wall and materials**: an integrated neutron dose that accrues over a run, with a wall-life indicator. Surviving the neutron and heat flux is one of fusion's defining materials challenges, and the focus of programs like Purdue's.
+- **First wall and materials**: an integrated neutron dose that accrues over a run, with a wall-life indicator. Surviving the neutron and heat flux is one of fusion's defining materials challenges.
 - **A contextual coach** that reads the current state and explains why the reactor is behaving as it is.
 
 ## The reactor visualization
 
-The central stage is a dependency-free, software-rendered 3D tokamak (perspective camera, depth-sorted painter's pass, atmospheric fog, multi-pass bloom). It shows a temperature-colored plasma with a hot burning core, toroidal-field coils weaving correctly through the plasma, poloidal-field coils, a central solenoid, vacuum-vessel ribs, helical field lines at a q ≈ 4 safety factor, streaming ions, in-core fusion flashes with the alpha particles they release, neutrons firing out to the blanket, and a divertor whose strike point sweeps when enabled. Beside it is a full 3D balance of plant: steam generator, turbine and generator, condenser, hyperboloid cooling tower with a steam plume, and a transmission pylon, linked by flowing coolant, steam, and power lines.
+The central stage is a dependency-free, software-rendered 3D tokamak (perspective camera, depth-sorted painter's pass, atmospheric fog, multi-pass bloom). It shows a temperature-colored plasma with a hot burning core, toroidal-field coils weaving correctly through the plasma, poloidal-field coils, a central solenoid, vacuum-vessel ribs, helical field lines at a q ≈ 4 safety factor, streaming ions, in-core fusion flashes with the alpha particles they release, neutrons firing out to the blanket, and a divertor whose strike point sweeps when enabled. The reactor sits centered as the focus of the stage; the rest of the power plant lives in its own Balance of Plant panel below, described under Data visualizations.
 
 The plasma core is rendered as a true volumetric glow using a raymarched WebGL shader (written in raw WebGL, no libraries) composited at the correct depth so the coils still pass in front of and behind it. If WebGL is unavailable on a given machine, it automatically falls back to the original software-rendered plasma, so it cannot break.
 
@@ -67,7 +67,7 @@ Navigate by dragging to orbit, scrolling to zoom, shift-drag or right-drag to pa
 
 ## Data visualizations
 
-Live, software-drawn panels accompany the reactor: the Lawson operating-point map with real-machine references, the power balance, output over time, D-T reactivity versus temperature, an energy-flow diagram from fusion to the grid, the D-T fuel cycle, and the reactor cross-section.
+Live, software-drawn panels accompany the reactor: the Lawson operating-point map with real-machine references, the power balance, output over time, D-T reactivity versus temperature, an energy-flow diagram from fusion to the grid, the D-T fuel cycle, the reactor cross-section, and a Balance of Plant flow that traces the reactor's heat to the grid one component at a time (blanket, steam generator, turbine, condenser, cooling tower, grid) with a live value for each. Its blanket and turbine stages are clickable and open the matching lesson.
 
 ## Accessibility
 
@@ -75,7 +75,7 @@ The simulator honors the operating system's reduced-motion setting (it stills an
 
 ## For educators
 
-- The first-wall and materials readout connects the prettiest failure mode in the sim to the real plasma-materials research that programs like Purdue's pursue.
+- The first-wall and materials readout connects the prettiest failure mode in the sim to the real plasma-materials research that university fusion programs pursue.
 - The CSV export pairs naturally with a hands-on lab: derive the operating point, hit the missions, export the run, and write it up.
 - Presentation mode plus the offline, single-folder design make it a turnkey booth exhibit on any laptop.
 
@@ -94,4 +94,4 @@ This is a teaching model, not a scientific reactor code. The numbers are illustr
 
 ## Credits
 
-Donated to the Rose-Hulman and Purdue fusion outreach programs. Built as a self-contained educational tool to help students see, drive, and understand magnetic-confinement fusion.
+A self-contained educational tool built to help students see, drive, and understand magnetic-confinement fusion.

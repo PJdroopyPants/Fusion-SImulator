@@ -107,7 +107,25 @@ const lessons = {
     body: "Fusion begins when deuterium and tritium nuclei move fast enough to overcome their electrical repulsion. Temperature sets the reaction rate, but heat without confinement just leaks away.",
     deeper: "The D-T reaction rate scales with density squared times the reactivity, n²⟨σv⟩. The reactivity climbs steeply from a few keV and is already strong by 10 to 20 keV, the practical operating window. Push too hard and the plasma pressure can exceed what the magnetic field can hold (the beta limit), risking a disruption.",
     formula: "P_fusion ∝ n² · ⟨σv⟩(T) · E_DT",
-    note: "Best operation usually sits near 14 to 20 keV with matching confinement."
+    note: "Best operation usually sits near 14 to 20 keV with matching confinement.",
+    plain: {
+      title: "It starts with a super-hot gas.",
+      body: "Heat the hydrogen fuel until its particles slam together hard enough to fuse and release energy. Hotter fuel fuses faster, but you also have to hold that heat in.",
+      note: "Make it very hot and hold the heat in at the same time."
+    }
+  },
+  solenoid: {
+    topic: "Central solenoid",
+    title: "The transformer that starts the current.",
+    body: "The central solenoid is a stack of coils running up the middle of the machine. Ramping its current induces the plasma current by transformer action, which both heats the plasma and helps create its confining field.",
+    deeper: "A transformer needs a changing current, so the solenoid's swing is finite. That limits how long a purely inductive pulse can run, which is one reason tokamaks are pulsed and why steady-state operation needs separate non-inductive current drive.",
+    formula: "Plasma current rises with the solenoid's current swing",
+    note: "It kickstarts and sustains the plasma current rather than producing power.",
+    plain: {
+      title: "The part that gets the current going.",
+      body: "A tall coil runs up the center of the machine. Changing its current pushes a current through the plasma, like a transformer, which helps heat it and hold its shape.",
+      note: "It starts the plasma current; it does not make the power."
+    }
   },
   magnets: {
     topic: "Magnets",
@@ -115,7 +133,12 @@ const lessons = {
     body: "Charged particles spiral along magnetic field lines, so superconducting coils shape a torus that keeps the hottest material away from the vessel and holds energy in.",
     deeper: "Confinement time tau_E, how long the plasma keeps its energy, rises strongly with field strength and device size. A stronger field also raises the pressure the plasma can hold before going unstable. Weaken the field while fuelling hard and confinement collapses, dropping you below breakeven.",
     formula: "tau_E increases with B, raising nT·tau_E",
-    note: "If the field is weak, energy leaks out and the reaction rate collapses."
+    note: "If the field is weak, energy leaks out and the reaction rate collapses.",
+    plain: {
+      title: "Magnets hold the hot gas in place.",
+      body: "The fuel is far too hot to touch any wall, so powerful magnets trap it in a floating ring and keep the heat from leaking out.",
+      note: "Weak magnets let the heat escape and the reaction fades."
+    }
   },
   blanket: {
     topic: "Blanket",
@@ -123,7 +146,12 @@ const lessons = {
     body: "About 80% of fusion energy leaves as fast 14 MeV neutrons. They deposit heat in a lithium blanket that drives the power cycle, and lithium reactions create fresh tritium.",
     deeper: "Tritium does not occur naturally in useful amounts, so a power plant must breed its own. The tritium breeding ratio (TBR) is tritium produced per tritium burned; above 1.0 the plant is self-sufficient. Neutron multipliers and blanket geometry push the TBR over unity.",
     formula: "TBR > 1.0 means fuel self-sufficiency",
-    note: "A breeding ratio above 1.0 means the plant is replacing its tritium fuel."
+    note: "A breeding ratio above 1.0 means the plant is replacing its tritium fuel.",
+    plain: {
+      title: "The blanket soaks up energy and makes more fuel.",
+      body: "Most of the energy flies out as tiny particles called neutrons. A lithium blanket catches them for heat and uses them to make fresh fuel.",
+      note: "Above 1.0, the plant makes more fuel than it burns."
+    }
   },
   divertor: {
     topic: "Divertor",
@@ -131,7 +159,12 @@ const lessons = {
     body: "Fusion produces helium ash and concentrates exhaust heat at the plasma edge. The divertor channels that heat and particle flux to specially cooled targets, protecting the rest of the wall.",
     deeper: "Unmanaged, edge heat flux can exceed materials limits (tens of MW/m²). Sweeping the strike point spreads the load over a larger area. Good exhaust handling also removes helium ash that would otherwise dilute the fuel and quench the burn.",
     formula: "Wall heat flux drops when the load is swept",
-    note: "Enable the divertor sweep to relieve peak wall heat flux."
+    note: "Enable the divertor sweep to relieve peak wall heat flux.",
+    plain: {
+      title: "The exhaust pipe for a tiny star.",
+      body: "Fusion leaves behind helium and dumps heat at the edge of the gas. The divertor channels that away so it does not damage the walls.",
+      note: "Turn on the divertor sweep to spread the heat out."
+    }
   },
   turbine: {
     topic: "Turbine",
@@ -139,7 +172,12 @@ const lessons = {
     body: "Coolant carries blanket heat into heat exchangers, raising steam (or another working fluid) that spins a turbine-generator. The conversion is ordinary thermodynamics.",
     deeper: "Gross electric output is thermal power times the turbine efficiency (about 33 to 45%). The plant must then subtract its own recirculating power: magnets, pumps, and especially the wall-plug cost of plasma heating. Net electricity therefore needs a high gain Q, not merely Q above 1.",
     formula: "P_net = P_thermal x eff_turbine - P_recirculating",
-    note: "High turbine load only helps when the blanket is hot and cooling is balanced."
+    note: "High turbine load only helps when the blanket is hot and cooling is balanced.",
+    plain: {
+      title: "The heat becomes electricity like any power plant.",
+      body: "Coolant carries the heat away to boil water into steam, and the steam spins a turbine to make electricity, just like a coal or nuclear plant.",
+      note: "The turbine only helps when the blanket is hot and cooling is balanced."
+    }
   }
 };
 
@@ -152,6 +190,7 @@ let sparks = [];
 let alphas = [];
 let fusionAcc = 0;
 let neutrons = [];
+let wallHeat = [];           // A4: per-rib neutron heat accumulation
 let lastFrame = performance.now();
 let model = {};
 
@@ -159,6 +198,7 @@ let model = {};
 let scaleRef = false;        // A5: human + scale reference overlay
 let unitMode = false;        // C3: real-world unit translator
 let showMachines = true;     // C2: real-machine points on the Lawson map
+let readLevel = "tech";      // C9: "tech" or "plain" lesson and coach wording
 let kioskCycle = 0;          // B1: presentation-mode auto-demo index
 let kioskLast = 0;           // B1: last auto-demo advance time
 
@@ -368,19 +408,8 @@ function updateReadouts() {
   outputs.reactorState.textContent = model.label;
   outputs.reactorState.style.background = model.stateColor;
   outputs.reactorState.style.boxShadow = `0 0 18px ${model.stateColor}66`;
-  outputs.netPowerBadge.textContent = formatMw(model.netElec);
   outputs.netPowerBadge.style.color = model.netElec > 0 ? "var(--green)" : "var(--coral)";
-  outputs.qBadge.textContent = model.q >= 50 ? "≈ ∞" : model.q.toFixed(1);
-
-  outputs.fusionPower.textContent = formatMw(model.fusionPower);
-  outputs.qPlasma.textContent = model.q >= 50 ? "≈ ∞" : model.q.toFixed(1);
-  outputs.electricOutput.textContent = formatMw(model.netElec);
-  outputs.tripleProduct.textContent = model.triple.toFixed(2);
-  outputs.confinementTime.textContent = `${model.tauE.toFixed(2)} s`;
-  outputs.stability.textContent = `${Math.round(model.stability)}%`;
-  outputs.wallLoad.textContent = `${model.wallLoad.toFixed(1)} MW/m²`;
-  outputs.coolantTemp.textContent = `${Math.round(model.coolantTemp)} °C`;
-  outputs.tritiumRatio.textContent = model.tritiumRatio.toFixed(2);
+  // B3: the numeric readouts are tweened smoothly per frame in tweenReadouts()
 
   outputs.fusionPowerMeter.value = model.fusionPower;
   outputs.qMeter.value = Math.min(25, model.q);
@@ -393,8 +422,7 @@ function updateReadouts() {
   setBar(outputs.coolantBar, (model.coolantTemp - 280) / 380, model.coolantTemp > 620);
   setBar(outputs.tritiumBar, model.tritiumRatio / 1.25, model.tritiumRatio < 1);
 
-  // Stage readout
-  outputs.stageTemp.textContent = model.temperature.toFixed(1);
+  // Stage readout (stageTemp is tweened in tweenReadouts)
   outputs.stageField.textContent = model.magneticField.toFixed(1);
   outputs.stageDensity.textContent = model.n20.toFixed(2);
 
@@ -402,6 +430,34 @@ function updateReadouts() {
   updateLesson();
   updateCoach();
   updateRealWorld();
+  updateAnnunciator();
+  updatePlant();
+}
+
+// Balance-of-plant panel: trace the reactor's heat to the grid, component by component.
+function updatePlant() {
+  if (!model || model.fusionPower === undefined) return;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const rejected = Math.max(0, (model.thermalPower || 0) - Math.max(0, model.grossElec || 0));
+  set("plBlanket", formatMw(model.pNeutron));
+  set("plSteam", `${Math.round(model.coolantTemp)} °C`);
+  set("plTurbine", formatMw(Math.max(0, model.grossElec)));
+  set("plCondenser", formatMw(rejected));
+  set("plTower", `${Math.round(model.coolingFlow)}%`);
+  set("plGrid", formatMw(model.netElec));
+  const grid = document.getElementById("plGrid");
+  if (grid) grid.style.color = model.netElec > 0 ? "var(--green)" : "var(--coral)";
+}
+
+/* ---------- B5: control-room annunciator lamps ---------- */
+function updateAnnunciator() {
+  const set = (id, on) => { const e = document.getElementById(id); if (e) e.classList.toggle("on", !!on); };
+  set("lampBurn", model.q >= 1);
+  set("lampNet", model.netElec > 0);
+  set("lampIgnite", model.phi >= 0.95);
+  set("lampBreed", model.tritiumRatio >= 1);
+  set("lampThermal", model.coolantTemp > 640 || model.wallLoad > 14);
+  set("lampDisrupt", model.disruptionRisk > 0.6 || model.stability < 28);
 }
 
 /* ---------- C3: real-world unit translator ---------- */
@@ -432,18 +488,19 @@ function updatePowerBalance() {
   outputs.pbNeutron.style.width = `${(model.pNeutron / scale) * 100}%`;
   outputs.pbExtVal.textContent = formatMw(model.pExt);
   outputs.pbFusVal.textContent = formatMw(model.fusionPower);
-  outputs.qBig.textContent = `Q = ${model.q >= 50 ? "≈ ∞" : model.q.toFixed(1)}`;
+  // qBig is tweened in tweenReadouts
 }
 
 /* ---------- Lessons + coach ---------- */
 function updateLesson() {
   const lesson = lessons[selectedTopic];
+  const plain = readLevel === "plain" && lesson.plain;
   outputs.lessonTopic.textContent = lesson.topic;
-  outputs.lessonTitle.textContent = lesson.title;
-  outputs.lessonBody.textContent = lesson.body;
+  outputs.lessonTitle.textContent = plain ? lesson.plain.title : lesson.title;
+  outputs.lessonBody.textContent = plain ? lesson.plain.body : lesson.body;
   outputs.lessonDeeper.textContent = lesson.deeper;
   outputs.lessonFormula.textContent = lesson.formula;
-  outputs.lessonNote.textContent = lesson.note;
+  outputs.lessonNote.textContent = plain ? lesson.plain.note : lesson.note;
 }
 
 function updateCoach() {
@@ -451,25 +508,46 @@ function updateCoach() {
 }
 
 function getCoachMessage() {
+  const plain = readLevel === "plain";
   if (model.emergencyQuench)
-    return "Emergency quench engaged. Plasma energy is being dumped to protect the vessel and magnets, so fusion power is intentionally near zero.";
+    return plain
+      ? "Emergency stop is on. The reactor is dumping its heat on purpose to stay safe, so there is almost no power right now."
+      : "Emergency quench engaged. Plasma energy is being dumped to protect the vessel and magnets, so fusion power is intentionally near zero.";
   if (model.disruptionRisk > 0.6)
-    return "Plasma pressure is outrunning the magnetic field (high beta). You are near a disruption. Raise the magnetic field or ease back fuel injection.";
+    return plain
+      ? "Danger: the hot gas is pushing harder than the magnets can hold. Turn the magnetic field up or ease off the fuel before it breaks apart."
+      : "Plasma pressure is outrunning the magnetic field (high beta). You are near a disruption. Raise the magnetic field or ease back fuel injection.";
   if (model.temperature < 9 && model.fuelRate > 25)
-    return "Fuel is present but the ions are too cool to fuse efficiently. Raise plasma temperature to climb the reactivity curve.";
+    return plain
+      ? "There is fuel, but it is too cold to fuse. Turn the temperature up."
+      : "Fuel is present but the ions are too cool to fuse efficiently. Raise plasma temperature to climb the reactivity curve.";
   if (model.magneticField < 4.4 && model.fuelRate > 60)
-    return "Confinement is weak for this much fuel, so energy leaks out faster than it is produced. Strengthen the field before fuelling harder.";
+    return plain
+      ? "The magnets are too weak for this much fuel, so the heat leaks out. Turn the field up before adding more fuel."
+      : "Confinement is weak for this much fuel, so energy leaks out faster than it is produced. Strengthen the field before fuelling harder.";
   if (model.coolantTemp > 620)
-    return "Coolant outlet is running hot. Increase blanket coolant flow or trim fusion power to protect the heat exchangers.";
+    return plain
+      ? "The coolant is getting too hot. Turn the coolant up or ease off the power."
+      : "Coolant outlet is running hot. Increase blanket coolant flow or trim fusion power to protect the heat exchangers.";
   if (model.phi >= 0.95)
-    return "Ignition. Alpha self-heating now sustains the burn on its own, external heating is essentially zero, and Q has run away. This is the goal.";
+    return plain
+      ? "Ignition! The reactor now heats itself and keeps going on its own. This is the goal."
+      : "Ignition. Alpha self-heating now sustains the burn on its own, external heating is essentially zero, and Q has run away. This is the goal.";
   if (model.tritiumRatio < 1 && model.fusionPower > 200)
-    return "Strong burn, but the breeding ratio is below 1.0, so the plant is consuming tritium faster than it makes it. Nudge cooling and keep the D-T blend balanced.";
+    return plain
+      ? "Good burn, but it is using fuel faster than it makes it. Nudge the cooling and keep the D-T mix even."
+      : "Strong burn, but the breeding ratio is below 1.0, so the plant is consuming tritium faster than it makes it. Nudge cooling and keep the D-T blend balanced.";
   if (model.netElec > 0)
-    return `Net positive: ${formatMw(model.netElec)} after recirculating power. The triple product is ${model.triple.toFixed(2)}×10²¹, about ${Math.round(model.phi * 100)}% of the way to ignition.`;
+    return plain
+      ? `Net positive: ${formatMw(model.netElec)} going to the grid. You are about ${Math.round(model.phi * 100)}% of the way to ignition.`
+      : `Net positive: ${formatMw(model.netElec)} after recirculating power. The triple product is ${model.triple.toFixed(2)}×10²¹, about ${Math.round(model.phi * 100)}% of the way to ignition.`;
   if (model.q >= 1)
-    return "Burning plasma. Fusion power now exceeds the heating you supply (Q above 1). Push confinement and density to turn that into net electricity.";
-  return "Below breakeven. Build temperature and confinement together to lift the operating point toward the ignition curve at right.";
+    return plain
+      ? "It is now making more energy than you put in. Push the field and fuel to turn that into real electricity."
+      : "Burning plasma. Fusion power now exceeds the heating you supply (Q above 1). Push confinement and density to turn that into net electricity.";
+  return plain
+    ? "Not there yet. Turn up the temperature and the magnetic field together to get closer to ignition."
+    : "Below breakeven. Build temperature and confinement together to lift the operating point toward the ignition curve at right.";
 }
 
 /* ---------- Canvas sizing ---------- */
@@ -527,7 +605,7 @@ let camTween = null;     // active camera fly-to {from,dYaw,to,t0,dur}, or null
 /* Canonical viewpoints reachable from the gizmo. */
 const VIEW_PRESETS = {
   iso:   { yaw: -0.62,   pitch: 0.60, dist: 3.15 },
-  top:   { yaw: -0.62,   pitch: 1.52, dist: 3.45 },
+  top:   { yaw: -0.62,   pitch: -1.45, dist: 3.45 },
   front: { yaw: 0.0,     pitch: 0.16, dist: 3.30 },
   side:  { yaw: -1.5708, pitch: 0.18, dist: 3.45 }
 };
@@ -631,14 +709,20 @@ function tracePts(ctx, pts, close) {
 
 /* ---- particles ---- */
 function seedParticles() {
-  particles = Array.from({ length: 168 }, () => ({
-    th: Math.random() * Math.PI * 2,
-    ph: Math.random() * Math.PI * 2,
-    lane: 0.18 + Math.random() * 0.78,
-    sp: 0.5 + Math.random() * 1.7,
-    size: 0.010 + Math.random() * 0.018,
-    hot: Math.random() < 0.5
-  }));
+  particles = Array.from({ length: 168 }, () => {
+    const r = Math.random();
+    const species = r < 0.38 ? "D" : r < 0.76 ? "T" : r < 0.88 ? "alpha" : "electron";
+    const sizeMul = species === "electron" ? 0.6 : species === "alpha" ? 1.4 : 1;
+    const spMul = species === "electron" ? 1.8 : species === "alpha" ? 0.8 : 1;
+    return {
+      th: Math.random() * Math.PI * 2,
+      ph: Math.random() * Math.PI * 2,
+      lane: 0.18 + Math.random() * 0.78,
+      sp: (0.5 + Math.random() * 1.7) * spMul,
+      size: (0.010 + Math.random() * 0.018) * sizeMul,
+      species
+    };
+  });
   sparks = [];
   alphas = [];
   fusionAcc = 0;
@@ -669,7 +753,7 @@ function bindInput() {
       const dyaw = ddx * 0.0095;
       const dpitch = -ddy * 0.0095;
       cam.yaw += dyaw;
-      cam.pitch = clamp(cam.pitch + dpitch, -0.55, 1.55);
+      cam.pitch = clamp(cam.pitch + dpitch, -1.45, 1.45);
       velYaw = dyaw; velPitch = dpitch;
     }
     dragX = cx; dragY = cy; lastInteract = performance.now();
@@ -825,6 +909,11 @@ function drawReactor(time) {
   prevTime = time;
   if (!(dt > 0) || dt > 60) dt = 16;
 
+  // A4: decay neutron wall-heat each frame (half-life ~700 ms)
+  if (wallHeat.length !== 26) wallHeat = new Array(26).fill(0);
+  const whDecay = Math.pow(0.5, dt / 700);
+  for (let i = 0; i < 26; i += 1) wallHeat[i] *= whDecay;
+
   if (camTween) {
     const k = clamp((time - camTween.t0) / camTween.dur, 0, 1);
     const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; // easeInOutQuad
@@ -835,7 +924,7 @@ function drawReactor(time) {
   } else {
     if (!dragOn) {
       cam.yaw += velYaw;
-      cam.pitch = clamp(cam.pitch + velPitch, -0.55, 1.55);
+      cam.pitch = clamp(cam.pitch + velPitch, -1.45, 1.45);
       velYaw *= 0.90; velPitch *= 0.90;
       if (Math.abs(velYaw) < 0.00006) velYaw = 0;
       if (Math.abs(velPitch) < 0.00006) velPitch = 0;
@@ -845,7 +934,7 @@ function drawReactor(time) {
 
   updateDisruption(dt);
   const shk = disruptionShake();
-  PROJ.cx = w * 0.47 + panX + (shk ? (Math.random() * 2 - 1) * shk : 0);
+  PROJ.cx = w * 0.5 + panX + (shk ? (Math.random() * 2 - 1) * shk : 0);
   PROJ.cy = h * 0.45 + panY + (shk ? (Math.random() * 2 - 1) * shk : 0);
   PROJ.focal = size * cam.focalK;
   updateViewDir();
@@ -863,14 +952,16 @@ function drawReactor(time) {
   /* ---- assemble depth-sorted primitives ---- */
   const prims = [];
 
-  // central solenoid (rings up the axis)
-  for (let i = 0; i <= 9; i += 1) {
-    const yy = -SOL_H + (2 * SOL_H * i) / 9;
-    const ring = [];
-    for (let a = 0; a <= 28; a += 1) { const t = (a / 28) * Math.PI * 2; ring.push([SOL_R * Math.cos(t), yy, SOL_R * Math.sin(t)]); }
-    const pr = projectAll(ring);
-    prims.push({ z: pr.depth, d: () => { tracePts(ctx, pr.pts, true); ctx.strokeStyle = "rgba(170,182,210,0.30)"; ctx.lineWidth = 1; ctx.stroke(); } });
+  // central solenoid — a solid, shaded, ribbed coil-stack column up the central axis:
+  // the transformer that drives the plasma current. Subtle field-driven energized tint.
+  const solEnergy = clamp((bNorm - 0.18) / 0.82, 0, 1);
+  const solRgb = mixColor([140, 148, 172], [152, 172, 236], solEnergy * 0.7);
+  const solNodes = [];
+  const solTurns = 14;
+  for (let i = 0; i <= solTurns; i += 1) {
+    solNodes.push({ d: (2 * SOL_H) * (i / solTurns), r: SOL_R * (i % 2 === 0 ? 0.93 : 1.05) });
   }
+  addRevolution(prims, ctx, [0, -SOL_H, 0], [0, 1, 0], solNodes, 18, solRgb, 1, true);
 
   // vacuum vessel / blanket shell — ghostly amber cage of poloidal ribs
   for (let ci = 0; ci < 26; ci += 1) {
@@ -879,7 +970,16 @@ function drawReactor(time) {
     for (let a = 0; a <= 30; a += 1) loop.push(torusPt(th, (a / 30) * Math.PI * 2, A_VESSEL));
     const pr = projectAll(loop);
     const b = depthBright(pr.depth);
-    prims.push({ z: pr.depth + 0.001, d: () => { tracePts(ctx, pr.pts, true); ctx.strokeStyle = `rgba(255,196,96,${(0.05 + 0.10 * b) * (0.6 + intensity * 0.5)})`; ctx.lineWidth = 1; ctx.stroke(); } });
+    const hc = clamp(wallHeat[ci] || 0, 0, 1); // A4: neutron heat on this rib (amber -> white-hot)
+    const gg = Math.round(196 + 50 * hc), bb = Math.round(96 + 150 * hc);
+    const al = Math.min(0.95, (0.05 + 0.10 * b) * (0.6 + intensity * 0.5) + hc * 0.55);
+    const lw = 1 + hc * 1.8;
+    prims.push({ z: pr.depth + 0.001, d: () => {
+      tracePts(ctx, pr.pts, true);
+      ctx.strokeStyle = `rgba(255,${gg},${bb},${al})`;
+      ctx.lineWidth = lw;
+      if (hc > 0.35) { ctx.save(); ctx.shadowColor = "rgba(255,180,120,0.7)"; ctx.shadowBlur = 7 * hc; ctx.stroke(); ctx.restore(); } else { ctx.stroke(); }
+    } });
   }
   // a couple of toroidal vessel hoops for read
   [0.0, Math.PI].forEach((ph) => {
@@ -965,12 +1065,13 @@ function drawReactor(time) {
       const b = depthBright(pr.depth);
       const al = (0.18 + 0.45 * b) * (0.45 + bNorm * 0.7);
       prims.push({ z: pr.depth - 0.002, d: () => {
-        ctx.save(); ctx.globalCompositeOperation = "lighter";
+        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
         tracePts(ctx, pr.pts, false);
         ctx.strokeStyle = `rgba(${90 + Math.round(intensity * 60)},${200},${255},${clamp(al, 0, 0.85)})`;
-        ctx.lineWidth = 1.0 + b * 1.1;
+        ctx.lineWidth = 1.0 + b * 1.1 + bNorm * 0.9; // A6: thicker, denser-looking field at higher B
+        if (!reduceMotion) { ctx.setLineDash([9, 7]); ctx.lineDashOffset = -time * (0.05 + bNorm * 0.08); } // A6: flow shows direction
         if (b > 0.6) { ctx.shadowColor = "rgba(120,210,255,0.5)"; ctx.shadowBlur = 5 * b; }
-        ctx.stroke(); ctx.shadowBlur = 0; ctx.restore();
+        ctx.stroke(); ctx.setLineDash([]); ctx.shadowBlur = 0; ctx.restore();
       } });
     }
   }
@@ -985,7 +1086,8 @@ function drawReactor(time) {
     const w1 = torusPt(p.th - 0.05 * p.sp, ph, A_PLASMA * 0.92 * p.lane);
     const tail = project(w1[0], w1[1], w1[2]);
     const rad = Math.max(0.8, p.size * c.s);
-    const col = p.hot ? "255,210,120" : "150,236,255";
+    // A6: color by species (deuterium, tritium, helium ash, electron)
+    const col = p.species === "alpha" ? "255,206,110" : p.species === "T" ? "255,150,110" : p.species === "electron" ? "215,216,240" : "150,200,255";
     const al = 0.22 + intensity * 0.55;
     prims.push({ z: c.depth - 0.0015, d: () => {
       ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
@@ -1000,7 +1102,11 @@ function drawReactor(time) {
   // neutrons streaming from the plasma surface into the blanket (80% of fusion energy)
   for (const nu of neutrons) {
     nu.life += dt * 0.0016 * nu.sp * (0.4 + intensity);
-    if (nu.life > 1) { nu.life = 0; nu.th = Math.random() * Math.PI * 2; nu.ph = Math.random() * Math.PI * 2; }
+    if (nu.life > 1) {
+      const bin = ((Math.floor((nu.th / (Math.PI * 2)) * 26) % 26) + 26) % 26; // A4: deposit heat where it struck
+      wallHeat[bin] = Math.min(1.4, wallHeat[bin] + intensity * (model.divertorSweep ? 0.10 : 0.18));
+      nu.life = 0; nu.th = Math.random() * Math.PI * 2; nu.ph = Math.random() * Math.PI * 2;
+    }
     const r1 = A_PLASMA + (A_VESSEL - A_PLASMA) * nu.life;
     const a0 = project(...torusPt(nu.th, nu.ph, r1));
     const a1 = project(...torusPt(nu.th, nu.ph, Math.max(A_PLASMA, r1 - (A_VESSEL - A_PLASMA) * 0.16)));
@@ -1034,10 +1140,7 @@ function drawReactor(time) {
     } });
   }
 
-  // balance of plant (anchored in world space)
-  addBOP(prims, ctx, time, intensity);
-
-  // A5: optional human + scale reference on the ground pad
+  // A5: optional human + scale reference (the plant now lives in the Balance of Plant panel)
   addScaleReference(prims, ctx);
 
   /* ---- paint sorted ---- */
@@ -1644,10 +1747,10 @@ function roundedRect(ctx, x, y, w, h, r) {
 /* ---- project hotspot anchors onto the moving model ---- */
 const HOTSPOT_ANCHORS = {
   plasma: () => [0, 0, 0],
+  solenoid: () => [0, SOL_H * 0.62, 0],
   magnets: () => torusPt(Math.PI * 1.15, Math.PI / 2, A_COIL * 1.05),
   blanket: () => torusPt(-0.35, 0, A_VESSEL * 1.05),
-  divertor: () => torusPt(Math.PI * 0.5, -Math.PI / 2, A_PLASMA * 1.1),
-  turbine: () => [BOP.turb.x, BOP.turb.y, BOP.turb.z]
+  divertor: () => torusPt(Math.PI * 0.5, -Math.PI / 2, A_PLASMA * 1.1)
 };
 function positionHotspots() {
   const rect = reactorCanvas.getBoundingClientRect();
@@ -2111,6 +2214,34 @@ function drawFuelCycle(time) {
   ctx.fillText(`TBR ${tbr.toFixed(2)}`, w - 14, h - 12);
 }
 
+/* ---------- B3: smooth value transitions (per-frame number tweening) ---------- */
+let disp = null;
+function tweenReadouts(dt) {
+  if (!model || model.q === undefined) return;
+  if (!disp) disp = { net: model.netElec, q: Math.min(model.q, 50), fus: model.fusionPower, tri: model.triple, tau: model.tauE, stab: model.stability, wall: model.wallLoad, cool: model.coolantTemp, tbr: model.tritiumRatio, temp: model.temperature };
+  const k = clamp(dt / 130, 0, 1);
+  const lp = (key, target) => { disp[key] += (target - disp[key]) * k; return disp[key]; };
+  const net = lp("net", model.netElec), q = lp("q", Math.min(model.q, 50)), fus = lp("fus", model.fusionPower);
+  const tri = lp("tri", model.triple), tau = lp("tau", model.tauE), stab = lp("stab", model.stability);
+  const wall = lp("wall", model.wallLoad), cool = lp("cool", model.coolantTemp), tbr = lp("tbr", model.tritiumRatio);
+  const temp = lp("temp", model.temperature);
+  const qStr = model.q >= 50 ? "≈ ∞" : q.toFixed(1);
+  const set = (el, v) => { if (el) el.textContent = v; };
+  set(outputs.netPowerBadge, formatMw(net));
+  set(outputs.qBadge, qStr);
+  set(outputs.fusionPower, formatMw(fus));
+  set(outputs.qPlasma, qStr);
+  set(outputs.electricOutput, formatMw(net));
+  set(outputs.tripleProduct, tri.toFixed(2));
+  set(outputs.confinementTime, `${tau.toFixed(2)} s`);
+  set(outputs.stability, `${Math.round(stab)}%`);
+  set(outputs.wallLoad, `${wall.toFixed(1)} MW/m²`);
+  set(outputs.coolantTemp, `${Math.round(cool)} °C`);
+  set(outputs.tritiumRatio, tbr.toFixed(2));
+  set(outputs.qBig, `Q = ${qStr}`);
+  set(outputs.stageTemp, temp.toFixed(1));
+}
+
 /* ---------- Animation + ticking ---------- */
 function animate(time) {
   const delta = time - lastFrame;
@@ -2124,6 +2255,7 @@ function animate(time) {
     drawSankey();
     drawFuelCycle(time);
     drawCrossSection();
+    tweenReadouts(delta);
   }
   requestAnimationFrame(animate);
 }
@@ -2167,6 +2299,21 @@ hotspots.forEach((b) => {
     selectedTopic = b.dataset.topic;
     hotspots.forEach((item) => item.classList.toggle("active", item === b));
     updateLesson();
+  });
+});
+
+// Balance-of-plant stages that map to a lesson select it (and sync the matching hotspot).
+document.querySelectorAll(".plant-stage[data-lesson]").forEach((el) => {
+  const pick = () => {
+    selectedTopic = el.dataset.lesson;
+    hotspots.forEach((h) => h.classList.toggle("active", h.dataset.topic === el.dataset.lesson));
+    updateLesson();
+    const panel = document.querySelector(".lesson-panel");
+    if (panel) panel.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+  el.addEventListener("click", pick);
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); }
   });
 });
 
@@ -2406,8 +2553,8 @@ function tickKiosk() {
 }
 
 function initPhase1Controls() {
-  let savedTheme = "dark";
-  try { savedTheme = localStorage.getItem("fusionTheme") || "dark"; } catch (e) {}
+  let savedTheme = "contrast";
+  try { savedTheme = localStorage.getItem("fusionTheme") || "contrast"; } catch (e) {}
   applyTheme(savedTheme);
   document.getElementById("themeSelect")?.addEventListener("change", (e) => applyTheme(e.target.value));
 
@@ -2586,58 +2733,138 @@ function exportRun() {
   setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
 }
 
-/* ---- B7: optional soundscape (off by default) ---- */
-let audioCtx = null, soundOn = false, humOsc = null, humGain = null;
-let sndPrevPhi = 0, sndPrevDisr = 0, sndPrevMissions = 0;
+/* ---- B7: layered reactor soundscape (raw Web Audio, off by default) ----
+   A continuous "bed" of detuned drone + sub-bass, coil whine, coolant hiss, and
+   turbine flutter, all driven by the live model, plus a fusion "boil" of noise
+   grains and gentle repeating alarms. A master gain (the volume slider) and a
+   ducking bus keep it tasteful; everything is synthesized, no audio files. ---- */
+let audioCtx = null, soundOn = false, audioReady = false, soundVol = 0.6;
+let masterGain = null, bedGain = null, alarmGain = null, noiseBuffer = null;
+let drA = null, drB = null, drSub = null, drFilter = null;
+let coilOsc = null, coilGain = null, coolGain = null, coolFilter = null, turbGain = null, turbLfoGain = null;
+let sndPrevPhi = 0, sndPrevMissions = 0, sndPrevNet = 0;
+let boilAcc = 0, warbleNext = 0, warbleTog = 0, thermalNext = 0;
+
+function mkLayer(type, freq, gv, dest) {
+  const o = audioCtx.createOscillator(); o.type = type; o.frequency.value = freq;
+  const g = audioCtx.createGain(); g.gain.value = gv;
+  o.connect(g); g.connect(dest); o.start();
+  return { o, g };
+}
 function initAudio() {
-  if (audioCtx) return;
+  if (audioReady) return true;
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
     audioCtx = new AC();
-    humOsc = audioCtx.createOscillator(); humOsc.type = "sine"; humOsc.frequency.value = 60;
-    humGain = audioCtx.createGain(); humGain.gain.value = 0;
-    humOsc.connect(humGain); humGain.connect(audioCtx.destination);
-    humOsc.start();
-  } catch (e) { audioCtx = null; }
+    masterGain = audioCtx.createGain(); masterGain.gain.value = soundVol; masterGain.connect(audioCtx.destination);
+    bedGain = audioCtx.createGain(); bedGain.gain.value = 0.0001; bedGain.connect(masterGain);
+    alarmGain = audioCtx.createGain(); alarmGain.gain.value = 1; alarmGain.connect(masterGain);
+    noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+    const nd = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < nd.length; i += 1) nd[i] = Math.random() * 2 - 1;
+    drFilter = audioCtx.createBiquadFilter(); drFilter.type = "lowpass"; drFilter.frequency.value = 600; drFilter.connect(bedGain);
+    drA = mkLayer("sine", 60, 0.32, drFilter);
+    drB = mkLayer("triangle", 90, 0.10, drFilter);
+    drSub = mkLayer("sine", 30, 0.32, drFilter);
+    const breLfo = audioCtx.createOscillator(); breLfo.type = "sine"; breLfo.frequency.value = 0.12;
+    const breGain = audioCtx.createGain(); breGain.gain.value = 130;
+    breLfo.connect(breGain); breGain.connect(drFilter.frequency); breLfo.start();
+    const coil = mkLayer("sine", 500, 0.0001, bedGain); coilOsc = coil.o; coilGain = coil.g;
+    const cs = audioCtx.createBufferSource(); cs.buffer = noiseBuffer; cs.loop = true;
+    coolFilter = audioCtx.createBiquadFilter(); coolFilter.type = "bandpass"; coolFilter.frequency.value = 1200; coolFilter.Q.value = 0.7;
+    coolGain = audioCtx.createGain(); coolGain.gain.value = 0.0001;
+    cs.connect(coolFilter); coolFilter.connect(coolGain); coolGain.connect(bedGain); cs.start();
+    const turb = mkLayer("sawtooth", 140, 0.0001, bedGain); turbGain = turb.g;
+    const tLfo = audioCtx.createOscillator(); tLfo.type = "sine"; tLfo.frequency.value = 6;
+    turbLfoGain = audioCtx.createGain(); turbLfoGain.gain.value = 0.0;
+    tLfo.connect(turbLfoGain); turbLfoGain.connect(turbGain.gain); tLfo.start();
+    audioReady = true;
+    return true;
+  } catch (e) { audioReady = false; return false; }
 }
-function blip(freq, dur, type, vol) {
-  if (!audioCtx || !soundOn) return;
+function tone(freq, dur, type, vol) {
+  if (!audioReady) return;
   const o = audioCtx.createOscillator(), g = audioCtx.createGain();
   o.type = type || "sine"; o.frequency.value = freq;
-  o.connect(g); g.connect(audioCtx.destination);
+  o.connect(g); g.connect(alarmGain);
+  const t = audioCtx.currentTime, d = dur || 0.3;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol || 0.1), t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.start(t); o.stop(t + d + 0.03);
+}
+function chimeUp() { tone(523, 0.18, "triangle", 0.1); setTimeout(() => tone(784, 0.3, "triangle", 0.1), 110); setTimeout(() => tone(1046, 0.34, "triangle", 0.08), 230); }
+function ignitionSwell() { [392, 523, 659, 784].forEach((f, i) => setTimeout(() => tone(f, 0.6, "sine", 0.09), i * 130)); }
+function boilTick(fp) {
+  if (!audioReady || !noiseBuffer) return;
+  const src = audioCtx.createBufferSource(); src.buffer = noiseBuffer;
+  src.playbackRate.value = 0.8 + Math.random() * 1.5;
+  const bp = audioCtx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1400 + Math.random() * 2600; bp.Q.value = 2.5;
+  const g = audioCtx.createGain();
   const t = audioCtx.currentTime;
   g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(vol || 0.12, t + 0.02);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + (dur || 0.3));
-  o.start(t); o.stop(t + (dur || 0.3) + 0.03);
+  g.gain.exponentialRampToValueAtTime(0.012 + fp * 0.03, t + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+  src.connect(bp); bp.connect(g); g.connect(bedGain);
+  src.start(t); src.stop(t + 0.08);
 }
-function chimeUp() { blip(523, 0.18, "triangle", 0.12); setTimeout(() => blip(784, 0.32, "triangle", 0.12), 120); }
-function alarmTone() { blip(175, 0.5, "sawtooth", 0.14); setTimeout(() => blip(140, 0.5, "sawtooth", 0.12), 150); }
+function setSoundVol(v) {
+  soundVol = clamp(v, 0, 1);
+  if (masterGain && audioCtx && soundOn) masterGain.gain.setTargetAtTime(soundVol, audioCtx.currentTime, 0.05);
+  try { localStorage.setItem("fusionSoundVol", String(soundVol)); } catch (e) {}
+}
 function setSound(on) {
   soundOn = on;
   if (on) {
     initAudio();
     if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
     sndPrevMissions = Number(document.getElementById("missionCount")?.textContent || 0);
+    if (masterGain) masterGain.gain.setTargetAtTime(soundVol, audioCtx.currentTime, 0.1);
+  } else if (masterGain && audioCtx) {
+    masterGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.15);
   }
-  if (humGain && audioCtx) humGain.gain.setTargetAtTime(on ? 0.02 : 0, audioCtx.currentTime, 0.15);
   const btn = document.getElementById("soundToggle");
   if (btn) btn.setAttribute("aria-pressed", String(on));
+  const vol = document.getElementById("soundVol");
+  if (vol) vol.hidden = !on;
   try { localStorage.setItem("fusionSound", on ? "1" : "0"); } catch (e) {}
 }
 function updateSound() {
-  if (!soundOn || !audioCtx) return;
-  const target = clamp((model.fusionPower || 0) / 2000, 0, 1);
-  if (humGain) humGain.gain.setTargetAtTime(0.012 + target * 0.05, audioCtx.currentTime, 0.3);
-  if (humOsc) humOsc.frequency.setTargetAtTime(46 + target * 92, audioCtx.currentTime, 0.3);
+  if (!soundOn || !audioReady) return;
+  const t = audioCtx.currentTime, tc = 0.4;
+  const fp = clamp((model.fusionPower || 0) / 2000, 0, 1);
+  const tN = clamp(((model.temperature || 6) - 6) / 30, 0, 1);
+  const field = clamp((model.magneticField || 5) / 8.8, 0, 1);
+  const cool = clamp((model.coolingFlow || 0) / 100, 0, 1);
+  const turb = clamp((model.turbineLoad || 0) / 100, 0, 1);
+  const disr = (model.disruptionRisk || 0) > 0.6 || (model.stability || 100) < 28;
+  const thermal = (model.coolantTemp || 0) > 640 || (model.wallLoad || 0) > 14;
+  const duck = (disr || thermal) ? 0.5 : 1;
+  const base = 42 + fp * 46 + tN * 14;
+  drA.o.frequency.setTargetAtTime(base, t, tc);
+  drB.o.frequency.setTargetAtTime(base * 1.5, t, tc);
+  drSub.o.frequency.setTargetAtTime(base * 0.5, t, tc);
+  drFilter.frequency.setTargetAtTime(300 + fp * 1400 + tN * 400, t, tc);
+  bedGain.gain.setTargetAtTime((0.32 + fp * 0.42) * duck, t, tc);
+  coilOsc.frequency.setTargetAtTime(420 + field * 900, t, tc);
+  coilGain.gain.setTargetAtTime(0.005 + field * 0.024, t, tc);
+  coolGain.gain.setTargetAtTime(0.012 + cool * 0.05, t, tc);
+  coolFilter.frequency.setTargetAtTime(800 + cool * 1600, t, tc);
+  turbGain.gain.setTargetAtTime(0.012 + turb * 0.045, t, tc);
+  turbLfoGain.gain.setTargetAtTime(0.01 + turb * 0.04, t, tc);
+  boilAcc += 0.36 * fp * 13;
+  let guard = 0;
+  while (boilAcc >= 1 && guard < 8) { boilAcc -= 1; guard += 1; boilTick(fp); }
   const phi = model.phi || 0;
-  if (phi >= 0.95 && sndPrevPhi < 0.95) chimeUp();
+  if (phi >= 0.95 && sndPrevPhi < 0.95) ignitionSwell();
   sndPrevPhi = phi;
-  const dr = model.disruptionRisk || 0;
-  if (dr > 0.62 && sndPrevDisr <= 0.62) alarmTone();
-  sndPrevDisr = dr;
+  const net = model.netElec || 0;
+  if (net > 0 && sndPrevNet <= 0) tone(660, 0.25, "sine", 0.09);
+  sndPrevNet = net;
   const mc = Number(document.getElementById("missionCount")?.textContent || 0);
   if (mc > sndPrevMissions) { chimeUp(); sndPrevMissions = mc; }
+  if (disr && t >= warbleNext) { warbleTog ^= 1; tone(warbleTog ? 466 : 350, 0.22, "square", 0.06); warbleNext = t + 0.32; }
+  if (thermal && !disr && t >= thermalNext) { tone(540, 0.18, "sine", 0.05); thermalNext = t + 1.4; }
 }
 
 /* ---- B4: guided tour + power-up ---- */
@@ -2682,13 +2909,11 @@ function endTour() {
 }
 function runPowerUp() {
   const ov = document.getElementById("powerup");
-  let firstVisit = false;
-  try { firstVisit = !localStorage.getItem("fusionTourDone"); } catch (e) {}
   if (ov) {
     if (reduceMotion) ov.hidden = true;
     else { ov.hidden = false; ov.classList.add("run"); setTimeout(() => { ov.hidden = true; }, 1900); }
   }
-  if (firstVisit) setTimeout(() => startTour(), reduceMotion ? 400 : 2200);
+  // The guided tour no longer auto-starts; it runs only from the Tour button.
 }
 
 /* ---- C1: guided story mode ---- */
@@ -2753,6 +2978,99 @@ function initPhase2Controls() {
   runPowerUp();
 }
 
+/* ---------- C9: reading-level switch ---------- */
+function setReadLevel(plain) {
+  readLevel = plain ? "plain" : "tech";
+  document.body.classList.toggle("plain", plain);
+  const btn = document.getElementById("levelToggle");
+  if (btn) btn.setAttribute("aria-pressed", String(plain));
+  try { localStorage.setItem("fusionReadLevel", readLevel); } catch (e) {}
+  updateLesson();
+  updateCoach();
+}
+
+/* ---------- C6: predict-then-test ---------- */
+const PREDICT_Q = [
+  { q: "You raise the magnetic field. What happens to the confinement time?", choices: ["It goes up", "It goes down", "No change"], answer: 0, why: "A stronger field holds the plasma's energy longer, so confinement time rises." },
+  { q: "You heat the plasma from 10 toward 20 keV. The D-T reaction rate...", choices: ["climbs steeply", "barely changes", "falls"], answer: 0, why: "Reactivity rises sharply through this range, which is why reactors aim for it." },
+  { q: "You push fuel high with a weak magnetic field. The likely result is...", choices: ["a disruption", "more net power", "nothing"], answer: 0, why: "Too much pressure for the field (high beta) drives the plasma unstable." },
+  { q: "At ignition, the external heating you need is about...", choices: ["near zero", "at its maximum", "negative"], answer: 0, why: "Alpha self-heating sustains the burn, so external heating falls toward zero." },
+  { q: "Turning on the divertor sweep mainly...", choices: ["lowers peak wall heat", "raises fusion power", "cools the grid"], answer: 0, why: "It spreads the exhaust load over a larger area, easing the peak heat flux." },
+  { q: "To send real power to the grid you need roughly...", choices: ["Q well above 1", "any Q above 0", "Q below 1"], answer: 0, why: "The plant must cover its own recirculating power, so net electricity needs a high Q." }
+];
+let predictIdx = -1, predictAnswered = false;
+function renderPredict() {
+  const qEl = document.getElementById("predictQ"), choicesEl = document.getElementById("predictChoices"), fbEl = document.getElementById("predictFeedback");
+  if (!qEl || !choicesEl) return;
+  const item = PREDICT_Q[predictIdx];
+  qEl.textContent = item.q;
+  if (fbEl) { fbEl.hidden = true; fbEl.textContent = ""; }
+  predictAnswered = false;
+  choicesEl.innerHTML = "";
+  item.choices.forEach((c, i) => {
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "predict-choice"; btn.textContent = c;
+    btn.addEventListener("click", () => answerPredict(i));
+    choicesEl.appendChild(btn);
+  });
+}
+function answerPredict(i) {
+  if (predictAnswered) return;
+  predictAnswered = true;
+  const item = PREDICT_Q[predictIdx];
+  const fbEl = document.getElementById("predictFeedback");
+  document.querySelectorAll("#predictChoices .predict-choice").forEach((b, idx) => {
+    if (idx === item.answer) b.classList.add("correct");
+    else if (idx === i) b.classList.add("wrong");
+    b.disabled = true;
+  });
+  const right = i === item.answer;
+  if (fbEl) {
+    fbEl.hidden = false;
+    fbEl.className = `predict-feedback ${right ? "right" : "miss"}`;
+    fbEl.textContent = `${right ? "Correct. " : "Not quite. "}${item.why} Now try it on the reactor to see.`;
+  }
+}
+function nextPredict() { predictIdx = (predictIdx + 1) % PREDICT_Q.length; renderPredict(); }
+
+/* ---------- B6: inject plus/minus steppers beside each setpoint slider ---------- */
+function addSteppers() {
+  document.querySelectorAll(".control input[type=range]").forEach((range) => {
+    const step = Number(range.step) || 1;
+    const nudge = step * 5;
+    const wrap = document.createElement("div");
+    wrap.className = "stepper";
+    const mk = (label, delta) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "step-btn"; b.textContent = label;
+      b.setAttribute("aria-label", (delta < 0 ? "Decrease " : "Increase ") + (range.id || "value"));
+      b.addEventListener("click", () => {
+        range.value = clamp(Number(range.value) + delta, Number(range.min), Number(range.max));
+        range.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      return b;
+    };
+    range.parentNode.insertBefore(wrap, range);
+    wrap.appendChild(mk("−", -nudge));
+    wrap.appendChild(range);
+    wrap.appendChild(mk("+", nudge));
+  });
+}
+
+function initBatchControls() {
+  try { if (localStorage.getItem("fusionReadLevel") === "plain") setReadLevel(true); } catch (e) {}
+  document.getElementById("levelToggle")?.addEventListener("click", () => setReadLevel(readLevel !== "plain"));
+  predictIdx = Math.floor(Math.random() * PREDICT_Q.length);
+  renderPredict();
+  document.getElementById("predictNext")?.addEventListener("click", () => nextPredict());
+  const volEl = document.getElementById("soundVol");
+  if (volEl) {
+    try { const sv = localStorage.getItem("fusionSoundVol"); if (sv !== null) { soundVol = clamp(parseFloat(sv) || 0.6, 0, 1); volEl.value = Math.round(soundVol * 100); } } catch (e) {}
+    volEl.addEventListener("input", () => setSoundVol(Number(volEl.value) / 100));
+  }
+  addSteppers();
+}
+
 seedParticles();
 updateReadouts();
 initNavHud();
@@ -2760,6 +3078,7 @@ buildMissions();
 attachTips();
 initPhase1Controls();
 initPhase2Controls();
+initBatchControls();
 setInterval(() => {
   advanceDynamics(0.36);
   model = calculateModel();
