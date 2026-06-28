@@ -499,13 +499,6 @@ input[type="range"]::-moz-range-thumb {
   letter-spacing: 0.06em;
 }
 
-/* Keep physics notation in its true case so the Greek tau survives
-   (uppercasing turns "nT-tau-E" into "NTTE"). */
-.metric-label .sym {
-  text-transform: none;
-  letter-spacing: 0;
-}
-
 .metric strong {
   display: block;
   margin: 8px 0 9px;

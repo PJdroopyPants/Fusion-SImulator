@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Fusion simulator">
+  <defs>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="42%" stop-color="#ffce6e"/>
+      <stop offset="100%" stop-color="#ff7a66"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0b0d12"/>
+  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="13.25" fill="none" stroke="rgba(120,132,156,0.28)" stroke-width="1.5"/>
+  <!-- poloidal coil -->
+  <ellipse cx="32" cy="32" rx="9.5" ry="22" fill="none" stroke="#a896ff" stroke-width="2.6" opacity="0.9"/>
+  <!-- toroidal plasma ring -->
+  <ellipse cx="32" cy="34" rx="21" ry="9.5" fill="none" stroke="#38e1c6" stroke-width="3.4"/>
+  <!-- burning core -->
+  <circle cx="32" cy="34" r="7.5" fill="url(#core)"/>
+</svg>

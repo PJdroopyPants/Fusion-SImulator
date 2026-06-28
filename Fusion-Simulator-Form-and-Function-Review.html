@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fusion Simulator — Form &amp; Function Review</title>
+<meta name="description" content="A prioritized form-and-function review of the Fusion Power Generator Simulator, scoped for a campus outreach donation.">
+<style>
+  :root{
+    --bg:#0b0d12; --bg2:#0e1117; --panel:rgba(22,26,34,.82); --panel2:rgba(31,37,48,.6);
+    --line:rgba(120,132,156,.20); --line2:rgba(120,132,156,.34);
+    --text:#eef2f8; --muted:#9aa4b8; --faint:#6e7889;
+    --teal:#38e1c6; --gold:#ffc24b; --coral:#ff7a66; --violet:#a896ff; --green:#7ee787; --blue:#5cc8ff; --danger:#ff5d5d;
+    --shadow:rgba(0,0,0,.45);
+    --mono:ui-monospace,"SFMono-Regular","Cascadia Code",Menlo,Consolas,monospace;
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; background:var(--bg); color:var(--text); line-height:1.6; -webkit-font-smoothing:antialiased;}
+  .ambient{position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(60% 50% at 16% 8%, rgba(56,225,198,.10), transparent 70%),
+      radial-gradient(55% 45% at 88% 14%, rgba(168,150,255,.10), transparent 70%),
+      radial-gradient(70% 60% at 50% 100%, rgba(255,122,102,.07), transparent 70%),
+      var(--bg);}
+  .wrap{position:relative; z-index:1; width:min(1020px,100%); margin:0 auto; padding:56px clamp(16px,4vw,40px) 90px;}
+  .kicker{margin:0 0 10px; color:var(--teal); font-size:.74rem; font-weight:800; letter-spacing:.16em; text-transform:uppercase;}
+  h1{margin:0; font-size:clamp(2rem,5vw,3.2rem); line-height:1.04; letter-spacing:-.015em;
+     background:linear-gradient(118deg,#fff 18%,var(--teal) 128%); -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .lede{margin:18px 0 0; max-width:66ch; color:var(--muted); font-size:1.06rem;}
+  h2{font-size:1.5rem; letter-spacing:-.01em; margin:0;}
+  h3{font-size:1.04rem; margin:0;}
+  a{color:var(--teal); text-decoration:none;} a:hover{text-decoration:underline;}
+  code{font-family:var(--mono); font-size:.84em; color:var(--teal); background:rgba(56,225,198,.08);
+       border:1px solid rgba(56,225,198,.18); border-radius:5px; padding:1px 6px;}
+  strong{color:#fff;}
+  .meta{display:flex; flex-wrap:wrap; gap:10px; margin-top:26px;}
+  .chip{display:inline-flex; align-items:center; gap:7px; padding:7px 13px; border:1px solid var(--line2);
+        border-radius:999px; background:var(--panel2); color:var(--muted); font-size:.8rem; font-weight:600;}
+  .chip b{color:var(--text); font-weight:700;}
+  section{position:relative; z-index:1; margin-top:54px;}
+  .sec-head{display:flex; align-items:baseline; gap:14px; margin-bottom:6px; padding-bottom:14px; border-bottom:1px solid var(--line);}
+  .sec-num{font-family:var(--mono); font-size:.92rem; color:var(--teal); font-weight:700;}
+  .sec-sub{margin:14px 0 26px; color:var(--muted); max-width:74ch;}
+  .panel{border:1px solid var(--line); border-radius:16px; background:var(--panel);
+         box-shadow:0 22px 48px var(--shadow), inset 0 1px 0 rgba(255,255,255,.04); padding:24px clamp(18px,3vw,30px);}
+  .grid{display:grid; gap:16px;}
+  @media(min-width:760px){ .grid.two{grid-template-columns:1fr 1fr;} }
+  .card{border:1px solid var(--line); border-radius:14px; background:var(--panel2); padding:20px 20px 18px;
+        transition:border-color .18s ease;}
+  .card:hover{border-color:var(--line2);}
+  .card-top{display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:9px;}
+  .card h3{font-size:1.02rem;}
+  .card .idnum{font-family:var(--mono); font-size:.78rem; color:var(--faint); white-space:nowrap; padding-top:3px;}
+  .card p{margin:.5rem 0 0; color:var(--muted); font-size:.93rem;}
+  .card p.why{color:#c8d0de;}
+  .hook{margin-top:13px; padding-top:12px; border-top:1px dashed var(--line2); font-size:.85rem; color:var(--muted);}
+  .hook b{color:var(--teal); font-weight:700;}
+  .badges{display:flex; flex-wrap:wrap; gap:6px; margin-top:12px;}
+  .badge{font-size:.68rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
+         padding:4px 9px; border-radius:6px; border:1px solid transparent; white-space:nowrap;}
+  .pri-quick{color:#062b25; background:var(--teal);}
+  .pri-high{color:#2a1d00; background:var(--gold);}
+  .pri-amb{color:#160d33; background:var(--violet);}
+  .ef{background:transparent; border-color:var(--line2); color:var(--muted);}
+  .imp{background:rgba(126,231,135,.12); border-color:rgba(126,231,135,.4); color:var(--green);}
+  .bug{background:rgba(255,93,93,.12); border-color:rgba(255,93,93,.42); color:var(--danger);}
+  .aud{background:rgba(92,200,255,.10); border-color:rgba(92,200,255,.35); color:var(--blue); text-transform:none; letter-spacing:0;}
+  .legend{display:grid; gap:18px; grid-template-columns:1fr;}
+  @media(min-width:720px){ .legend{grid-template-columns:repeat(3,1fr);} }
+  .legend h4{margin:0 0 9px; font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; color:var(--faint);}
+  .legend .row{display:flex; align-items:center; gap:9px; margin:7px 0; font-size:.86rem; color:var(--muted);}
+  .table-scroll{overflow-x:auto; border-radius:14px; border:1px solid var(--line);}
+  table{border-collapse:collapse; width:100%; min-width:640px; font-size:.9rem;}
+  th,td{text-align:left; padding:12px 15px; border-bottom:1px solid var(--line); vertical-align:top;}
+  thead th{background:rgba(8,10,14,.5); color:var(--faint); font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; font-weight:800;}
+  tbody tr:last-child td{border-bottom:0;}
+  tbody tr:hover{background:rgba(56,225,198,.04);}
+  td .dot{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:8px; vertical-align:middle;}
+  .callout{border-left:3px solid var(--gold); background:linear-gradient(180deg,rgba(255,194,75,.08),rgba(255,194,75,.02));
+    border-radius:10px; padding:16px 18px; margin-top:18px;}
+  .callout .kicker{color:var(--gold); margin-bottom:6px;}
+  .callout p{margin:0; color:#dfe5ef; font-size:.92rem;}
+  .callout.teal{border-left-color:var(--teal); background:linear-gradient(180deg,rgba(56,225,198,.08),rgba(56,225,198,.02));}
+  .callout.teal .kicker{color:var(--teal);}
+  ul.clean{margin:.4rem 0 0; padding-left:1.1rem;} ul.clean li{margin:.34rem 0; color:var(--muted);}
+  ul.check{list-style:none; margin:.4rem 0 0; padding:0;}
+  ul.check li{position:relative; padding-left:1.7rem; margin:.5rem 0; color:var(--muted);}
+  ul.check li::before{content:"\2713"; position:absolute; left:0; top:-1px; color:var(--teal); font-weight:800;
+    border:1px solid var(--line2); border-radius:5px; width:1.15rem; height:1.15rem; display:inline-flex; align-items:center; justify-content:center; font-size:.7rem;}
+  .phase{display:flex; gap:16px; align-items:flex-start; padding:18px 0; border-bottom:1px solid var(--line);}
+  .phase:last-child{border-bottom:0;}
+  .phase .tag{flex:none; width:120px; font-weight:800; font-size:.82rem;}
+  .phase .tag span{display:block; font-size:.7rem; font-weight:600; color:var(--faint); margin-top:2px;}
+  .phase p{margin:0; color:var(--muted); font-size:.92rem;}
+  footer{position:relative; z-index:1; margin-top:64px; padding-top:22px; border-top:1px solid var(--line);
+    color:var(--faint); font-size:.82rem; width:min(1020px,100%); margin-left:auto; margin-right:auto; padding-left:clamp(16px,4vw,40px); padding-right:clamp(16px,4vw,40px);}
+  @media print{
+    .ambient{display:none;}
+    body{background:#fff; color:#13161c;}
+    h1{-webkit-text-fill-color:#0a7c6c; color:#0a7c6c;}
+    .panel,.card{box-shadow:none; background:#fff; border-color:#cdd3dc; break-inside:avoid;}
+    .lede,.card p,.sec-sub,.phase p,ul.clean li,ul.check li{color:#3a4150;}
+    strong{color:#000;} code{color:#0a7c6c; background:#eef7f5; border-color:#cfe7e2;}
+    a{color:#0a7c6c;} section{break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="wrap">
+
+  <p class="kicker">Form &amp; Function Review &middot; Prepared for the Tokamak Learning Lab</p>
+  <h1>Fusion Power Generator Simulator</h1>
+  <p class="lede">A second set of eyes ahead of the campus-outreach donation. This is a critique of the <em>current build</em> — not the roadmap — based on reading every line of <code>index.html</code>, <code>script.js</code>, and <code>styles.css</code> and driving the live app from startup through ignition. It weights all four areas you asked for: visual form, physics &amp; teaching depth, booth robustness, and "make it a gift" packaging. Each item carries a priority and effort tag so you can pick by appetite.</p>
+
+  <div class="meta">
+    <span class="chip">Verdict <b>Strong base, ship-ready soon</b></span>
+    <span class="chip">Reviewed <b>Live build, June 2026</b></span>
+    <span class="chip">Form <b>Critique, not code changes</b></span>
+    <span class="chip">Base <b>Vanilla JS, one portable folder</b></span>
+  </div>
+
+  <!-- 00 -->
+  <section id="strong">
+    <div class="sec-head"><span class="sec-num">00</span><h2>What is already excellent</h2></div>
+    <p class="sec-sub">Said plainly because the rest of this document is corrective by nature: this is a genuinely accomplished piece of work, well past the level most outreach demos ever reach. The recommendations are refinements, not rescues.</p>
+    <div class="panel">
+      <ul class="clean">
+        <li>A real dependency-free 3D engine on a 2D canvas — perspective camera, painter's depth sort, fog, bloom, vignette — with a raymarched WebGL plasma core that <em>falls back safely</em> to software when WebGL is missing. That fallback is exactly the right instinct for a booth.</li>
+        <li>A physically motivated model: triple product, a real Lawson ignition curve, energy gain <code>Q</code>, a power balance, breeding ratio, and genuine burn-through dynamics where alpha self-heating can run away into ignition or collapse.</li>
+        <li>Outstanding teaching content: tiered tech/plain lessons, a context-aware coach, seven missions, predict-then-test, a glossary, a guided story, and a tour — all written clearly and accurately.</li>
+        <li>Serious accessibility groundwork: reduced-motion paths, four themes including high-contrast and colorblind-safe, ARIA live regions on the readouts, keyboard reset, touch gestures, and per-slider steppers.</li>
+        <li>Clean, disciplined code: no debug leftovers, bounded particle and history buffers, sensible persistence of theme/units/sound, and a kiosk mode with an idle auto-demo.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 01 -->
+  <section id="howto">
+    <div class="sec-head"><span class="sec-num">01</span><h2>How to read this</h2></div>
+    <p class="sec-sub">Every item below carries three tags: a priority tier, a build effort, and a flag when it is an outright bug rather than an enhancement. Start with the bugs and quick wins — most are an hour or less and several change the very first impression a visitor forms.</p>
+    <div class="panel legend">
+      <div>
+        <h4>Priority tier</h4>
+        <div class="row"><span class="badge pri-quick">Quick win</span> High payoff, low risk</div>
+        <div class="row"><span class="badge pri-high">High impact</span> A meaningful feature</div>
+        <div class="row"><span class="badge pri-amb">Ambitious</span> A larger, optional bet</div>
+      </div>
+      <div>
+        <h4>Build effort</h4>
+        <div class="row"><span class="badge ef">Effort · Low</span> Hours, localized</div>
+        <div class="row"><span class="badge ef">Effort · Med</span> Days, one subsystem</div>
+        <div class="row"><span class="badge ef">Effort · High</span> Weeks, or a dependency</div>
+      </div>
+      <div>
+        <h4>Flags</h4>
+        <div class="row"><span class="badge bug">Bug / defect</span> Reads as broken or wrong</div>
+        <div class="row"><span class="badge imp">Polish</span> Looks or feels better</div>
+        <div class="row"><span class="badge aud">audience</span> Who it serves most</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 -->
+  <section id="glance">
+    <div class="sec-head"><span class="sec-num">02</span><h2>The findings at a glance</h2></div>
+    <p class="sec-sub">Sorted within each area. If you only do the quick wins and the one high-impact performance fix (C1), the build takes a visible step toward "donation-grade."</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>ID</th><th>Finding</th><th>Area</th><th>Tier</th><th>Effort</th></tr></thead>
+        <tbody>
+          <tr><td>A1</td><td>Default theme boots to high-contrast, not the showcase "Control room" dark</td><td>Form</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>A2</td><td>Signature label renders as "NTTE" — uppercasing eats the τ (tau)</td><td>Form</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>A3</td><td>Locked panel heights leave large empty voids (lesson, power balance, history)</td><td>Form</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>A4</td><td>Side panels scroll internally and hide the four toggles below the fold</td><td>Form</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+          <tr><td>A5</td><td>First numbers a visitor meets are a red "−265 MW" net</td><td>Form</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>A6</td><td>Small typography nits: "Q = ≈ ∞", cramped Sankey labels</td><td>Form</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>B1</td><td>Sim clock uses a fixed dt (0.36 s), so ramps drift on slow/throttled machines</td><td>Physics</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>B2</td><td>Reactivity caption says "peaks near 65 keV"; the chart labels "peak ≈ 69 keV"</td><td>Physics</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>B3</td><td>No visible "model card" of assumptions for the undergrad/educator audience</td><td>Physics</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+          <tr><td>B4</td><td>No self-check guarding the physics against a future maintainer's edits</td><td>Physics</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+          <tr><td>B5</td><td>Optional depth: helium-ash dilution and a radiative-loss lower branch</td><td>Physics</td><td><span class="dot" style="background:var(--violet)"></span>Amb</td><td>Med</td></tr>
+          <tr><td>C1</td><td>Every canvas redraws every frame, including static charts and off-screen panels</td><td>Robustness</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+          <tr><td>C2</td><td>No visibilitychange guard; loops keep running when the tab/screen sleeps</td><td>Robustness</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>C3</td><td>backdrop-filter blur on every panel is costly on weak booth GPUs</td><td>Robustness</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+          <tr><td>C4</td><td>No idle watchdog reset and no WebGL context-loss recovery for all-day runs</td><td>Robustness</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+          <tr><td>D1</td><td>Credits / donation panel (your roadmap D4) not yet built</td><td>Gift</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>D2</td><td>QR takeaway card (D3) not yet built</td><td>Gift</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+          <tr><td>D3</td><td>Lab worksheet + instructor answer key (D2) not yet built</td><td>Gift</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+          <tr><td>D4</td><td>Packaging polish: no favicon, no web-app manifest for tablet kiosk</td><td>Gift</td><td><span class="dot" style="background:var(--teal)"></span>Quick</td><td>Low</td></tr>
+          <tr><td>D5</td><td>Deep-linkable operating points via URL hash (new idea)</td><td>Gift</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+          <tr><td>E1</td><td>Charts carry aria-labels but no text/data alternative for screen readers</td><td>A11y</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+          <tr><td>E2</td><td>The 3D stage has no keyboard orbit/zoom</td><td>A11y</td><td><span class="dot" style="background:var(--gold)"></span>High</td><td>Med</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 03 FORM -->
+  <section id="form">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Visual form &amp; first impression</h2></div>
+    <p class="sec-sub">A booth is a hostile place for software: bright rooms, a few seconds of attention, and no one reading a manual. The visuals already carry the spectacle; these items remove the small frictions that quietly undercut it.</p>
+    <div class="grid two">
+
+      <div class="card">
+        <div class="card-top"><h3>Confirm the default theme</h3><span class="idnum">A1</span></div>
+        <p>The app boots in high-contrast — <code>&lt;html data-theme="contrast"&gt;</code> in the markup, and <code>localStorage.getItem("fusionTheme") || "contrast"</code> in the script — yet your README and the theme dropdown both lead with "Control room" (dark) as the signature look.</p>
+        <p class="why"><b>Why it matters:</b> the first palette a stranger sees is currently the flattest one, not the cinematic one you designed around. If high-contrast was a deliberate projector choice, keep it; otherwise default to dark and leave contrast one click away.</p>
+        <div class="hook"><b>Hook:</b> change the fallback in the theme-init read and the root attribute; everything else is already variable-driven.</div>
+        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort · Low</span><span class="badge aud">All</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>"NTTE" — the τ is lost to uppercasing</h3><span class="idnum">A2</span></div>
+        <p>Your central figure of merit displays as <strong>NTTE</strong> and confinement as <strong>TE</strong>. The markup is correct (<code>nT&amp;tau;<sub>E</sub></code>), but <code>.metric-label{text-transform:uppercase}</code> turns the Greek τ into a Latin-looking capital T. The glossary, which is not uppercased, renders τ correctly — proof the cause is the transform.</p>
+        <p class="why"><b>Why it matters:</b> the notation <em>is</em> the lesson. A physics tool that mangles n·T·τ<sub>E</sub> on its headline card undercuts its own credibility for the undergrad audience.</p>
+        <div class="hook"><b>Hook:</b> drop the uppercase on these two labels, or wrap the symbol in a span with <code>text-transform:none</code>.</div>
+        <div class="badges"><span class="badge bug">Bug / defect</span><span class="badge ef">Effort · Low</span><span class="badge aud">UG</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>Empty voids from locked panel heights</h3><span class="idnum">A3</span></div>
+        <p>The Plasma Core lesson panel, the Power Balance panel, and the Output-Over-Time panel each show large blank areas because their height is pinned to a taller neighbor in the same grid row. The lesson panel in particular leaves roughly a third of its height empty below the note.</p>
+        <p class="why"><b>Why it matters:</b> empty boxes read as "unfinished" at a glance. These voids are also opportunities: the lesson panel could host its formula or a small diagram; the Power Balance void is the natural home for your roadmap's step-through energy ledger (C10).</p>
+        <div class="hook"><b>Hook:</b> let these panels size to content (<code>align-items:start</code> on the grid), or fill the space with content you already compute.</div>
+        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort · Low</span><span class="badge aud">All</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>Controls hidden below an internal scrollbar</h3><span class="idnum">A4</span></div>
+        <p><code>.sim-grid &gt; .panel</code> is fixed at <code>height: calc(100vh - 150px)</code>, so on a typical laptop the Control Room's four toggles — neutral beam, pellet pacing, divertor sweep, emergency quench — sit below an internal scroll a visitor may never notice. The same applies to the lower telemetry.</p>
+        <p class="why"><b>Why it matters:</b> a booth visitor who never scrolls inside a panel simply never finds the divertor or quench — two of your most teachable controls.</p>
+        <div class="hook"><b>Hook:</b> a more compact control stack, a two-column toggle/slider layout at shorter viewport heights, or a subtle "more below" fade affordance.</div>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Med</span><span class="badge aud">All</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>The cold-open shows a losing reactor</h3><span class="idnum">A5</span></div>
+        <p>On the default Startup preset the three headline badges read Burning Plasma · <strong style="color:var(--coral)">−265 MW</strong> · Q 1.6. It is physically honest (sub-breakeven), but a passerby reads a big red negative number as "broken."</p>
+        <p class="why"><b>Why it matters:</b> the first 1–2 seconds decide whether someone stops. Consider opening at a gentler just-below-breakeven point, labeling the state "Warming up," or letting the kiosk idle-demo reach a net-positive beat quickly.</p>
+        <div class="hook"><b>Hook:</b> tune the <code>startup</code> entry in <code>presetValues</code>, or seed the first load from a "warm start" preset.</div>
+        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort · Low</span><span class="badge aud">HS / public</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>Typography micro-nits</h3><span class="idnum">A6</span></div>
+        <p>At ignition the gain reads <strong>"Q = ≈ ∞"</strong> — the "=" and "≈" together are redundant; "Q ≈ ∞" is cleaner. In the Sankey, the small "heat 20 + fusion 1890" sublabels crowd the "Power in" node and can overlap at some widths.</p>
+        <p class="why"><b>Why it matters:</b> these are the polish details that separate "student project" from "exhibit." Tiny fixes, disproportionate credibility.</p>
+        <div class="hook"><b>Hook:</b> build <code>qBig</code> as <code>Q ${qStr}</code> when <code>qStr</code> already starts with "≈"; give the Sankey node labels a min-gap or hide sublabels under a width threshold.</div>
+        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort · Low</span><span class="badge aud">All</span></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 04 PHYSICS -->
+  <section id="physics">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Physics realism &amp; teaching depth</h2></div>
+    <p class="sec-sub">The model is already well-judged for intuition. These items raise its honesty for engineering undergraduates and protect it for whoever maintains it after the handoff.</p>
+    <div class="grid two">
+
+      <div class="card">
+        <div class="card-top"><h3>Decouple the sim clock from a fixed dt</h3><span class="idnum">B1</span></div>
+        <p>The model tick runs <code>setInterval(() =&gt; { advanceDynamics(0.36); … }, 360)</code> and always advances exactly 0.36 simulated seconds. But timers coalesce on a busy machine and throttle hard in a background tab, so simulated time silently drifts from the wall clock — and the "last ~40 s" history axis stops being true.</p>
+        <p class="why"><b>Why it matters:</b> the burn-through ramp is one of your best teaching moments; it should feel the same on a fast laptop and a cheap tablet. Your render loop already measures real <code>delta</code> — the model loop should too.</p>
+        <div class="hook"><b>Hook:</b> in the interval, compute elapsed seconds from <code>performance.now()</code>, clamp to a sane max (say 0.5 s), and pass that to <code>advanceDynamics</code> and the materials/history updates.</div>
+        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort · Low</span><span class="badge aud">UG</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>Reactivity caption vs. chart label</h3><span class="idnum">B2</span></div>
+        <p>The D-T Reactivity caption says the rate "peaks near 65 keV," while the chart annotation reads "peak ≈ 69 keV." Both are in the right neighborhood, but the two numbers disagree on the same screen.</p>
+        <p class="why"><b>Why it matters:</b> a sharp undergrad will notice, and it is a 30-second fix. Pick one value (the D-T &lang;σv&rang; maximum is around 64–66 keV) and use it in both places.</p>
+        <div class="hook"><b>Hook:</b> the caption lives in <code>index.html</code>; the label is drawn in <code>drawReactivity()</code>.</div>
+        <div class="badges"><span class="badge bug">Bug / defect</span><span class="badge ef">Effort · Low</span><span class="badge aud">UG</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>Add a visible "model card"</h3><span class="idnum">B3</span></div>
+        <p>The physics is principled but its assumptions are implicit. A short, optional panel would make them teachable: the gain closure <code>Q = 5φ/(1−φ)</code>, the 20/80 alpha/neutron split, the ignition curve <code>L(T)</code>, the <code>τ<sub>E</sub> ∝ B^1.4</code> scaling, and one honest line that it is calibrated for intuition, not engineering.</p>
+        <p class="why"><b>Why it matters:</b> for educators and undergraduates, credibility comes from knowing exactly where the simplifications are. It also turns "magic numbers" into a discussion prompt.</p>
+        <div class="hook"><b>Hook:</b> a new collapsible panel in the learning row, same pattern as the glossary; the relations already live in <code>calculateModel()</code> and the header comment.</div>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Med</span><span class="badge aud">UG / educators</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>Guard the model with a self-check</h3><span class="idnum">B4</span></div>
+        <p>You intend a student to be able to maintain this. A tiny test harness — reachable at, say, <code>?selftest</code> — could assert the invariants the physics must keep: stronger B raises τ<sub>E</sub>; a 50/50 D-T blend maximizes the rate; emergency quench drives fusion toward zero; each preset lands in its intended state band.</p>
+        <p class="why"><b>Why it matters:</b> it is cheap insurance that a well-meaning future edit cannot silently break the model in a way no one notices until a booth.</p>
+        <div class="hook"><b>Hook:</b> a small function that runs <code>calculateModel()</code> across a grid of inputs and logs pass/fail; no framework, no dependency.</div>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Med</span><span class="badge aud">UG / maintainer</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>Optional depth that closes loops you already hint at</h3><span class="idnum">B5</span></div>
+        <p>Two refinements would reward the curious without bloating the model: (1) <strong>helium-ash accumulation</strong> that dilutes the fuel and must be exhausted by the divertor — finally making the divertor consequential to the burn; (2) a <strong>radiative-loss term</strong> (bremsstrahlung rising with temperature and density) so there is a real "too cold / too dilute" lower branch rather than a monotonic climb.</p>
+        <p class="why"><b>Why it matters:</b> your copy already gestures at both ("removes helium ash that would otherwise quench the burn"), so modeling them makes the words true and deepens the UG exercise.</p>
+        <div class="hook"><b>Hook:</b> evolve an ash fraction state alongside <code>burnT</code>; subtract a P<sub>rad</sub> term in the power balance.</div>
+        <div class="badges"><span class="badge pri-amb">Ambitious</span><span class="badge ef">Effort · Med</span><span class="badge aud">UG</span></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 05 ROBUSTNESS -->
+  <section id="robust">
+    <div class="sec-head"><span class="sec-num">05</span><h2>Booth performance &amp; robustness</h2></div>
+    <p class="sec-sub">A donated exhibit has to survive a full open-house day on whatever hardware the host has — often a mid-range tablet. This is the area with the single highest-leverage fix in the whole review.</p>
+
+    <div class="callout teal">
+      <p class="kicker">The one to do first</p>
+      <p><strong>C1 — stop redrawing everything every frame.</strong> <code>animate()</code> calls <code>drawReactor</code>, <code>drawGizmo</code>, <code>drawHistory</code>, <code>drawLawson</code>, <code>drawReactivity</code>, <code>drawSankey</code>, <code>drawFuelCycle</code>, and <code>drawCrossSection</code> on every <code>requestAnimationFrame</code> (~60 fps). But the six analysis/physics charts only change on the 360 ms model tick, and most sit far below the fold. On an all-day booth tablet this is the dominant battery and heat cost, for no visible benefit.</p>
+    </div>
+
+    <div class="grid two" style="margin-top:18px;">
+
+      <div class="card">
+        <div class="card-top"><h3>Draw the slow charts only when they change</h3><span class="idnum">C1</span></div>
+        <p>In order of payoff: (a) mark the six charts "dirty" only on the model tick and on resize, and skip them otherwise; (b) wrap each off-screen canvas in an <code>IntersectionObserver</code> and skip it while not visible; (c) keep only the reactor stage on the per-frame path, optionally capped near 40 fps.</p>
+        <p class="why"><b>Why it matters:</b> realistically a 3–5× cut in idle CPU/GPU, which on a tablet means less throttling, less fan, and a screen that still looks crisp at hour six.</p>
+        <div class="hook"><b>Hook:</b> a <code>dirty</code> flag set in the <code>setInterval</code> tick; gate each chart's draw call on it plus an <code>isVisible</code> flag.</div>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Med</span><span class="badge aud">All</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>Pause when the tab or screen sleeps</h3><span class="idnum">C2</span></div>
+        <p>There is no <code>visibilitychange</code> handling. When the kiosk display sleeps or the tab is backgrounded, the 360 ms interval keeps firing (throttled), advancing the fixed-dt clock out of step (see B1), and the rAF loop resumes mid-state.</p>
+        <p class="why"><b>Why it matters:</b> pausing both loops on hide and resuming cleanly on show saves power and keeps the model coherent across a long unattended day.</p>
+        <div class="hook"><b>Hook:</b> on <code>document.hidden</code>, cancel the rAF and clear the interval; restore on focus.</div>
+        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort · Low</span><span class="badge aud">All</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>A "lite" path for weak GPUs</h3><span class="idnum">C3</span></div>
+        <p>Every <code>.panel</code> and the reactor stage use <code>backdrop-filter: blur(14px)</code>, recomposited each frame. It is gorgeous on a laptop and a real cost on integrated tablet graphics.</p>
+        <p class="why"><b>Why it matters:</b> the same instinct that gave you the <code>reduceMotion</code> path applies to GPU load. Auto-detect a weak device (low <code>hardwareConcurrency</code>, or an FPS probe that dips) and drop blur, simplify bloom, and thin the particle counts.</p>
+        <div class="hook"><b>Hook:</b> a <code>body.lite</code> class that zeroes the blur and the heavy passes; toggle it from a one-time FPS sample.</div>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Med</span><span class="badge aud">All</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>Survive an unattended day</h3><span class="idnum">C4</span></div>
+        <p>Two safeguards for a walk-away exhibit: an <strong>idle watchdog</strong> that resets to a friendly preset after a few minutes of no input, so no one ever walks up to a reactor the last visitor left mid-disruption; and <strong>WebGL context-loss recovery</strong> (<code>webglcontextlost</code>/<code>restored</code>) so a long session can't end on a black plasma. Your software fallback covers a missing context, but not one lost mid-run.</p>
+        <p class="why"><b>Why it matters:</b> these are exactly the failure modes that only appear after hours, i.e. only at the actual event.</p>
+        <div class="hook"><b>Hook:</b> reuse the kiosk idle timer for the reset; add the two canvas event listeners next to <code>initPlasmaGL()</code>.</div>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Med</span><span class="badge aud">All</span></div>
+      </div>
+
+    </div>
+    <div class="callout">
+      <p class="kicker">Already in good shape</p>
+      <p>Memory hygiene looks sound — sparks cap at 90, the trail at 26, history at 120. Worth one deliberate multi-hour soak test to confirm nothing accumulates across re-inits (stray listeners, audio nodes), but I found no obvious leak in the code.</p>
+    </div>
+  </section>
+
+  <!-- 06 GIFT -->
+  <section id="gift">
+    <div class="sec-head"><span class="sec-num">06</span><h2>"Make it a gift" packaging</h2></div>
+    <p class="sec-sub">These are the pieces that turn a great simulator into a donation a program can adopt and feel ownership of. Three are straight from your own roadmap (D2–D4) and simply aren't built yet; the rest are small.</p>
+    <div class="grid two">
+
+      <div class="card">
+        <div class="card-top"><h3>Credits &amp; donation panel</h3><span class="idnum">D1</span></div>
+        <p>A small "About this exhibit" footer or modal naming the gift to the program, with room for their logos and links and a one-line model disclaimer.</p>
+        <p class="why"><b>Why it matters:</b> it makes the gift feel official and gives the host program a sense of ownership — the difference between "a thing we found" and "our exhibit."</p>
+        <div class="hook"><b>Hook:</b> your existing disclaimer copy is a good seed; reuse the panel/lesson styling.</div>
+        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort · Low</span><span class="badge aud">All</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>QR takeaway card</h3><span class="idnum">D2</span></div>
+        <p>When a visitor hits a milestone, offer a printable / downloadable card — "I reached Q = X at the fusion booth" — with a QR to the program's fusion page.</p>
+        <p class="why"><b>Why it matters:</b> it converts a 90-second interaction into a follow-up, which is the entire point of outreach. This is the highest-ROI new feature for recruiting.</p>
+        <div class="hook"><b>Hook:</b> render the card to an offscreen canvas from the current model (you already export the run), then offer it as a PNG; a tiny vendored QR generator keeps it offline.</div>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Med</span><span class="badge aud">All</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>Lab worksheet + instructor key</h3><span class="idnum">D3</span></div>
+        <p>The CSV export exists; the paired worksheet does not. A one-page handout — derive the Lawson point, complete three missions, export the run, interpret it — plus an instructor answer key for the missions and the predict-then-test questions, drops the sim straight into a Rose-Hulman lab period.</p>
+        <p class="why"><b>Why it matters:</b> curriculum fit is what makes a tool get <em>used</em> after the open house, not just admired at it.</p>
+        <div class="hook"><b>Hook:</b> author it as a short PDF/markdown beside the app; the reading-level switch lets one file serve both an open house and a sophomore lab.</div>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Med</span><span class="badge aud">UG</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>Packaging polish</h3><span class="idnum">D4</span></div>
+        <p>No favicon, no branded document head beyond the title, and no web-app manifest. For a tablet kiosk, a manifest plus an apple-touch-icon enables "Add to Home Screen" full-screen launch with no browser chrome — a genuine booth win — and a favicon just makes it feel finished.</p>
+        <p class="why"><b>Why it matters:</b> these are minutes of work that change how "done" the gift feels, and the manifest meaningfully improves the kiosk experience.</p>
+        <div class="hook"><b>Hook:</b> add a small inline-SVG favicon, a <code>manifest.webmanifest</code> with <code>display:"fullscreen"</code>, and an author/license meta line.</div>
+        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort · Low</span><span class="badge aud">All</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>Deep-linkable operating points</h3><span class="idnum">D5</span></div>
+        <p>Serialize the current setpoints into the URL hash so a state can be shared or bookmarked. An instructor could hand out a link (or QR) that opens the sim at an exact scenario, and the worksheet could reference precise starting points.</p>
+        <p class="why"><b>Why it matters:</b> no backend, pure win — it makes the worksheet (D3) and the QR card (D2) far more powerful, and lets you pre-stage a booth demo.</p>
+        <div class="hook"><b>Hook:</b> read/write a compact hash in <code>applyPreset</code> and on load; you already have the full input set in <code>controls</code>.</div>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Med</span><span class="badge aud">All</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-top"><h3>A one-page facilitator guide</h3><span class="idnum">D6</span></div>
+        <p>A short <code>BOOTH-SETUP</code> note: how to launch full-screen, which preset to leave it idling on, how to reset, and a 30-second script a volunteer can read to a visitor.</p>
+        <p class="why"><b>Why it matters:</b> the people staffing the booth often aren't the people who built it. A half-page makes them confident in minutes.</p>
+        <div class="hook"><b>Hook:</b> a markdown file in the folder; pairs with the watchdog reset (C4) and kiosk mode.</div>
+        <div class="badges"><span class="badge pri-quick">Quick win</span><span class="badge ef">Effort · Low</span><span class="badge aud">All</span></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 07 A11Y -->
+  <section id="a11y">
+    <div class="sec-head"><span class="sec-num">07</span><h2>Accessibility, to finish what you started</h2></div>
+    <p class="sec-sub">Your accessibility work is already a cut above — reduced-motion, four themes, live regions, steppers. Two gaps remain, and closing them matters for a campus that will care about it.</p>
+    <div class="grid two">
+      <div class="card">
+        <div class="card-top"><h3>Make the charts readable to a screen reader</h3><span class="idnum">E1</span></div>
+        <p>The canvases carry <code>aria-label</code>s, but the <em>numbers</em> inside them — the live operating point, the power-balance split, the peak net — are invisible to assistive tech. The telemetry readouts are already in live regions; extend that same pattern to the visualizations.</p>
+        <p class="why"><b>Why it matters:</b> a visually-hidden text summary or small data table per chart, updated with the model, makes the analysis genuinely usable non-visually.</p>
+        <div class="hook"><b>Hook:</b> a <code>.visually-hidden</code> live region beside each chart, written in the same tick that draws it.</div>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Med</span><span class="badge aud">All</span></div>
+      </div>
+      <div class="card">
+        <div class="card-top"><h3>Keyboard control of the 3D stage</h3><span class="idnum">E2</span></div>
+        <p>Orbit, zoom, and pan are mouse/touch only. The ISO/TOP/FRONT/SIDE snaps and the R reset are a partial path, but there is no arrow-key orbit or <code>+</code>/<code>−</code> zoom when the canvas has focus.</p>
+        <p class="why"><b>Why it matters:</b> the reactor is the centerpiece; a keyboard-only visitor should be able to look around it too.</p>
+        <div class="hook"><b>Hook:</b> on a focusable canvas, map arrows to <code>cam.yaw/pitch</code> and <code>+/−</code> to zoom — the same state the drag handlers already mutate.</div>
+        <div class="badges"><span class="badge pri-high">High impact</span><span class="badge ef">Effort · Med</span><span class="badge aud">All</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 08 QA -->
+  <section id="qa">
+    <div class="sec-head"><span class="sec-num">08</span><h2>A pre-donation QA checklist</h2></div>
+    <p class="sec-sub">Independent of the enhancements above, run this pass before handing it over. It is the difference between "works on my machine" and "works at the event."</p>
+    <div class="panel">
+      <ul class="check">
+        <li>Open <code>index.html</code> directly from the folder (<code>file://</code>) with no server, in current Chrome, Edge, Firefox, and Safari.</li>
+        <li>Run on a real mid-range tablet for at least an hour: watch for heat, throttling, and frame-rate decay (this is what C1–C3 protect against).</li>
+        <li>Project it in a bright room and read every label from across a room — this is the real test of the theme default (A1) and the τ legibility (A2).</li>
+        <li>Drive each preset and each mission to completion; confirm the state labels, lamps, and coach text all agree.</li>
+        <li>Toggle reduced-motion at the OS level and confirm the stilled experience is still coherent.</li>
+        <li>Do a keyboard-only and a screen-reader pass (E1, E2).</li>
+        <li>Re-verify the Section-06 real-machine figures at donation time — they were current mid-2026 but ITER/SPARC/EAST move.</li>
+        <li>Leave it idle for 10 minutes and confirm it returns to a friendly state (after C4).</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 09 ORDER -->
+  <section id="order">
+    <div class="sec-head"><span class="sec-num">09</span><h2>A suggested order of attack</h2></div>
+    <p class="sec-sub">Bugs and quick wins first — several change the first impression for the cost of an afternoon — then the one big robustness fix, then the gift pieces, then optional depth.</p>
+    <div class="panel">
+      <div class="phase"><div class="tag">An afternoon<span>Fix what reads as wrong</span></div>
+        <p>A2 (τ label), B2 (65 vs 69 keV), A6 (typography), A1 (theme default), A3 (empty panels), A5 (cold-open), C2 (visibility guard), D4 (favicon + manifest). All low-effort, several high-visibility.</p></div>
+      <div class="phase"><div class="tag">A few days<span>Make it booth-tough &amp; giftable</span></div>
+        <p>C1 (per-frame redraw — do this one), C3 (lite GPU path), C4 (watchdog + context loss), A4 (controls below the fold), then the gift trio D1 (credits), D2 (QR card), D3 (worksheet + key), and D5 (deep links).</p></div>
+      <div class="phase"><div class="tag">When you want depth<span>Reward the curious</span></div>
+        <p>B3 (model card), B4 (self-check), E1/E2 (chart a11y + keyboard orbit), and finally the optional B5 physics refinements. None are required to donate; all raise the ceiling.</p></div>
+    </div>
+    <div class="callout">
+      <p class="kicker">Three things to protect</p>
+      <p><strong>Portability</strong> — keep it openable from one folder with no network. <strong>Accessibility</strong> — keep the reduced-motion, contrast, and colorblind paths first-class as you add features. <strong>Performance</strong> — gate every new heavy addition behind the same idle/visibility/lite checks, so it stays smooth on the weakest machine in the room.</p>
+    </div>
+  </section>
+
+</div>
+<footer>
+  A form-and-function review of the Fusion Power Generator Simulator, prepared for a campus-outreach donation. It proposes no changes to the code by itself; line and function references point at the current build (<code>index.html</code>, <code>script.js</code>, <code>styles.css</code>) so each item is actionable. The simulator remains a simplified teaching model — calibrated for intuition and outreach, not engineering accuracy.
+</footer>
+</body>
+</html>

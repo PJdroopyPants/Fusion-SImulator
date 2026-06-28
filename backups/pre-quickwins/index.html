@@ -1,20 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="contrast">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Fusion Generator Simulator</title>
     <meta name="description" content="An interactive, physically grounded tokamak fusion power simulator for STEM learners.">
-    <meta name="author" content="Tokamak Learning Lab">
-    <meta name="theme-color" content="#0b0d12">
-    <meta name="color-scheme" content="dark light">
-    <link rel="icon" type="image/svg+xml" href="icon.svg">
-    <link rel="apple-touch-icon" href="icon.svg">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Fusion Sim">
-    <link rel="manifest" href="manifest.webmanifest">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -267,13 +257,13 @@
               <meter id="electricMeter" min="-300" max="700" value="0"></meter>
             </article>
             <article class="metric metric-triple">
-              <span class="metric-label">Triple product <span class="sym">nT&tau;<sub>E</sub></span></span>
+              <span class="metric-label">Triple product nT&tau;<sub>E</sub></span>
               <strong id="tripleProduct">0.00</strong>
               <span class="metric-unit">×10²¹ keV·s·m⁻³ &nbsp;(ignition ≈ 3)</span>
               <meter id="tripleMeter" min="0" max="3.5" value="0"></meter>
             </article>
             <article class="metric">
-              <span class="metric-label">Confinement <span class="sym">&tau;<sub>E</sub></span></span>
+              <span class="metric-label">Confinement &tau;<sub>E</sub></span>
               <strong id="confinementTime">0.0 s</strong>
               <meter id="confinementMeter" min="0" max="3" value="0"></meter>
             </article>

@@ -2042,7 +2042,7 @@ function drawHistory() {
 
 /* ---------- D-T reactivity vs temperature ---------- */
 /* Relative reaction-rate shape: rises ~T^2, rolls over past ~65 keV. */
-function reactivityShape(T) { return (T * T) / (1 + Math.pow(T / 57, 3.3)); } // peaks ~65 keV (matches caption + real D-T)
+function reactivityShape(T) { return (T * T) / (1 + Math.pow(T / 60, 3.3)); }
 
 function drawReactivity() {
   if (!reactivityCtx) return;
@@ -2147,8 +2147,7 @@ function drawSankey() {
   };
   node(xIn, midY, "Power in", `${Math.round(inTot)} MW`, "rgba(238,242,248,0.92)", "#ffc24b");
   ctx.fillStyle = "rgba(154,164,184,0.8)"; ctx.font = "8.5px Inter, system-ui, sans-serif"; ctx.textAlign = "center";
-  const inSub = `heat ${Math.round(heat)} + fusion ${Math.round(fus)}`;
-  ctx.fillText(inSub, Math.max(xIn, ctx.measureText(inSub).width / 2 + 4), midY + 22); // clamp so it never clips the left edge
+  ctx.fillText(`heat ${Math.round(heat)} + fusion ${Math.round(fus)}`, xIn, midY + 22);
   node(xTh, midY, "Thermal", `${Math.round(thermal)} MW`, "rgba(238,242,248,0.92)", "#ff9a5a");
   node(xEl, midY, "Gross elec", `${Math.round(gross)} MW`, "rgba(238,242,248,0.92)", "#38e1c6");
   node(xOut, h * 0.18, "Net to grid", `${Math.round(net)} MW`, "rgba(238,242,248,0.92)", net >= 0 ? "#7ee787" : "#ff5d5d");
@@ -2239,7 +2238,7 @@ function tweenReadouts(dt) {
   set(outputs.wallLoad, `${wall.toFixed(1)} MW/m²`);
   set(outputs.coolantTemp, `${Math.round(cool)} °C`);
   set(outputs.tritiumRatio, tbr.toFixed(2));
-  set(outputs.qBig, qStr.charAt(0) === "≈" ? `Q ${qStr}` : `Q = ${qStr}`);
+  set(outputs.qBig, `Q = ${qStr}`);
   set(outputs.stageTemp, temp.toFixed(1));
 }
 
@@ -2258,7 +2257,7 @@ function animate(time) {
     drawCrossSection();
     tweenReadouts(delta);
   }
-  rafId = requestAnimationFrame(animate);
+  requestAnimationFrame(animate);
 }
 
 function tickHistory() {
@@ -2554,8 +2553,8 @@ function tickKiosk() {
 }
 
 function initPhase1Controls() {
-  let savedTheme = "dark";
-  try { savedTheme = localStorage.getItem("fusionTheme") || "dark"; } catch (e) {}
+  let savedTheme = "contrast";
+  try { savedTheme = localStorage.getItem("fusionTheme") || "contrast"; } catch (e) {}
   applyTheme(savedTheme);
   document.getElementById("themeSelect")?.addEventListener("change", (e) => applyTheme(e.target.value));
 
@@ -3080,12 +3079,7 @@ attachTips();
 initPhase1Controls();
 initPhase2Controls();
 initBatchControls();
-
-// ---- C2: pause the render loop and the model tick when the tab/screen is hidden,
-// then resume cleanly, so an all-day kiosk saves power and stays time-coherent. ----
-const TICK_MS = 360;
-let rafId = null, modelTimer = null;
-function modelTick() {
+setInterval(() => {
   advanceDynamics(0.36);
   model = calculateModel();
   tickHistory();
@@ -3095,14 +3089,5 @@ function modelTick() {
   updateMaterials(0.36);
   updateSound();
   updateStory();
-}
-function startLoops() {
-  if (!modelTimer) modelTimer = setInterval(modelTick, TICK_MS);
-  if (rafId === null) { lastFrame = performance.now(); rafId = requestAnimationFrame(animate); }
-}
-function stopLoops() {
-  if (modelTimer) { clearInterval(modelTimer); modelTimer = null; }
-  if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
-}
-document.addEventListener("visibilitychange", () => { if (document.hidden) stopLoops(); else startLoops(); });
-startLoops();
+}, 360);
+requestAnimationFrame(animate);
