@@ -63,6 +63,7 @@ Navigate by dragging to orbit, scrolling to zoom, shift-drag or right-drag to pa
 - **Themes**: a control-room dark theme, a light theme for bright rooms and projectors, a high-contrast theme, and a colorblind-safe palette.
 - **Sound** (off by default) adds a reactor hum that tracks fusion power, with chimes on ignition and mission completion and an alarm on disruption.
 - **Export run (CSV)** downloads the current setpoints, key outputs, and the recent history as a lab worksheet.
+- **Takeaway card** generates a shareable summary of the visitor's run, their best energy gain, peak net power, hottest plasma, and missions completed, alongside a QR code to run the simulator themselves. It downloads as a PNG for a booth handout or a phone photo. The QR is baked in and points to the project repository; a host can repoint it by regenerating the code for their own URL (see the note above `TAKEAWAY_QR` in `script.js`).
 - **Present** is the fullscreen kiosk mode described in Quick start.
 
 ## Data visualizations

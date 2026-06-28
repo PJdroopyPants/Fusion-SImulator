@@ -337,6 +337,7 @@
 
           <div class="tele-actions">
             <button type="button" class="tool-btn wide" id="exportBtn" title="Download this run as a CSV">Export run (CSV)</button>
+            <button type="button" class="tool-btn wide" id="cardBtn" title="A takeaway card of your run, with a QR to run it yourself">Takeaway card</button>
           </div>
 
           <section class="coach" aria-live="polite">
@@ -647,6 +648,33 @@
         <button type="button" class="story-next" id="storyNext">Next</button>
       </div>
     </section>
+
+    <!-- D3: takeaway card -->
+    <div id="cardOverlay" class="card-overlay" hidden>
+      <div class="takeaway-card" role="dialog" aria-modal="true" aria-label="Your fusion run, a takeaway card">
+        <button type="button" class="card-close" id="cardClose" aria-label="Close card">&times;</button>
+        <p class="tc-kicker">Tokamak Learning Lab</p>
+        <h3 class="tc-title">You ran a fusion reactor</h3>
+        <p class="tc-verdict" id="tcVerdict">You drove a real fusion plasma.</p>
+        <div class="tc-stats">
+          <div class="tc-stat"><span>Best energy gain Q</span><strong id="tcQ">&mdash;</strong></div>
+          <div class="tc-stat"><span>Peak net power</span><strong id="tcNet">&mdash;</strong></div>
+          <div class="tc-stat"><span>Hottest plasma</span><strong id="tcTemp">&mdash;</strong></div>
+          <div class="tc-stat"><span>Missions completed</span><strong id="tcMissions">&mdash;</strong></div>
+        </div>
+        <div class="tc-foot">
+          <div class="tc-qr" id="tcQR" aria-hidden="true"></div>
+          <div class="tc-foot-text">
+            <p class="tc-run">Scan to run it yourself</p>
+            <p class="tc-url" id="tcUrl"></p>
+            <p class="tc-don">Donated for educational use, free to run and share.</p>
+          </div>
+        </div>
+        <div class="tc-actions">
+          <button type="button" class="tool-btn" id="cardDownload">Download card (PNG)</button>
+        </div>
+      </div>
+    </div>
 
     <!-- About / credits (D1) -->
     <div id="aboutOverlay" class="about-overlay" hidden></div>

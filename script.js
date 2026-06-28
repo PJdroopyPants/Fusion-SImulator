@@ -437,6 +437,7 @@ function updateReadouts() {
   updateRealWorld();
   updateAnnunciator();
   updatePlant();
+  updatePeaks();
 }
 
 // Balance-of-plant panel: trace the reactor's heat to the grid, component by component.
@@ -1350,18 +1351,22 @@ function buildDProfile() {
    specular sheen, plus an optional emissive term for the energised winding. */
 function shadeCoil(rgb, n, emissive) {
   const ndl = Math.max(0, n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2]);
-  let r = rgb[0] * (0.30 + ndl * 0.78);
-  let g = rgb[1] * (0.33 + ndl * 0.74);
-  let b = rgb[2] * (0.40 + ndl * 0.70);
-  const vd = clamp(Math.abs(n[0] * VIEW_DIR[0] + n[1] * VIEW_DIR[1] + n[2] * VIEW_DIR[2]), 0, 1);
-  const rim = Math.pow(1 - vd, 3) * 0.30;
-  r += 58 * rim; g += 72 * rim; b += 104 * rim;
+  // diffuse body: a cool shadow rising to a brighter key (polished metal has a wide tonal range)
+  let r = rgb[0] * (0.24 + ndl * 0.86);
+  let g = rgb[1] * (0.27 + ndl * 0.84);
+  let b = rgb[2] * (0.36 + ndl * 0.80);
+  // Blinn-Phong: a broad body sheen plus a tight, bright polished glint
   const hx = LIGHT[0] + VIEW_DIR[0], hy = LIGHT[1] + VIEW_DIR[1], hz = LIGHT[2] + VIEW_DIR[2];
   const hl = Math.hypot(hx, hy, hz) || 1;
   const ndh = Math.max(0, (n[0] * hx + n[1] * hy + n[2] * hz) / hl);
-  const spec = Math.pow(ndh, 30) * 74;
-  r += spec; g += spec; b += spec * 1.05;
-  if (emissive > 0) { r += 50 * emissive; g += 42 * emissive; b += 98 * emissive; }
+  const sheen = Math.pow(ndh, 6) * 26;
+  const glint = Math.pow(ndh, 64) * 120;
+  r += sheen + glint; g += sheen + glint; b += sheen * 1.06 + glint * 1.08;
+  // fresnel rim: a cool sky-blue edge, the hallmark of a curved polished surface
+  const vd = clamp(Math.abs(n[0] * VIEW_DIR[0] + n[1] * VIEW_DIR[1] + n[2] * VIEW_DIR[2]), 0, 1);
+  const rim = Math.pow(1 - vd, 3.2) * 0.44;
+  r += 54 * rim; g += 76 * rim; b += 118 * rim;
+  if (emissive > 0) { r += 48 * emissive; g += 40 * emissive; b += 96 * emissive; }
   return [clamp(Math.round(r), 0, 255), clamp(Math.round(g), 0, 255), clamp(Math.round(b), 0, 255)];
 }
 function addFaceCoil(prims, ctx, pts, normal, rgb, emissive) {
@@ -1377,39 +1382,44 @@ function addFaceCoil(prims, ctx, pts, normal, rgb, emissive) {
 function addDCoils(prims, ctx, bNorm) {
   const prof = D_PROFILE || (D_PROFILE = buildDProfile());
   const M = prof.length;
-  const NC = 14, wP = 0.036, wT = 0.036;                // thinner, less intrusive
+  const NC = 14, TUBE_R = 0.046, NS = 8;                // round (octagonal) cross-section: a smooth metallic bar
   const emis = clamp((bNorm - 0.18) / 0.82, 0, 1);      // brighter / more energised at high field
-  const caseRgb = [120, 120, 144];                      // brushed-steel coil case
-  const windRgb = [136, 128, 206];                      // superconducting winding pack (inner face)
+  const coilRgb = [128, 126, 170];                      // blue-violet brushed steel
+  const cs = new Array(NS), sn = new Array(NS);
+  for (let s = 0; s < NS; s += 1) { const a = (s / NS) * Math.PI * 2; cs[s] = Math.cos(a); sn[s] = Math.sin(a); }
   for (let ci = 0; ci < NC; ci += 1) {
     const th = (ci / NC) * Math.PI * 2;
     const cth = Math.cos(th), sth = Math.sin(th);
-    const et = [-sth, 0, cth];                           // toroidal (out-of-plane) unit
+    const et = [-sth, 0, cth];                           // toroidal (out-of-plane) cross-section axis
     const rings = new Array(M);
     for (let i = 0; i < M; i += 1) {
       const a = prof[i], pv = prof[(i - 1 + M) % M], nx = prof[(i + 1) % M];
       let nu = -(nx[1] - pv[1]), nv = (nx[0] - pv[0]);
-      const ln = Math.hypot(nu, nv) || 1; nu /= ln; nv /= ln;     // in-plane normal (radial, vertical)
+      const ln = Math.hypot(nu, nv) || 1; nu /= ln; nv /= ln;     // in-plane (radial/vertical) cross-section axis
       const u = a[0], v = a[1];
       const Px = (R + u) * cth, Py = v, Pz = (R + u) * sth;
-      const npx = nu * cth, npy = nv, npz = nu * sth;             // world in-plane normal
-      rings[i] = {
-        c0: [Px + wP * npx + wT * et[0], Py + wP * npy, Pz + wP * npz + wT * et[2]],
-        c1: [Px + wP * npx - wT * et[0], Py + wP * npy, Pz + wP * npz - wT * et[2]],
-        c2: [Px - wP * npx + wT * et[0], Py - wP * npy, Pz - wP * npz + wT * et[2]],
-        c3: [Px - wP * npx - wT * et[0], Py - wP * npy, Pz - wP * npz - wT * et[2]],
-        np: [npx, npy, npz]
-      };
+      const npx = nu * cth, npy = nv, npz = nu * sth;
+      const ring = new Array(NS);
+      for (let s = 0; s < NS; s += 1) {
+        const ox = cs[s] * npx + sn[s] * et[0];
+        const oy = cs[s] * npy + sn[s] * et[1];
+        const oz = cs[s] * npz + sn[s] * et[2];
+        ring[s] = { p: [Px + TUBE_R * ox, Py + TUBE_R * oy, Pz + TUBE_R * oz], n: [ox, oy, oz] };
+      }
+      rings[i] = ring;
     }
-    const netor = [-et[0], 0, -et[2]];
     for (let i = 0; i < M; i += 1) {
       const r0 = rings[i], r1 = rings[(i + 1) % M];
-      const band = (i % 4 === 0) ? 0.82 : 1.0;                                                   // casing-segment ribs
-      const cs = [caseRgb[0] * band, caseRgb[1] * band, caseRgb[2] * band];
-      addFaceCoil(prims, ctx, [r0.c0, r0.c1, r1.c1, r1.c0], r0.np, windRgb, emis * 0.5 + 0.04);   // inner winding (faces plasma)
-      addFaceCoil(prims, ctx, [r0.c3, r0.c2, r1.c2, r1.c3], [-r0.np[0], -r0.np[1], -r0.np[2]], cs, emis * 0.1); // outer case
-      addFaceCoil(prims, ctx, [r0.c2, r0.c0, r1.c0, r1.c2], et, cs, emis * 0.1);                   // +toroidal side
-      addFaceCoil(prims, ctx, [r0.c1, r0.c3, r1.c3, r1.c1], netor, cs, emis * 0.1);                // -toroidal side
+      const band = (i % 6 === 0) ? 0.9 : 1.0;            // subtle casing ribs along the bar
+      const col = [coilRgb[0] * band, coilRgb[1] * band, coilRgb[2] * band];
+      for (let s = 0; s < NS; s += 1) {
+        const s2 = (s + 1) % NS;
+        const quad = [r0[s].p, r0[s2].p, r1[s2].p, r1[s].p];
+        const nrm = [r0[s].n[0] + r0[s2].n[0], r0[s].n[1] + r0[s2].n[1], r0[s].n[2] + r0[s2].n[2]];
+        const inward = -(r0[s].n[0] * cth + r0[s].n[2] * sth);          // side facing the central axis / plasma
+        const e = emis * (0.12 + 0.5 * clamp(inward, 0, 1)) + 0.03;     // energised winding glows on the inner side
+        addFaceCoil(prims, ctx, quad, nrm, col, e);
+      }
     }
   }
 }
@@ -1422,7 +1432,7 @@ function addPFCoils(prims, ctx, bNorm) {
     { h: 0.86, rho: 0.74, tr: 0.05 },   // upper shaping coil
     { h: -0.86, rho: 0.74, tr: 0.05 }   // lower shaping coil
   ];
-  const Nmaj = 34, Nmin = 8;                             // higher-poly = smoother rings
+  const Nmaj = 44, Nmin = 14;                            // higher-poly = smoother rings
   const caseRgb = [106, 126, 164];                       // blue-steel, distinct from the violet TF coils
   const emis = 0.04 + 0.14 * clamp((bNorm - 0.18) / 0.82, 0, 1);
   for (const co of coils) {
@@ -2994,6 +3004,10 @@ function initPhase2Controls() {
   document.getElementById("tourSkip")?.addEventListener("click", () => endTour());
   document.getElementById("tourOverlay")?.addEventListener("click", (e) => { if (e.target.id === "tourOverlay") endTour(); });
   document.getElementById("exportBtn")?.addEventListener("click", () => exportRun());
+  document.getElementById("cardBtn")?.addEventListener("click", () => openTakeaway());
+  document.getElementById("cardClose")?.addEventListener("click", () => closeTakeaway());
+  document.getElementById("cardDownload")?.addEventListener("click", () => downloadTakeaway());
+  document.getElementById("cardOverlay")?.addEventListener("click", (e) => { if (e.target && e.target.id === "cardOverlay") closeTakeaway(); });
   document.getElementById("storyToggle")?.addEventListener("click", () => setStory(!storyOn));
   document.getElementById("storyNext")?.addEventListener("click", () => storyNav(1));
   document.getElementById("storyPrev")?.addEventListener("click", () => storyNav(-1));
@@ -3061,6 +3075,96 @@ function answerPredict(i) {
   }
 }
 function nextPredict() { predictIdx = (predictIdx + 1) % PREDICT_Q.length; renderPredict(); }
+
+/* ---------- D3: takeaway card — a printable summary of the visitor's run, with a QR.
+   The QR is baked at build time (error-correction level M) and verified to decode back to
+   TAKEAWAY_URL. To point it elsewhere, regenerate TAKEAWAY_QR for the new URL with any QR tool. ---------- */
+const TAKEAWAY_URL = "https://github.com/PJdroopyPants/Fusion-SImulator";
+const TAKEAWAY_QR = ["111111101000000010111001001111111","100000101100001011001011101000001","101110100111011010100010101011101","101110101000100100110010101011101","101110100010110011100000101011101","100000100001001110100110101000001","111111101010101010101010101111111","000000001011001111010001100000000","101101110100001111100110101001011","011100011111011011001101001101100","100110101100110000101001010111011","110001000001100011010000011101001","001000110011001110001011000111011","101010010110101001001110100100010","001000111110001001011100101100100","001110010000010100100100011011100","010101100011011010100110011010100","111001000111001000011011111011011","000100101011001110101110111110100","010011000110010001110001111010010","001100101001100110000100000001110","111010001101011111001101010001101","000010100011111100111101111100011","011100010111001100101000001001000","100011111000101011010011111111000","000000001111110110011100100011010","111111101100111011111101101010000","100000101110001101101111100011100","101110100001111011111111111110111","101110101110000011010101000100001","101110101000000111000010001101000","100000100110000001111011001110001","111111101110011001110101001010100"];
+let bestQ = 0, bestNet = -Infinity, hotT = 0;
+function updatePeaks() {
+  if (!model) return;
+  if (typeof model.q === "number") { const qv = isFinite(model.q) ? model.q : 50; if (qv > bestQ) bestQ = qv; }
+  if (typeof model.netElec === "number" && model.netElec > bestNet) bestNet = model.netElec;
+  if (typeof model.temperature === "number" && model.temperature > hotT) hotT = model.temperature;
+}
+function takeawayStats() {
+  const missions = Number(document.getElementById("missionCount")?.textContent || 0);
+  const total = Number(document.getElementById("missionTotal")?.textContent || 7);
+  const qStr = bestQ >= 50 ? "≈ ∞" : bestQ.toFixed(1);
+  const milC = Math.round(hotT * 11.6);
+  const netStr = bestNet > 0 ? `${Math.round(bestNet)} MW` : "not net-positive";
+  let verdict;
+  if (bestQ >= 50) verdict = "You reached ignition. The plasma sustained its own burn.";
+  else if (bestQ >= 5) verdict = "You ran a strong burning plasma.";
+  else if (bestQ >= 1) verdict = "You crossed scientific breakeven, Q of at least 1.";
+  else verdict = "You drove a real magnetic-confinement plasma.";
+  return { missions, total, qStr, milC, netStr, verdict };
+}
+function qrSvg(modules, px) {
+  const N = modules.length, q = 2, size = N + q * 2;
+  let rects = "";
+  for (let y = 0; y < N; y += 1) for (let xx = 0; xx < N; xx += 1) if (modules[y][xx] === "1") rects += `<rect x="${xx + q}" y="${y + q}" width="1.04" height="1.04"/>`;
+  return `<svg viewBox="0 0 ${size} ${size}" width="${px}" height="${px}" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg"><rect width="${size}" height="${size}" fill="#ffffff"/><g fill="#0b0d12">${rects}</g></svg>`;
+}
+function openTakeaway() {
+  const s = takeawayStats();
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set("tcVerdict", s.verdict);
+  set("tcQ", s.qStr);
+  set("tcNet", s.netStr);
+  set("tcTemp", `${s.milC.toLocaleString()} million °C`);
+  set("tcMissions", `${s.missions} of ${s.total}`);
+  set("tcUrl", TAKEAWAY_URL.replace(/^https?:\/\//, ""));
+  const qr = document.getElementById("tcQR"); if (qr) qr.innerHTML = qrSvg(TAKEAWAY_QR, 128);
+  const ov = document.getElementById("cardOverlay"); if (ov) ov.hidden = false;
+}
+function closeTakeaway() { const ov = document.getElementById("cardOverlay"); if (ov) ov.hidden = true; }
+function tcRoundRect(x, rx, ry, w, h, r) { x.beginPath(); x.moveTo(rx + r, ry); x.arcTo(rx + w, ry, rx + w, ry + h, r); x.arcTo(rx + w, ry + h, rx, ry + h, r); x.arcTo(rx, ry + h, rx, ry, r); x.arcTo(rx, ry, rx + w, ry, r); x.closePath(); }
+function tcWrap(x, text, tx, ty, maxW, lh) {
+  const words = String(text).split(" "); let line = "", yy = ty;
+  for (let i = 0; i < words.length; i += 1) {
+    const test = line ? line + " " + words[i] : words[i];
+    if (x.measureText(test).width > maxW && line) { x.fillText(line, tx, yy); line = words[i]; yy += lh; } else line = test;
+  }
+  if (line) x.fillText(line, tx, yy);
+  return yy;
+}
+function tcDrawQr(x, modules, ox, oy, px) {
+  const N = modules.length, q = 2, total = N + q * 2, m = px / total;
+  x.fillStyle = "#ffffff"; x.fillRect(ox, oy, px, px);
+  x.fillStyle = "#0b0d12";
+  for (let yy = 0; yy < N; yy += 1) for (let xx = 0; xx < N; xx += 1) if (modules[yy][xx] === "1") x.fillRect(ox + (xx + q) * m, oy + (yy + q) * m, m + 0.4, m + 0.4);
+}
+function downloadTakeaway() {
+  const s = takeawayStats();
+  const W = 680, H = 936, sc = 2;
+  const cv = document.createElement("canvas"); cv.width = W * sc; cv.height = H * sc;
+  const x = cv.getContext("2d"); x.scale(sc, sc);
+  x.fillStyle = "#0b0e14"; x.fillRect(0, 0, W, H);
+  x.fillStyle = "#10141d"; tcRoundRect(x, 24, 24, W - 48, H - 48, 22); x.fill();
+  x.strokeStyle = "rgba(120,132,156,0.28)"; x.lineWidth = 1.5; x.stroke();
+  x.textAlign = "left"; x.textBaseline = "alphabetic";
+  x.fillStyle = "#38e1c6"; x.font = "700 15px Inter, system-ui, sans-serif"; x.fillText("TOKAMAK LEARNING LAB", 54, 80);
+  x.fillStyle = "#eef2f8"; x.font = "800 33px Inter, system-ui, sans-serif"; x.fillText("You ran a fusion reactor", 54, 122);
+  x.fillStyle = "#cdd6e6"; x.font = "500 18px Inter, system-ui, sans-serif"; tcWrap(x, s.verdict, 54, 158, W - 108, 25);
+  const stats = [["BEST ENERGY GAIN Q", s.qStr], ["PEAK NET POWER", s.netStr], ["HOTTEST PLASMA", s.milC.toLocaleString() + " million °C"], ["MISSIONS COMPLETED", s.missions + " of " + s.total]];
+  let yy = 224;
+  stats.forEach((row) => {
+    x.fillStyle = "#0c0f17"; tcRoundRect(x, 54, yy, W - 108, 62, 12); x.fill();
+    x.strokeStyle = "rgba(120,132,156,0.18)"; x.lineWidth = 1; x.stroke();
+    x.fillStyle = "#9aa4b8"; x.font = "700 12px Inter, system-ui, sans-serif"; x.fillText(row[0], 74, yy + 25);
+    x.fillStyle = "#eef2f8"; x.font = "800 23px Inter, system-ui, sans-serif"; x.fillText(row[1], 74, yy + 50);
+    yy += 74;
+  });
+  const qpx = 152, qx = 54, qy = yy + 10;
+  tcDrawQr(x, TAKEAWAY_QR, qx, qy, qpx);
+  const tx = qx + qpx + 24;
+  x.fillStyle = "#eef2f8"; x.font = "700 19px Inter, system-ui, sans-serif"; x.fillText("Scan to run it yourself", tx, qy + 34);
+  x.fillStyle = "#9aa4b8"; x.font = "500 14px Inter, system-ui, sans-serif"; tcWrap(x, TAKEAWAY_URL.replace(/^https?:\/\//, ""), tx, qy + 60, W - tx - 54, 18);
+  x.fillStyle = "#7f8aa0"; x.font = "500 13px Inter, system-ui, sans-serif"; tcWrap(x, "Donated for educational use, free to run and share.", tx, qy + 104, W - tx - 54, 18);
+  cv.toBlob((b) => { if (!b) return; const a = document.createElement("a"); const u = URL.createObjectURL(b); a.href = u; a.download = "fusion-takeaway.png"; a.click(); setTimeout(() => URL.revokeObjectURL(u), 1500); });
+}
 
 /* ---------- B6: inject plus/minus steppers beside each setpoint slider ---------- */
 function addSteppers() {
