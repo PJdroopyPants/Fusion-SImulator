@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fusion Power Generator — Instructor Answer Key</title>
+<style>
+  :root{
+    --ink:#13161c; --soft:#48505e; --faint:#7b8494; --line:#d2d8e0; --teal:#0a8f7c; --accent:#8a4b00;
+    --box:#fbf6ee; --rule:#aeb6c2;
+    font-family: "Segoe UI", Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:#eef1f4; color:var(--ink); line-height:1.5;}
+  .sheet{width:min(840px,100%); margin:0 auto; background:#fff; padding:40px clamp(20px,5vw,52px) 56px;}
+  header.head{border-bottom:2px solid var(--accent); padding-bottom:14px; margin-bottom:6px;}
+  .eyebrow{margin:0 0 4px; color:var(--accent); font-size:.72rem; font-weight:800; letter-spacing:.16em; text-transform:uppercase;}
+  h1{margin:0; font-size:1.6rem;}
+  .keytag{display:inline-block; margin-top:8px; padding:3px 10px; background:#8a4b00; color:#fff; border-radius:5px; font-size:.72rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase;}
+  .sub{margin:8px 0 0; color:var(--soft); font-size:.92rem; max-width:64ch;}
+  h2{font-size:1.04rem; margin:24px 0 4px; padding:6px 0; border-bottom:1px solid var(--line); color:var(--accent);}
+  h2 .n{font-family:ui-monospace,Consolas,monospace; color:var(--teal); margin-right:8px;}
+  p{margin:.5rem 0;} .lead{color:var(--soft);}
+  table{border-collapse:collapse; width:100%; margin:10px 0; font-size:.9rem;}
+  th,td{border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top;}
+  th{background:#f5efe6; font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--soft);}
+  code{font-family:ui-monospace,Consolas,monospace; font-size:.85em; background:#eef3f5; border:1px solid var(--line); border-radius:4px; padding:1px 5px; color:var(--teal);}
+  .ans{background:var(--box); border-left:3px solid var(--accent); border-radius:6px; padding:10px 13px; margin:9px 0; font-size:.92rem;}
+  .ans b{color:var(--ink);}
+  ul{margin:.4rem 0; padding-left:1.2rem;} li{margin:.3rem 0;}
+  .foot{margin-top:30px; padding-top:12px; border-top:1px solid var(--line); color:var(--faint); font-size:.78rem;}
+  @media print{ body{background:#fff;} .sheet{width:100%; padding:0 6px;} h2{break-after:avoid;} table,.ans{break-inside:avoid;} @page{margin:14mm;} }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header class="head">
+    <p class="eyebrow">Tokamak Learning Lab · Facilitator Material</p>
+    <h1>Fusion Power Generator — Answer Key</h1>
+    <span class="keytag">Instructor copy — do not distribute</span>
+    <p class="sub">Pass-conditions, expected behavior, and model answers for the student lab worksheet. The model is calibrated for intuition; accept reasoning over exact numbers, which drift a little as the plasma settles over a few seconds.</p>
+  </header>
+
+  <h2><span class="n">2</span>Preset behavior (expected)</h2>
+  <p class="lead">Approximate, once each preset settles. Exact values vary slightly with the burn-through dynamics.</p>
+  <table>
+    <tr><th>Preset</th><th>What students should see</th></tr>
+    <tr><td>Startup</td><td>A burning plasma (Q ≈ 1.5), but <b>net electric is negative</b> (≈ −250 to −270 MW): fusion power ≈ 240 MW, yet the plant draws more than it makes. Good illustration that Q&nbsp;&gt;&nbsp;1 is not the same as net power.</td></tr>
+    <tr><td>Cruise</td><td>A strong burning plasma that goes <b>net positive</b> (state reads “Net Power”), Q of a few.</td></tr>
+    <tr><td>High Gain</td><td>A clean, self-sustaining <b>Ignition</b> (Q shown as ≈ ∞), with the largest net export (several hundred MW).</td></tr>
+    <tr><td>Stress</td><td>Pushed past the beta limit into <b>Disruption Risk</b> (high fuel, weaker field).</td></tr>
+    <tr><td>Shutdown</td><td>Emergency quench on; fusion power near zero.</td></tr>
+  </table>
+  <p><b>First net-positive preset:</b> Cruise. A reactor can make fusion power yet export nothing because the plant’s own <em>recirculating power</em> (magnets, pumps, and especially plasma heating) must be paid first — net power needs a <em>high</em> Q, not merely Q&nbsp;&gt;&nbsp;1.</p>
+
+  <h2><span class="n">3</span>Lawson operating point</h2>
+  <ul>
+    <li>Ignition target ≈ <code>3 ×10²¹ keV·s·m⁻³</code>. “Fraction of the way” = their triple product ÷ 3.</li>
+    <li>Below the ignition curve until they approach ignition; the High Gain preset puts the point on/above it.</li>
+    <li>Raising B and T moves the point <b>up and to the right</b>. Stronger field raises confinement time τ<sub>E</sub>, which raises n·T·τ<sub>E</sub>; higher T raises the reaction rate — both push toward the ignition curve.</li>
+  </ul>
+
+  <h2><span class="n">4</span>Predict, then test</h2>
+  <div class="ans"><b>a. Raise magnetic field →</b> τ<sub>E</sub> <b>increases</b> (a stronger field holds the plasma’s energy longer), so the triple product and <b>Q rise</b>.</div>
+  <div class="ans"><b>b. High fuel + weak field →</b> a <b>disruption</b>. Pressure (high beta) outruns what the field can hold, and confinement is lost.</div>
+  <div class="ans"><b>c. Divertor sweep →</b> <b>peak wall heat flux drops</b>. Sweeping the strike point spreads the exhaust load over a larger area.</div>
+
+  <h2><span class="n">5</span>Mission pass-conditions</h2>
+  <p class="lead">Exact thresholds the simulator checks (any state that satisfies them counts).</p>
+  <table>
+    <tr><th>Mission</th><th>Passes when…</th></tr>
+    <tr><td>First Light</td><td>Fusion power ≥ <b>400 MW</b></td></tr>
+    <tr><td>Net Positive</td><td>Net electric <b>&gt; 0</b></td></tr>
+    <tr><td>Lean Burn</td><td>Q ≥ <b>4</b> with fuel injection ≤ <b>65%</b></td></tr>
+    <tr><td>Strong Field</td><td>Q ≥ <b>3</b> with magnetic field ≥ <b>8 T</b></td></tr>
+    <tr><td>Frugal Plant</td><td>Net &gt; 0 with turbine load ≤ <b>70%</b></td></tr>
+    <tr><td>Self-Sufficient</td><td>Tritium breeding ratio ≥ <b>1</b> with coolant ≤ <b>70%</b></td></tr>
+    <tr><td>Ignition</td><td>Reach ignition (φ ≥ 0.95) with fuel injection ≤ <b>75%</b></td></tr>
+  </table>
+  <p>The three on the worksheet (First Light, Net Positive, Ignition) form a natural arc: make the reaction happen, make it pay, then make it self-sustaining. A reliable route to Ignition is the High Gain preset, then trimming fuel below 75%.</p>
+
+  <h2><span class="n">7</span>Short-answer model responses</h2>
+  <div class="ans"><b>a. 80/20 split.</b> The <b>alpha particles (≈20%)</b> stay in the plasma and heat it; the <b>neutrons (≈80%)</b> escape into the blanket, where their heat ultimately makes the electricity. Ignition depends on the alpha fraction: once alpha self-heating alone replaces the losses, the burn sustains itself and external heating can fall toward zero.</div>
+  <div class="ans"><b>b. Tritium breeding ratio (TBR).</b> Tritium produced in the lithium blanket per tritium burned. Tritium isn’t available naturally in useful amounts, so a power plant must breed its own fuel — a TBR above 1.0 means it replaces (slightly more than) what it consumes.</div>
+  <div class="ans"><b>c. Disruptions.</b> Plasma pressure outruns the confining magnetic field (the beta limit), confinement collapses, and the stored energy dumps onto the wall. Students avoid it by raising the magnetic field and/or easing fuel before the disruption-risk lamp climbs.</div>
+
+  <h2>Bonus: full predict-then-test bank (in-app)</h2>
+  <p class="lead">The simulator’s “Make a prediction” panel cycles these; correct answers below.</p>
+  <table>
+    <tr><th>Prompt</th><th>Answer</th></tr>
+    <tr><td>Raise the magnetic field → confinement time…</td><td>goes up</td></tr>
+    <tr><td>Heat from 10 → 20 keV → the D-T reaction rate…</td><td>climbs steeply</td></tr>
+    <tr><td>Push fuel high with a weak field →</td><td>a disruption</td></tr>
+    <tr><td>At ignition, external heating needed is…</td><td>near zero</td></tr>
+    <tr><td>Divertor sweep mainly…</td><td>lowers peak wall heat</td></tr>
+    <tr><td>To send real power to the grid you need…</td><td>Q well above 1</td></tr>
+  </table>
+
+  <p class="foot">Tokamak Learning Lab · Fusion Power Generator. Simplified teaching model — illustrative numbers, calibrated for intuition rather than engineering accuracy. Pairs with the in-app “Export run (CSV)” for a written lab report.</p>
+</div>
+</body>
+</html>

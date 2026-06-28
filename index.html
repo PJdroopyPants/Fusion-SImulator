@@ -44,6 +44,7 @@
             <input type="range" id="soundVol" class="vol-slider" min="0" max="100" value="60" title="Sound volume" aria-label="Sound volume" hidden>
             <button class="tool-btn" id="tourBtn" type="button" title="Take a guided tour">Tour</button>
             <button class="tool-btn" id="presentBtn" type="button" aria-pressed="false" title="Fullscreen exhibit mode">Present</button>
+            <button class="tool-btn" id="aboutBtn" type="button" aria-haspopup="dialog" title="About this exhibit">About</button>
           </div>
           <div class="status-strip" aria-live="polite">
             <span class="status-block">
@@ -628,6 +629,24 @@
         <button type="button" class="story-next" id="storyNext">Next</button>
       </div>
     </section>
+
+    <!-- About / credits (D1) -->
+    <div id="aboutOverlay" class="about-overlay" hidden></div>
+    <aside id="aboutPanel" class="about-panel" hidden role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+      <button type="button" class="about-close" id="aboutClose" aria-label="Close about">&times;</button>
+      <p class="about-kicker">About this exhibit</p>
+      <h3 id="aboutTitle">Fusion Power Generator</h3>
+      <p class="about-lede">An interactive, dependency-free teaching model of a tokamak fusion power plant, built for STEM outreach &mdash; from curious newcomers to engineering undergraduates.</p>
+      <div class="about-block">
+        <p class="about-label">A gift for STEM outreach</p>
+        <p>Donated for educational use, free to run and share.<span class="about-note">A hosting program can add its name, logo, and links here.</span></p>
+      </div>
+      <div class="about-block">
+        <p class="about-label">Made by</p>
+        <p>Tokamak Learning Lab</p>
+      </div>
+      <p class="about-disclaimer">Simplified teaching model. The numbers are illustrative and calibrated for intuition, not engineering accuracy.</p>
+    </aside>
 
     <div id="tipPop" class="tip-pop" role="tooltip" hidden></div>
 

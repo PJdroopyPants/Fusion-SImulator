@@ -193,6 +193,8 @@ let neutrons = [];
 let wallHeat = [];           // A4: per-rib neutron heat accumulation
 let lastFrame = performance.now();
 let model = {};
+let chartsDirty = true;     // C1: redraw the static charts only when their data changes
+const vis = new Set();      // C1: canvases currently on screen (off-screen ones are skipped)
 
 /* ---------- Phase 1 UI state ---------- */
 let scaleRef = false;        // A5: human + scale reference overlay
@@ -201,6 +203,8 @@ let showMachines = true;     // C2: real-machine points on the Lawson map
 let readLevel = "tech";      // C9: "tech" or "plain" lesson and coach wording
 let kioskCycle = 0;          // B1: presentation-mode auto-demo index
 let kioskLast = 0;           // B1: last auto-demo advance time
+let lastUserAction = performance.now();  // C4: last real interaction (idle watchdog)
+const WATCHDOG_MS = 180000;  // C4: normal-mode idle reset after 3 minutes
 
 /* ---------- Math helpers ---------- */
 function gaussian(value, center, width) {
@@ -785,7 +789,7 @@ function bindInput() {
    into the 2D reactor at the core's depth. Falls back to the 2D plasma discs if
    WebGL is unavailable or the shader fails to compile. Camera matched to project().
    =========================================================== */
-let glCanvas = null, glx = null, glProg = null, glReady = false, glFailed = false;
+let glCanvas = null, glx = null, glProg = null, glReady = false, glFailed = false, glLost = false;
 const glLoc = {};
 const PLASMA_VS = `
 attribute vec2 aPos;
@@ -844,27 +848,36 @@ function glCompile(type, src) {
   if (!glx.getShaderParameter(sh, glx.COMPILE_STATUS)) { console.warn("plasma shader:", glx.getShaderInfoLog(sh)); return null; }
   return sh;
 }
+// C4: build (or rebuild) the GL program + buffer on the current context. Re-runnable after a context restore.
+function buildPlasmaGLResources() {
+  const vs = glCompile(glx.VERTEX_SHADER, PLASMA_VS), fs = glCompile(glx.FRAGMENT_SHADER, PLASMA_FS);
+  if (!vs || !fs) return false;
+  glProg = glx.createProgram();
+  glx.attachShader(glProg, vs); glx.attachShader(glProg, fs); glx.linkProgram(glProg);
+  if (!glx.getProgramParameter(glProg, glx.LINK_STATUS)) return false;
+  glx.useProgram(glProg);
+  const buf = glx.createBuffer();
+  glx.bindBuffer(glx.ARRAY_BUFFER, buf);
+  glx.bufferData(glx.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), glx.STATIC_DRAW);
+  const ap = glx.getAttribLocation(glProg, "aPos");
+  glx.enableVertexAttribArray(ap); glx.vertexAttribPointer(ap, 2, glx.FLOAT, false, 0, 0);
+  ["uRes", "uCx", "uCy", "uFocal", "uTime", "uIntensity", "uR", "uA", "uRb", "uEye", "uColor", "uHot", "uInvRot"].forEach((n) => { glLoc[n] = glx.getUniformLocation(glProg, n); });
+  glx.clearColor(0, 0, 0, 1);
+  return true;
+}
 function initPlasmaGL() {
   if (glReady) return true;
   if (glFailed) return false;
+  if (glLost) return false;   // C4: context lost; wait for restore rather than spawning a new one
   try {
     glCanvas = document.createElement("canvas");
     const opts = { alpha: false, antialias: true, depth: false, premultipliedAlpha: false, powerPreference: "low-power" };
     glx = glCanvas.getContext("webgl", opts) || glCanvas.getContext("experimental-webgl", opts);
     if (!glx) { glFailed = true; return false; }
-    const vs = glCompile(glx.VERTEX_SHADER, PLASMA_VS), fs = glCompile(glx.FRAGMENT_SHADER, PLASMA_FS);
-    if (!vs || !fs) { glFailed = true; return false; }
-    glProg = glx.createProgram();
-    glx.attachShader(glProg, vs); glx.attachShader(glProg, fs); glx.linkProgram(glProg);
-    if (!glx.getProgramParameter(glProg, glx.LINK_STATUS)) { glFailed = true; return false; }
-    glx.useProgram(glProg);
-    const buf = glx.createBuffer();
-    glx.bindBuffer(glx.ARRAY_BUFFER, buf);
-    glx.bufferData(glx.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), glx.STATIC_DRAW);
-    const ap = glx.getAttribLocation(glProg, "aPos");
-    glx.enableVertexAttribArray(ap); glx.vertexAttribPointer(ap, 2, glx.FLOAT, false, 0, 0);
-    ["uRes", "uCx", "uCy", "uFocal", "uTime", "uIntensity", "uR", "uA", "uRb", "uEye", "uColor", "uHot", "uInvRot"].forEach((n) => { glLoc[n] = glx.getUniformLocation(glProg, n); });
-    glx.clearColor(0, 0, 0, 1);
+    // C4: recover from a GPU context loss (driver reset, sleep/wake) instead of dying on a black plasma.
+    glCanvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); glReady = false; glLost = true; }, false);
+    glCanvas.addEventListener("webglcontextrestored", () => { glLost = false; glProg = null; if (buildPlasmaGLResources()) glReady = true; }, false);
+    if (!buildPlasmaGLResources()) { glFailed = true; return false; }
     glReady = true;
     return true;
   } catch (e) { glFailed = true; return false; }
@@ -2248,14 +2261,18 @@ function animate(time) {
   const delta = time - lastFrame;
   lastFrame = time;
   if (delta > 0) {
-    drawReactor(time);
-    drawGizmo();
-    drawHistory();
-    drawLawson();
-    drawReactivity();
-    drawSankey();
-    drawFuelCycle(time);
-    drawCrossSection();
+    // C1: per-frame work only for the reactor stage and the animated fuel cycle, and only on screen.
+    if (vis.has(reactorCanvas)) { drawReactor(time); drawGizmo(); }
+    if (fuelCycleCanvas && vis.has(fuelCycleCanvas)) drawFuelCycle(time);
+    // C1: the static charts redraw only when their data changed (flag set on the model tick) and they're visible.
+    if (chartsDirty) {
+      if (historyCanvas && vis.has(historyCanvas)) drawHistory();
+      if (lawsonCanvas && vis.has(lawsonCanvas)) drawLawson();
+      if (reactivityCanvas && vis.has(reactivityCanvas)) drawReactivity();
+      if (sankeyCanvas && vis.has(sankeyCanvas)) drawSankey();
+      drawCrossSection();   // self-skips when the cutaway is closed
+      chartsDirty = false;
+    }
     tweenReadouts(delta);
   }
   rafId = requestAnimationFrame(animate);
@@ -2322,6 +2339,7 @@ window.addEventListener("resize", () => {
   resizeCanvas(reactorCanvas, reactorCtx);
   resizeCanvas(historyCanvas, historyCtx);
   resizeCanvas(lawsonCanvas, lawsonCtx);
+  chartsDirty = true;
 });
 
 /* ---------- Navigation HUD wiring ---------- */
@@ -2521,6 +2539,7 @@ function applyTheme(name) {
   try { localStorage.setItem("fusionTheme", t); } catch (e) {}
   const sel = document.getElementById("themeSelect");
   if (sel) sel.value = t;
+  chartsDirty = true;   // C1: recolor charts immediately on theme change
 }
 
 let kioskOn = false;
@@ -2571,7 +2590,7 @@ function initPhase1Controls() {
 
   document.getElementById("presentBtn")?.addEventListener("click", () => setKiosk(!kioskOn));
   document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && kioskOn) setKiosk(false); });
-  ["pointerdown", "keydown"].forEach((ev) => document.addEventListener(ev, () => { kioskLast = performance.now(); }, { passive: true }));
+  ["pointerdown", "keydown"].forEach((ev) => document.addEventListener(ev, () => { kioskLast = performance.now(); lastUserAction = performance.now(); }, { passive: true }));
 
   const scaleBtn = document.getElementById("scaleToggle");
   scaleBtn?.addEventListener("click", () => {
@@ -2582,7 +2601,7 @@ function initPhase1Controls() {
   const mac = document.getElementById("showMachines");
   if (mac) {
     mac.checked = showMachines;
-    mac.addEventListener("change", () => { showMachines = mac.checked; });
+    mac.addEventListener("change", () => { showMachines = mac.checked; chartsDirty = true; });
   }
 }
 
@@ -2965,6 +2984,7 @@ function initPhase2Controls() {
     const on = cv.hidden;
     cv.hidden = !on;
     cut.setAttribute("aria-pressed", String(on));
+    chartsDirty = true;
   });
   document.getElementById("soundToggle")?.addEventListener("click", () => setSound(!soundOn));
   document.getElementById("tourBtn")?.addEventListener("click", () => startTour());
@@ -3081,6 +3101,31 @@ initPhase1Controls();
 initPhase2Controls();
 initBatchControls();
 
+// ---- D1: About / credits modal open-close ----
+(function initAbout() {
+  const panel = document.getElementById("aboutPanel");
+  const overlay = document.getElementById("aboutOverlay");
+  const setOpen = (on) => { if (panel) panel.hidden = !on; if (overlay) overlay.hidden = !on; };
+  document.getElementById("aboutBtn")?.addEventListener("click", () => setOpen(true));
+  document.getElementById("aboutClose")?.addEventListener("click", () => setOpen(false));
+  overlay?.addEventListener("click", () => setOpen(false));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && panel && !panel.hidden) setOpen(false); });
+})();
+
+// ---- C1: track which canvases are on screen so off-screen charts are not redrawn. ----
+[reactorCanvas, historyCanvas, lawsonCanvas, reactivityCanvas, sankeyCanvas, fuelCycleCanvas]
+  .forEach((c) => { if (c) vis.add(c); });
+if ("IntersectionObserver" in window) {
+  const vizObserver = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) { vis.add(e.target); chartsDirty = true; }
+      else vis.delete(e.target);
+    }
+  }, { rootMargin: "150px 0px" });
+  [reactorCanvas, historyCanvas, lawsonCanvas, reactivityCanvas, sankeyCanvas, fuelCycleCanvas]
+    .forEach((c) => { if (c) vizObserver.observe(c); });
+}
+
 // ---- C2: pause the render loop and the model tick when the tab/screen is hidden,
 // then resume cleanly, so an all-day kiosk saves power and stays time-coherent. ----
 const TICK_MS = 360;
@@ -3088,10 +3133,18 @@ let rafId = null, modelTimer = null;
 function modelTick() {
   advanceDynamics(0.36);
   model = calculateModel();
+  chartsDirty = true;
   tickHistory();
   updateReadouts();
   updateMissions();
   tickKiosk();
+  // C4: idle watchdog (normal mode) — return to a clean attract state after long inactivity,
+  // so a visitor never finds a reactor the last person left mid-disruption.
+  if (!kioskOn && performance.now() - lastUserAction > WATCHDOG_MS) {
+    lastUserAction = performance.now();
+    applyPreset("cruise");
+    resetCamera();
+  }
   updateMaterials(0.36);
   updateSound();
   updateStory();

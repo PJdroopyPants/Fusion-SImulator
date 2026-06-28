@@ -1885,3 +1885,25 @@ button.plant-stage:focus-visible { outline: 2px solid var(--teal); outline-offse
 @media (max-width: 760px) {
   .plant-arrow { display: none; }
   .plant-stage { flex: 1 1 42%; min-width: 0; }
+}
+
+/* ---------- D1: About / credits modal ---------- */
+.about-overlay { position: fixed; inset: 0; z-index: 70; background: rgba(6, 8, 12, 0.62); backdrop-filter: blur(2px); }
+.about-overlay[hidden] { display: none; }
+.about-panel {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 71;
+  width: min(440px, calc(100vw - 28px)); max-height: calc(100vh - 40px); overflow-y: auto;
+  padding: 24px 26px 22px; border: 1px solid rgba(56, 225, 198, 0.45); border-radius: 16px;
+  background: var(--panel-solid); box-shadow: 0 24px 60px var(--shadow), 0 0 32px rgba(56, 225, 198, 0.14);
+}
+.about-panel[hidden] { display: none; }
+.about-close { position: absolute; top: 12px; right: 14px; border: 0; background: none; color: var(--faint); font-size: 1.3rem; line-height: 1; cursor: pointer; }
+.about-close:hover { color: var(--text); }
+.about-kicker { margin: 0 0 6px; color: var(--teal); font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; }
+.about-panel h3 { margin: 0 0 8px; font-size: 1.2rem; }
+.about-lede { margin: 0 0 16px; color: var(--muted); font-size: 0.9rem; line-height: 1.55; }
+.about-block { margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
+.about-label { margin: 0 0 3px; color: var(--faint); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
+.about-block p:not(.about-label) { margin: 0; color: var(--text); font-size: 0.92rem; }
+.about-note { display: block; margin-top: 4px; color: var(--muted); font-size: 0.8rem; }
+.about-disclaimer { margin: 4px 0 0; color: var(--faint); font-size: 0.78rem; line-height: 1.5; }

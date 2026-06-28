@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fusion Power Generator — Lab Worksheet</title>
+<style>
+  :root{
+    --ink:#13161c; --soft:#48505e; --faint:#7b8494; --line:#d2d8e0; --teal:#0a8f7c; --accent:#0a7c6c;
+    --rule:#aeb6c2; --box:#f4f7f9;
+    font-family: "Segoe UI", Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:#eef1f4; color:var(--ink); line-height:1.5;}
+  .sheet{width:min(840px,100%); margin:0 auto; background:#fff; padding:40px clamp(20px,5vw,52px) 56px;}
+  header.head{border-bottom:2px solid var(--accent); padding-bottom:14px; margin-bottom:8px;}
+  .eyebrow{margin:0 0 4px; color:var(--accent); font-size:.72rem; font-weight:800; letter-spacing:.16em; text-transform:uppercase;}
+  h1{margin:0; font-size:1.7rem; letter-spacing:-.01em;}
+  .sub{margin:6px 0 0; color:var(--soft); font-size:.94rem; max-width:60ch;}
+  .meta{display:flex; flex-wrap:wrap; gap:18px; margin:16px 0 6px; font-size:.9rem;}
+  .meta .f{flex:1 1 200px;}
+  .meta .blank{display:inline-block; min-width:150px; border-bottom:1px solid var(--rule); height:1.1em;}
+  h2{font-size:1.04rem; margin:26px 0 4px; padding:6px 0 6px; border-bottom:1px solid var(--line); color:var(--accent);}
+  h2 .n{font-family:ui-monospace,Consolas,monospace; color:var(--teal); margin-right:8px;}
+  p{margin:.5rem 0;} p.lead{color:var(--soft);}
+  .tip{background:var(--box); border-left:3px solid var(--teal); border-radius:6px; padding:10px 13px; margin:10px 0; font-size:.9rem; color:var(--soft);}
+  ol,ul{margin:.4rem 0 .4rem; padding-left:1.3rem;} li{margin:.32rem 0;}
+  .fill{display:block; border-bottom:1px solid var(--rule); height:1.35em; margin:.5rem 0;}
+  .fill.half{width:55%;}
+  table{border-collapse:collapse; width:100%; margin:10px 0; font-size:.9rem;}
+  th,td{border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top;}
+  th{background:#eef3f5; font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--soft);}
+  td.write{height:34px;}
+  .mission{display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-bottom:1px dashed var(--line);}
+  .mission:last-child{border-bottom:0;}
+  .chk{flex:none; width:16px; height:16px; border:1.5px solid var(--rule); border-radius:4px; margin-top:3px;}
+  .mission b{font-size:.95rem;}
+  .mission small{display:block; color:var(--soft);}
+  .q{margin:12px 0;}
+  .q .lines .fill{margin:.45rem 0;}
+  .foot{margin-top:30px; padding-top:12px; border-top:1px solid var(--line); color:var(--faint); font-size:.78rem;}
+  @media print{
+    body{background:#fff;} .sheet{width:100%; padding:0 6px;}
+    h2{break-after:avoid;} .mission,table,.q{break-inside:avoid;}
+    @page{margin:14mm;}
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header class="head">
+    <p class="eyebrow">Tokamak Learning Lab · Student Worksheet</p>
+    <h1>Fusion Power Generator — Lab</h1>
+    <p class="sub">Drive a magnetic-confinement fusion reactor toward ignition, read its instruments, and connect what you see to the physics of fusion energy.</p>
+  </header>
+
+  <div class="meta">
+    <span class="f">Name: <span class="blank"></span></span>
+    <span class="f">Date: <span class="blank"></span></span>
+    <span class="f">Best energy gain Q reached: <span class="blank"></span></span>
+  </div>
+
+  <p class="tip"><strong>Getting started:</strong> open <code>index.html</code> in a web browser. Everything runs locally — no internet needed. Use the sliders and preset buttons in the Control Room; read the Live Telemetry on the right and the graphs below. Turning on <em>Real-world units</em> and <em>Plain words</em> (top bar) can help while you learn.</p>
+
+  <h2><span class="n">1</span>Orientation</h2>
+  <p class="lead">Find these three headline readouts at the top of the screen and write what each one means in your own words.</p>
+  <table>
+    <tr><th>Readout</th><th>Current value</th><th>What it tells you</th></tr>
+    <tr><td>Reactor state</td><td class="write"></td><td class="write"></td></tr>
+    <tr><td>Net electric (MW)</td><td class="write"></td><td class="write"></td></tr>
+    <tr><td>Energy gain Q</td><td class="write"></td><td class="write"></td></tr>
+  </table>
+  <p>In one sentence: what does <strong>Q = 1</strong> mean, and what does <strong>Q → ∞</strong> (ignition) mean?</p>
+  <span class="fill"></span>
+
+  <h2><span class="n">2</span>From cold gas to a burning plasma</h2>
+  <p class="lead">Click each preset in turn and record the telemetry. Watch how the reactor state changes.</p>
+  <table>
+    <tr><th>Preset</th><th>Fusion power (MW)</th><th>Q</th><th>Net electric (MW)</th><th>Reactor state</th></tr>
+    <tr><td>Startup</td><td class="write"></td><td class="write"></td><td class="write"></td><td class="write"></td></tr>
+    <tr><td>Cruise</td><td class="write"></td><td class="write"></td><td class="write"></td><td class="write"></td></tr>
+    <tr><td>High Gain</td><td class="write"></td><td class="write"></td><td class="write"></td><td class="write"></td></tr>
+  </table>
+  <p>Which preset first produces <strong>positive</strong> net electricity? Why can a reactor have fusion power but still send <em>nothing</em> to the grid?</p>
+  <span class="fill"></span>
+  <span class="fill"></span>
+
+  <h2><span class="n">3</span>The Lawson operating point</h2>
+  <p class="lead">Scroll to the <em>Lawson Operating-Point Map</em> and the <em>Triple product</em> readout.</p>
+  <ol>
+    <li>Record the triple product <strong>n·T·τ<sub>E</sub></strong>: <span class="fill half"></span> ×10²¹ keV·s·m⁻³</li>
+    <li>The ignition target is about <strong>3</strong> in those units. What fraction of the way to ignition are you? <span class="fill half"></span></li>
+    <li>On the map, is your operating point <em>below</em>, <em>on</em>, or <em>above</em> the ignition curve? <span class="fill half"></span></li>
+  </ol>
+  <p>Raise <strong>magnetic field</strong> and <strong>plasma temperature</strong> together and watch the point move. Which direction does it travel on the map, and why does stronger confinement help?</p>
+  <span class="fill"></span>
+  <span class="fill"></span>
+
+  <h2><span class="n">4</span>Predict, then test</h2>
+  <p class="lead">Write your prediction <em>first</em>, then change the control and record what actually happens.</p>
+
+  <div class="q">
+    <p><strong>a.</strong> You raise the <strong>magnetic field</strong>. What happens to the confinement time τ<sub>E</sub>, and to Q?</p>
+    <div class="lines"><span class="fill">Prediction:</span><span class="fill">Observed:</span></div>
+  </div>
+  <div class="q">
+    <p><strong>b.</strong> You push <strong>fuel injection</strong> high while the <strong>magnetic field is weak</strong>. What do you expect?</p>
+    <div class="lines"><span class="fill">Prediction:</span><span class="fill">Observed:</span></div>
+  </div>
+  <div class="q">
+    <p><strong>c.</strong> You turn on the <strong>divertor sweep</strong>. What changes on the wall-load readout?</p>
+    <div class="lines"><span class="fill">Prediction:</span><span class="fill">Observed:</span></div>
+  </div>
+
+  <h2><span class="n">5</span>Complete three missions</h2>
+  <p class="lead">Open Mission Control and complete these. Record the setpoints that worked.</p>
+  <div class="mission"><span class="chk"></span><span><b>First Light</b><small>Produce 400 MW of fusion power.</small><span class="fill">Setpoints used:</span></span></div>
+  <div class="mission"><span class="chk"></span><span><b>Net Positive</b><small>Send real power to the grid (net above 0).</small><span class="fill">Setpoints used:</span></span></div>
+  <div class="mission"><span class="chk"></span><span><b>Ignition</b><small>Reach ignition with fuel injection at 75% or less.</small><span class="fill">Setpoints used:</span></span></div>
+
+  <h2><span class="n">6</span>Export your run &amp; interpret</h2>
+  <p class="lead">Click <em>Export run (CSV)</em> in the telemetry panel. Open the file (any spreadsheet) and answer:</p>
+  <table>
+    <tr><th>From your exported run</th><th>Value</th></tr>
+    <tr><td>Peak net electric (MW)</td><td class="write"></td></tr>
+    <tr><td>Energy gain Q at that point</td><td class="write"></td></tr>
+    <tr><td>Triple product n·T·τ<sub>E</sub></td><td class="write"></td></tr>
+  </table>
+  <p>In 2–3 sentences, describe the path you took from startup to your best operating point. What was the hardest trade-off?</p>
+  <span class="fill"></span>
+  <span class="fill"></span>
+  <span class="fill"></span>
+
+  <h2><span class="n">7</span>Going further (short answer)</h2>
+  <div class="q"><p><strong>a.</strong> Roughly 80% of D-T fusion energy leaves as neutrons and 20% as alpha particles. Which fraction heats the plasma, and which makes the electricity? Why does this matter for reaching ignition?</p><span class="fill"></span><span class="fill"></span></div>
+  <div class="q"><p><strong>b.</strong> What is the <em>tritium breeding ratio</em>, and why must a real power plant keep it above 1.0?</p><span class="fill"></span><span class="fill"></span></div>
+  <div class="q"><p><strong>c.</strong> A disruption ends a shot suddenly. In your own words, what causes one in this model, and how did you avoid it?</p><span class="fill"></span><span class="fill"></span></div>
+
+  <p class="foot">Tokamak Learning Lab · Fusion Power Generator. A simplified teaching model — numbers are illustrative, calibrated for intuition rather than engineering accuracy.</p>
+</div>
+</body>
+</html>
