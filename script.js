@@ -813,6 +813,19 @@ function bindInput() {
   window.addEventListener("touchend", up);
   reactorCanvas.addEventListener("dblclick", () => resetCamera());
   window.addEventListener("keydown", (e) => { if (e.key === "r" || e.key === "R") resetCamera(); });
+  // A4: keyboard control of the 3D stage — focusable canvas, arrows orbit, +/- zoom, R resets.
+  reactorCanvas.setAttribute("tabindex", "0");
+  reactorCanvas.addEventListener("keydown", (e) => {
+    let used = true; const a = 0.18;
+    if (e.key === "ArrowLeft") cam.yaw -= a;
+    else if (e.key === "ArrowRight") cam.yaw += a;
+    else if (e.key === "ArrowUp") cam.pitch = clamp(cam.pitch - a, -1.45, 1.45);
+    else if (e.key === "ArrowDown") cam.pitch = clamp(cam.pitch + a, -1.45, 1.45);
+    else if (e.key === "+" || e.key === "=") cam.dist = clamp(cam.dist - 0.35, 1.9, 6.4);
+    else if (e.key === "-" || e.key === "_") cam.dist = clamp(cam.dist + 0.35, 1.9, 6.4);
+    else used = false;
+    if (used) { e.preventDefault(); camTween = null; lastInteract = performance.now(); }
+  });
 
   // hotspots are repositioned every frame; keep their transitions off-position
   hotspots.forEach((b) => { b.style.transitionProperty = "background-color, border-color, box-shadow, color, opacity"; });
@@ -919,7 +932,10 @@ function initPlasmaGL() {
 }
 function renderPlasmaGL(w, h, pColor, hotCore, intensity, time) {
   if (!glReady) return false;
-  const W = Math.max(2, Math.floor(w)), H = Math.max(2, Math.floor(h));
+  // F3: supersample the volumetric core so it is sharp on retina tablets (the 2D coils render at full
+  // device resolution; the plasma was rendering at CSS px and upscaling). Capped at 2x, off under lite.
+  const s = liteMode ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+  const W = Math.max(2, Math.floor(w * s)), H = Math.max(2, Math.floor(h * s));
   if (glCanvas.width !== W || glCanvas.height !== H) { glCanvas.width = W; glCanvas.height = H; }
   glx.viewport(0, 0, W, H);
   glx.clear(glx.COLOR_BUFFER_BIT);
@@ -927,9 +943,9 @@ function renderPlasmaGL(w, h, pColor, hotCore, intensity, time) {
   // invRot = Ry(-yaw) * Rx(-pitch), column-major
   const invRot = [cyw, 0, -syw, -syw * sp, cp, -cyw * sp, syw * cp, sp, cyw * cp];
   glx.uniform2f(glLoc.uRes, W, H);
-  glx.uniform1f(glLoc.uCx, PROJ.cx);
-  glx.uniform1f(glLoc.uCy, PROJ.cy);
-  glx.uniform1f(glLoc.uFocal, PROJ.focal);
+  glx.uniform1f(glLoc.uCx, PROJ.cx * s);
+  glx.uniform1f(glLoc.uCy, PROJ.cy * s);
+  glx.uniform1f(glLoc.uFocal, PROJ.focal * s);
   glx.uniform1f(glLoc.uTime, reduceMotion ? 0 : time);
   glx.uniform1f(glLoc.uIntensity, intensity);
   glx.uniform1f(glLoc.uR, R);
@@ -1785,7 +1801,8 @@ function drawTitle(ctx, w, h) {
   ctx.save();
   ctx.fillStyle = "rgba(238,242,248,0.5)";
   ctx.font = "700 11px Inter, system-ui, sans-serif";
-  ctx.fillText("MAGNETIC CONFINEMENT VESSEL", Math.max(16, w * 0.05), Math.max(24, h * 0.06));
+  // F5: the full label collides with the corner HUD on a narrow stage; shorten it there.
+  ctx.fillText(w < 520 ? "TOKAMAK" : "MAGNETIC CONFINEMENT VESSEL", Math.max(16, w * 0.05), Math.max(24, h * 0.06));
   ctx.restore();
 }
 
@@ -1837,9 +1854,11 @@ function positionHotspots() {
     }
   }
   // 3) apply, clamped to the stage bounds
+  // F5: keep labels clear of the right-edge camera HUD, the top title, and the bottom toggles.
+  const padR = rect.width > 560 ? 58 : 26, padT = 30, padB = 34, padL = 6;
   items.forEach((it) => {
-    const left = clamp(it.x, it.w / 2, rect.width - it.w / 2);
-    const top = clamp(it.y, it.h / 2, rect.height - it.h / 2);
+    const left = clamp(it.x, it.w / 2 + padL, rect.width - it.w / 2 - padR);
+    const top = clamp(it.y, it.h / 2 + padT, rect.height - it.h / 2 - padB);
     it.b.style.left = `${(left / rect.width) * 100}%`;
     it.b.style.top = `${(top / rect.height) * 100}%`;
     it.b.style.right = "auto";
@@ -2319,6 +2338,7 @@ function animate(time) {
       chartsDirty = false;
     }
     tweenReadouts(delta);
+    positionStoryRing();   // U4: keep the guided-story highlight ring on its control as the page scrolls
   }
   rafId = requestAnimationFrame(animate);
 }
@@ -2438,13 +2458,13 @@ function initNavHud() {
 /* Two intro milestones a preset can reach, then five constraint puzzles that no
    preset satisfies: each forces a deliberate tradeoff, so they must be hand-tuned. */
 const MISSIONS = [
-  { id: "firstlight", name: "First Light", goal: "Produce 400 MW of fusion power", test: (m) => m.fusionPower >= 400 },
-  { id: "netpos", name: "Net Positive", goal: "Send real power to the grid (net above 0)", test: (m) => m.netElec > 0 },
-  { id: "leanburn", name: "Lean Burn", goal: "Reach Q of 4 with fuel injection at 65% or less", test: (m) => m.q >= 4 && m.fuelRate <= 65 },
-  { id: "strongfield", name: "Strong Field", goal: "Reach Q of 3 with magnetic field at 8 T or more", test: (m) => m.q >= 3 && m.magneticField >= 8.0 },
-  { id: "frugal", name: "Frugal Plant", goal: "Go net positive with turbine load at 70% or less", test: (m) => m.netElec > 0 && m.turbineLoad <= 70 },
-  { id: "breed", name: "Self-Sufficient", goal: "Breed tritium (TBR over 1) with coolant at 70% or less", test: (m) => m.tritiumRatio >= 1 && m.coolingFlow <= 70 },
-  { id: "ignition", name: "Ignition", goal: "Reach ignition with fuel injection at 75% or less", test: (m) => m.phi >= 0.95 && m.fuelRate <= 75 }
+  { id: "firstlight", name: "First Light", goal: "Produce 400 MW of fusion power", hint: "Try the Cruise preset, then nudge Fuel injection up.", test: (m) => m.fusionPower >= 400 },
+  { id: "netpos", name: "Net Positive", goal: "Send real power to the grid (net above 0)", hint: "Cruise reaches it — net power needs a high Q, not just Q above 1.", test: (m) => m.netElec > 0 },
+  { id: "leanburn", name: "Lean Burn", goal: "Reach Q of 4 with fuel injection at 65% or less", hint: "From Cruise, ease Fuel injection down toward 65% while keeping the field strong.", test: (m) => m.q >= 4 && m.fuelRate <= 65 },
+  { id: "strongfield", name: "Strong Field", goal: "Reach Q of 3 with magnetic field at 8 T or more", hint: "Push Magnetic field to 8 T or more (High Gain is close), temperature up.", test: (m) => m.q >= 3 && m.magneticField >= 8.0 },
+  { id: "frugal", name: "Frugal Plant", goal: "Go net positive with turbine load at 70% or less", hint: "From Cruise, lower Turbine load toward 70% but stay net positive.", test: (m) => m.netElec > 0 && m.turbineLoad <= 70 },
+  { id: "breed", name: "Self-Sufficient", goal: "Breed tritium (TBR over 1) with coolant at 70% or less", hint: "Lower Blanket coolant toward 70% while holding a strong burn.", test: (m) => m.tritiumRatio >= 1 && m.coolingFlow <= 70 },
+  { id: "ignition", name: "Ignition", goal: "Reach ignition with fuel injection at 75% or less", hint: "Use High Gain, then trim Fuel injection under 75%.", test: (m) => m.phi >= 0.95 && m.fuelRate <= 75 }
 ];
 const missionState = {};
 let missionPrevT = 0, missionsInitialized = false;
@@ -2462,10 +2482,25 @@ function buildMissions() {
       '<span class="mission-check" aria-hidden="true"></span>' +
       `<span class="mission-name">${mn.name}</span>` +
       `<span class="mission-goal">${mn.goal}</span>` +
-      (mn.hold ? '<span class="mission-bar"><span></span></span>' : "");
+      (mn.hold ? '<span class="mission-bar"><span></span></span>' : "") +
+      (mn.hint ? '<button type="button" class="mission-hint-btn" aria-expanded="false">Hint</button>' +
+                 `<p class="mission-hint" hidden>${mn.hint}</p>` : "");
     list.appendChild(chip);
     missionState[mn.id] = { done: false, hold: 0, el: chip, bar: mn.hold ? chip.querySelector(".mission-bar span") : null };
   });
+  // U3: one delegated handler reveals a starting hint per challenge (kept hidden so the puzzle stays a puzzle).
+  if (!buildMissions._wired) {
+    list.addEventListener("click", (e) => {
+      const btn = e.target.closest(".mission-hint-btn");
+      if (!btn) return;
+      const hint = btn.nextElementSibling;
+      const show = hint && hint.hidden;
+      if (hint) hint.hidden = !show;
+      btn.setAttribute("aria-expanded", String(!!show));
+      btn.textContent = show ? "Hide hint" : "Hint";
+    });
+    buildMissions._wired = true;
+  }
   missionPrevT = performance.now();
 }
 
@@ -2486,6 +2521,8 @@ function completeMission(mn, st) {
     st.el.classList.add("justdone");
     setTimeout(() => st.el.classList.remove("justdone"), 900);
     showMissionToast(mn.name);
+    const chip = document.getElementById("missionChip");   // U3: pulse the status-strip chip too
+    if (chip) { chip.classList.add("pulse"); setTimeout(() => chip.classList.remove("pulse"), 1000); }
   }
 }
 
@@ -2512,6 +2549,8 @@ function updateMissions() {
   missionsInitialized = true;
   const c = document.getElementById("missionCount");
   if (c) c.textContent = count;
+  const cc = document.getElementById("missionChipCount");   // U3: keep the status-strip chip in sync
+  if (cc) cc.textContent = count;
 }
 
 /* ---------- Teachable tooltips ---------- */
@@ -2966,11 +3005,12 @@ function showTourStep(i) {
     card.hidden = false;
   }, 240);
 }
-function startTour() { const o = document.getElementById("tourOverlay"); if (o) o.hidden = false; showTourStep(0); }
+function startTour() { const o = document.getElementById("tourOverlay"); if (o) o.hidden = false; showTourStep(0); dialogOpen(document.getElementById("tourCard"), "#tourNext", endTour); }
 function endTour() {
   ["tourOverlay", "tourCard", "tourRing"].forEach((id) => { const e = document.getElementById(id); if (e) e.hidden = true; });
   tourStep = -1;
   try { localStorage.setItem("fusionTourDone", "1"); } catch (e) {}
+  dialogClose();   // A1: restore focus to whatever opened the tour
 }
 function runPowerUp() {
   const ov = document.getElementById("powerup");
@@ -2983,25 +3023,46 @@ function runPowerUp() {
 
 /* ---- C1: guided story mode ---- */
 const STORY = [
-  { title: "1. Just cold gas", body: "Right now the deuterium and tritium are too cold to fuse, so nothing happens. Let us change that.", hint: "Watch the core stay dark.", test: () => true },
-  { title: "2. Heat the fuel", body: "Raise plasma temperature. Hotter ions collide hard enough to fuse, and the reaction rate climbs steeply.", hint: "Set temperature to about 15 keV.", test: () => Number(controls.temperature.value) >= 14 },
-  { title: "3. Hold it with the field", body: "Heat leaks out unless you confine it. Raise the magnetic field to keep the energy in long enough to matter.", hint: "Set magnetic field near 7 T.", test: () => Number(controls.magneticField.value) >= 6.8 },
-  { title: "4. Feed the fire", body: "More fuel means more reactions. Increase injection and watch fusion power climb.", hint: "Get fusion power above 400 MW.", test: (m) => (m.fusionPower || 0) >= 400 },
-  { title: "5. Cross breakeven", body: "When fusion power passes the heating you supply, Q passes 1. You now get more out than you put in.", hint: "Push Q above 1.", test: (m) => (m.q || 0) >= 1 },
-  { title: "6. Ignition", body: "Near ignition the plasma heats itself and Q runs away. This is the goal of fusion energy.", hint: "Reach the ignition state.", test: (m) => (m.phi || 0) >= 0.95 }
+  { title: "1. Just cold gas", body: "Right now the deuterium and tritium are too cold to fuse, so nothing happens. Let us change that.", hint: "Watch the core stay dark.", sel: ".reactor-stage", test: () => true },
+  { title: "2. Heat the fuel", body: "Raise plasma temperature. Hotter ions collide hard enough to fuse, and the reaction rate climbs steeply.", hint: "Set temperature to about 15 keV.", sel: "#temperature", test: () => Number(controls.temperature.value) >= 14 },
+  { title: "3. Hold it with the field", body: "Heat leaks out unless you confine it. Raise the magnetic field to keep the energy in long enough to matter.", hint: "Set magnetic field near 7 T.", sel: "#magneticField", test: () => Number(controls.magneticField.value) >= 6.8 },
+  { title: "4. Feed the fire", body: "More fuel means more reactions. Increase injection and watch fusion power climb.", hint: "Get fusion power above 400 MW.", sel: "#fuelRate", test: (m) => (m.fusionPower || 0) >= 400 },
+  { title: "5. Cross breakeven", body: "When fusion power passes the heating you supply, Q passes 1. You now get more out than you put in.", hint: "Push Q above 1.", sel: "#qPlasma", test: (m) => (m.q || 0) >= 1 },
+  { title: "6. Ignition", body: "Near ignition the plasma heats itself and Q runs away. This is the goal of fusion energy.", hint: "Reach the ignition state.", sel: ".reactor-stage", test: (m) => (m.phi || 0) >= 0.95 }
 ];
 let storyOn = false, storyStep = 0;
+// U4: reuse the tour's highlight ring to point the learner at the control each story step names.
+// The ring is repositioned every frame (positionStoryRing in animate) so it follows the control after
+// the page scrolls it into view — and it only ever touches the ring while the story owns it, so the
+// tour (which shares the ring element) is left alone.
+let storyEl = null;
+function storySpotlight(sel) {
+  storyEl = sel ? document.querySelector(sel) : null;
+  if (!storyEl) { const ring = document.getElementById("tourRing"); if (ring) ring.hidden = true; return; }
+  if (storyEl.scrollIntoView) storyEl.scrollIntoView({ behavior: "smooth", block: "center" });
+  positionStoryRing();
+}
+function positionStoryRing() {
+  if (!storyOn || !storyEl) return;
+  const ring = document.getElementById("tourRing");
+  if (!ring) return;
+  const r = storyEl.getBoundingClientRect();
+  ring.style.left = `${r.left - 6}px`; ring.style.top = `${r.top - 6}px`;
+  ring.style.width = `${r.width + 12}px`; ring.style.height = `${r.height + 12}px`;
+  ring.hidden = false;
+}
 function renderStory() {
   const panel = document.getElementById("storyPanel");
   if (!panel) return;
   panel.hidden = !storyOn;
-  if (!storyOn) return;
+  if (!storyOn) { storySpotlight(null); return; }
   const s = STORY[storyStep];
   const set = (id, t) => { const n = document.getElementById(id); if (n) n.textContent = t; };
   set("storyTitle", s.title); set("storyBody", s.body); set("storyHint", s.hint);
   set("storyProg", `Step ${storyStep + 1} of ${STORY.length}`);
   const pv = document.getElementById("storyPrev"); if (pv) pv.disabled = storyStep === 0;
   const nx = document.getElementById("storyNext"); if (nx) nx.textContent = storyStep === STORY.length - 1 ? "Finish" : "Next";
+  storySpotlight(s.sel);
 }
 function updateStory() {
   if (!storyOn) return;
@@ -3028,6 +3089,8 @@ function setStory(on) {
   const btn = document.getElementById("storyToggle");
   if (btn) btn.setAttribute("aria-pressed", String(on));
   renderStory();
+  if (on) dialogOpen(document.getElementById("storyPanel"), "#storyNext", () => setStory(false));   // A1
+  else dialogClose();
 }
 function storyNav(d) {
   if (storyOn && storyStep === STORY.length - 1 && d > 0) { setStory(false); return; }
@@ -3165,8 +3228,9 @@ function openTakeaway() {
   set("tcUrl", TAKEAWAY_URL.replace(/^https?:\/\//, ""));
   const qr = document.getElementById("tcQR"); if (qr) qr.innerHTML = qrSvg(TAKEAWAY_QR, 128);
   const ov = document.getElementById("cardOverlay"); if (ov) ov.hidden = false;
+  dialogOpen(document.querySelector(".takeaway-card"), "#cardClose", closeTakeaway);   // A1
 }
-function closeTakeaway() { const ov = document.getElementById("cardOverlay"); if (ov) ov.hidden = true; }
+function closeTakeaway() { const ov = document.getElementById("cardOverlay"); if (ov) ov.hidden = true; dialogClose(); }
 function tcRoundRect(x, rx, ry, w, h, r) { x.beginPath(); x.moveTo(rx + r, ry); x.arcTo(rx + w, ry, rx + w, ry + h, r); x.arcTo(rx + w, ry + h, rx, ry + h, r); x.arcTo(rx, ry + h, rx, ry, r); x.arcTo(rx, ry, rx + w, ry, r); x.closePath(); }
 function tcWrap(x, text, tx, ty, maxW, lh) {
   const words = String(text).split(" "); let line = "", yy = ty;
@@ -3256,6 +3320,13 @@ seedParticles();
 updateReadouts();
 initNavHud();
 buildMissions();
+// U3: the status-strip "challenges" chip jumps to the missions panel and flashes it.
+document.getElementById("missionChip")?.addEventListener("click", () => {
+  const p = document.querySelector(".missions");
+  if (!p) return;
+  p.scrollIntoView({ behavior: "smooth", block: "center" });
+  p.classList.add("flash"); setTimeout(() => p.classList.remove("flash"), 1100);
+});
 attachTips();
 initPhase1Controls();
 initPhase2Controls();
@@ -3278,14 +3349,46 @@ function initScrollCues() {
 initScrollCues();
 
 // ---- D1: About / credits modal open-close ----
+/* A1: shared modal focus management — focus in, trap Tab inside, restore focus on close, Escape to
+   close. Wired into the About, Takeaway-card, Tour, and Story dialogs. */
+const _dlg = { panel: null, restore: null, close: null };
+function dialogOpen(panel, firstSel, closeFn) {
+  if (!panel) return;
+  _dlg.panel = panel; _dlg.close = closeFn || null; _dlg.restore = document.activeElement;
+  const first = (firstSel && panel.querySelector(firstSel)) ||
+    panel.querySelector('a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])');
+  const tryFocus = () => { if (_dlg.panel === panel && first) { try { first.focus(); } catch (e) {} } };
+  setTimeout(tryFocus, 40); setTimeout(tryFocus, 280);   // second pass covers the tour card's delayed reveal
+}
+function dialogClose() {
+  if (!_dlg.panel) return;
+  const r = _dlg.restore;
+  _dlg.panel = null; _dlg.close = null; _dlg.restore = null;
+  if (r && r.focus) { try { r.focus(); } catch (e) {} }
+}
+document.addEventListener("keydown", (e) => {
+  if (!_dlg.panel) return;
+  if (e.key === "Escape") { if (_dlg.close) _dlg.close(); return; }
+  if (e.key !== "Tab") return;
+  const f = Array.from(_dlg.panel.querySelectorAll(
+    'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])'
+  )).filter((el) => el.offsetParent !== null);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+
 (function initAbout() {
   const panel = document.getElementById("aboutPanel");
   const overlay = document.getElementById("aboutOverlay");
-  const setOpen = (on) => { if (panel) panel.hidden = !on; if (overlay) overlay.hidden = !on; };
+  const setOpen = (on) => {
+    if (panel) panel.hidden = !on; if (overlay) overlay.hidden = !on;
+    if (on) dialogOpen(panel, "#aboutClose", () => setOpen(false)); else dialogClose();
+  };
   document.getElementById("aboutBtn")?.addEventListener("click", () => setOpen(true));
   document.getElementById("aboutClose")?.addEventListener("click", () => setOpen(false));
   overlay?.addEventListener("click", () => setOpen(false));
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && panel && !panel.hidden) setOpen(false); });
 })();
 
 // ---- C1: track which canvases are on screen so off-screen charts are not redrawn. ----

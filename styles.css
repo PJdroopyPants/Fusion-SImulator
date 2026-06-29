@@ -219,6 +219,30 @@ h2 {
   color: var(--gold);
 }
 
+/* U3: status-strip "challenges" chip — a button that jumps to the missions panel. */
+.mission-jump {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.mission-jump strong { color: var(--teal); font-size: 1.05rem; }
+.mission-jump:hover { border-color: var(--teal); color: var(--text); }
+.mission-jump.pulse { animation: missionChipPulse 1s ease; }
+@keyframes missionChipPulse { 0%, 100% { box-shadow: none; } 30% { box-shadow: 0 0 0 4px rgba(56, 225, 198, 0.3); border-color: var(--teal); } }
+.missions.flash { animation: missionsFlash 1.1s ease; }
+@keyframes missionsFlash { 0%, 100% { box-shadow: none; } 25% { box-shadow: 0 0 0 2px rgba(56, 225, 198, 0.4), 0 0 30px rgba(56, 225, 198, 0.15); } }
+
 /* ---------- Layout grids ---------- */
 .sim-grid {
   display: grid;
@@ -1190,6 +1214,33 @@ meter::-moz-meter-bar {
   margin-top: 2px;
   font-size: 0.72rem;
   color: var(--muted);
+}
+
+/* U3: per-mission starting hint, revealed by a small toggle so the challenge stays a challenge. */
+.mission-hint-btn {
+  margin-top: 9px;
+  padding: 3px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+.mission-hint-btn:hover { border-color: var(--teal); color: var(--teal); }
+.mission-hint {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-left: 2px solid var(--teal);
+  border-radius: 0 6px 6px 0;
+  background: rgba(56, 225, 198, 0.06);
+  color: #c8d0de;
+  font-size: 0.74rem;
+  line-height: 1.45;
 }
 
 .mission-bar {

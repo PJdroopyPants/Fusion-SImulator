@@ -61,6 +61,10 @@
               <span class="status-caption">Energy gain Q</span>
               <span id="qBadge" class="q-badge">0.0</span>
             </span>
+            <span class="status-block">
+              <span class="status-caption">Challenges</span>
+              <button type="button" id="missionChip" class="mission-jump" title="Jump to the challenges"><strong id="missionChipCount">0</strong> / 7</button>
+            </span>
           </div>
         </div>
       </header>
@@ -166,7 +170,7 @@
 
         <!-- REACTOR STAGE -->
         <section class="reactor-stage" aria-label="Tokamak reactor visualization">
-          <canvas id="reactorCanvas" aria-label="Animated reactor cutaway"></canvas>
+          <canvas id="reactorCanvas" aria-label="Interactive 3D reactor. Drag or use arrow keys to orbit; plus and minus to zoom; R resets the view."></canvas>
           <div class="stage-overlay">
             <button class="hotspot hotspot-magnets" type="button" data-topic="magnets">Magnets</button>
             <button class="hotspot hotspot-core active" type="button" data-topic="plasma">Plasma core</button>
