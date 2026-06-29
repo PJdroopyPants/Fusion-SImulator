@@ -762,7 +762,8 @@ function bindInput() {
   inputBound = true;
   reduceMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   reactorCanvas.style.cursor = "grab";
-  reactorCanvas.style.touchAction = "none";
+  reactorCanvas.style.touchAction = "pan-y";   // U2: vertical swipes scroll the page; horizontal drags orbit
+  let touchAxis = null, touchStartX = 0, touchStartY = 0;   // U2: one-finger directional lock
 
   const down = (cx, cy, pan) => { camTween = null; dragOn = true; dragX = cx; dragY = cy; panMode = !!pan; lastInteract = performance.now(); reactorCanvas.style.cursor = pan ? "move" : "grabbing"; };
   const move = (cx, cy) => {
@@ -779,7 +780,7 @@ function bindInput() {
     }
     dragX = cx; dragY = cy; lastInteract = performance.now();
   };
-  const up = () => { dragOn = false; panMode = false; reactorCanvas.style.cursor = panSticky ? "move" : "grab"; };
+  const up = () => { dragOn = false; panMode = false; touchAxis = null; reactorCanvas.style.cursor = panSticky ? "move" : "grab"; };
 
   reactorCanvas.addEventListener("mousedown", (e) => down(e.clientX, e.clientY, e.button === 2 || e.shiftKey || panSticky));
   reactorCanvas.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -790,8 +791,25 @@ function bindInput() {
     cam.dist = clamp(cam.dist + e.deltaY * 0.0022, 1.9, 6.4);
     lastInteract = performance.now();
   }, { passive: false });
-  reactorCanvas.addEventListener("touchstart", (e) => { if (e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY, e.touches.length >= 2 || panSticky); }, { passive: true });
-  reactorCanvas.addEventListener("touchmove", (e) => { if (e.touches[0]) { move(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); } }, { passive: false });
+  reactorCanvas.addEventListener("touchstart", (e) => {
+    if (!e.touches[0]) return;
+    const manip = e.touches.length >= 2 || panSticky;   // two-finger or latched pan is a deliberate manipulation
+    touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY;
+    touchAxis = manip ? "orbit" : null;                 // single finger: decide on first move (below)
+    down(touchStartX, touchStartY, manip);
+  }, { passive: true });
+  reactorCanvas.addEventListener("touchmove", (e) => {
+    if (!e.touches[0]) return;
+    const x = e.touches[0].clientX, y = e.touches[0].clientY;
+    if (touchAxis === null) {
+      const dx = Math.abs(x - touchStartX), dy = Math.abs(y - touchStartY);
+      if (dx < 8 && dy < 8) return;                      // wait until the gesture has a clear direction
+      if (dy > dx) { touchAxis = "scroll"; dragOn = false; return; }   // U2: vertical → let the page scroll
+      touchAxis = "orbit";                               // horizontal → orbit the reactor
+    }
+    if (touchAxis === "scroll") return;                  // the browser scrolls; don't fight it
+    move(x, y); e.preventDefault();
+  }, { passive: false });
   window.addEventListener("touchend", up);
   reactorCanvas.addEventListener("dblclick", () => resetCamera());
   window.addEventListener("keydown", (e) => { if (e.key === "r" || e.key === "R") resetCamera(); });
@@ -3316,6 +3334,10 @@ function stopLoops() {
   if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
 }
 document.addEventListener("visibilitychange", () => { if (document.hidden) stopLoops(); else startLoops(); });
+// F1: open on a clean net-positive operating point so the first thing a passer-by sees is a
+// working reactor (green output climbing to +300 MW), not a red sub-breakeven number. The
+// Startup preset (which teaches that Q > 1 is not net power) stays one click away.
+applyPreset("cruise");
 startLoops();
 
 // ---- C3: FPS safety net — drop to the lite path if early frames are slow ----

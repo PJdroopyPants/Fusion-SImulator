@@ -189,14 +189,16 @@ h2 {
 .state-pill,
 .power-badge,
 .q-badge {
-  min-height: 34px;
+  min-height: 40px;
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
-  padding: 6px 14px;
+  padding: 7px 16px;
   background: var(--panel-2);
-  font-size: 0.92rem;
+  /* F2: the three hero results are the numbers a passer-by reads from across a room — make them big. */
+  font-size: clamp(1rem, 1.5vw, 1.45rem);
+  line-height: 1.1;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -1539,7 +1541,7 @@ body.kiosk .sim-grid > .panel,
 body.kiosk .sim-grid > .reactor-stage { height: calc(100vh - 132px); min-height: 0; }
 body.kiosk .status-strip .state-pill,
 body.kiosk .status-strip .power-badge,
-body.kiosk .status-strip .q-badge { font-size: 1.04rem; min-height: 40px; }
+body.kiosk .status-strip .q-badge { font-size: clamp(1.4rem, 2.4vw, 2rem); min-height: 52px; }
 
 /* ---- Theme: light ---- */
 html[data-theme="light"] {
@@ -1750,19 +1752,34 @@ html[data-theme="cb"] {
 .annunciator { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
 .lamp {
   flex: 1 1 auto;
-  text-align: center;
-  padding: 5px 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: rgba(8, 10, 14, 0.5);
-  color: var(--faint);
-  font-size: 0.62rem;
+  /* F4: brighter off-state + a leading LED dot so each lamp reads as an instrument, not a dead pixel. */
+  color: var(--muted);
+  font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
+.lamp::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+.lamp.warn::before { background: rgba(255, 93, 93, 0.45); }
 .lamp.on { color: #07120f; background: var(--teal); border-color: var(--teal); box-shadow: 0 0 12px var(--glow-teal); }
+.lamp.on::before { background: #07120f; box-shadow: 0 0 6px rgba(7, 18, 15, 0.45); }
 .lamp.warn.on { color: #1a0606; background: var(--danger); border-color: var(--danger); box-shadow: 0 0 14px rgba(255, 93, 93, 0.5); animation: lampBlink 0.9s steps(1, end) infinite; }
 @keyframes lampBlink { 50% { opacity: 0.45; } }
 
