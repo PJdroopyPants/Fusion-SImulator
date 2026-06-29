@@ -88,7 +88,7 @@ The simulator honors the operating system's reduced-motion setting (it stills an
 - `Fusion-Lab-Worksheet.html` is the one-page student lab handout; `Fusion-Lab-Instructor-Key.html` is the matching instructor answer key (marked "do not distribute"). Both carry grade-band, time, and standards metadata.
 - `Fusion-Facilitator-Guide.html` is a one-page booth run-of-show for the volunteer staffing the exhibit.
 - `CHANGELOG.md` records what changed in each release; the version also shows in the in-app About panel.
-- `Fusion-Simulator-Enhancement-Roadmap.html` is the current status-and-roadmap document: what is already shipped and a prioritized, verified list of next steps.
+- `Fusion-Simulator-Enhancement-Roadmap.html` is the build-status and handover document: what the exhibit includes, what was deliberately left out, and a pre-donation QA checklist.
 - `backups/` holds copies of the files from before the enhancement work. It is reference only and need not ship with the donated bundle.
 
 ## Disclaimer

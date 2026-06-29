@@ -230,6 +230,10 @@ let kioskLast = 0;           // B1: last auto-demo advance time
 let lastUserAction = performance.now();  // C4: last real interaction (idle watchdog)
 const WATCHDOG_MS = 180000;  // C4: normal-mode idle reset after 3 minutes
 let liteMode = !!((navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2) || (navigator.deviceMemory && navigator.deviceMemory <= 2));  // C3: weak-GPU lite path
+// Firefox/Gecko: its CPU-side canvas blur (bloom) and large-buffer compositing are catastrophically
+// slower than Chrome's, so force the lite render path (no bloom, no supersample, fewer particles, no
+// backdrop-filter) from the very first frame. Set BEFORE seedParticles / the first render reads it.
+if (/Gecko\//.test(navigator.userAgent)) liteMode = true;
 
 /* ---------- Math helpers ---------- */
 function gaussian(value, center, width) {
@@ -614,7 +618,10 @@ function getCoachMessage() {
 function resizeCanvas(canvas, ctx) {
   const rect = canvas.getBoundingClientRect();
   if (rect.width < 1 || rect.height < 1) return rect; // hidden (e.g. presentation mode): keep last size
-  const scale = window.devicePixelRatio || 1;
+  // On the lite path (forced for Firefox), render at 1x device resolution instead of the full DPR. On a
+  // 2x display that is 1/4 the pixels, which is the single biggest cut to the fill-bound software renderer
+  // that makes Gecko crawl. The image is slightly softer but the frame rate is transformed.
+  const scale = liteMode ? 1 : (window.devicePixelRatio || 1);
   const width = Math.max(1, Math.floor(rect.width * scale));
   const height = Math.max(1, Math.floor(rect.height * scale));
   if (canvas.width !== width || canvas.height !== height) {
@@ -769,7 +776,7 @@ function tracePts(ctx, pts, close) {
 
 /* ---- particles ---- */
 function seedParticles() {
-  particles = Array.from({ length: liteMode ? 96 : 168 }, () => {
+  particles = Array.from({ length: liteMode ? 54 : 168 }, () => {
     const r = Math.random();
     const species = r < 0.38 ? "D" : r < 0.76 ? "T" : r < 0.88 ? "alpha" : "electron";
     const sizeMul = species === "electron" ? 0.6 : species === "alpha" ? 1.4 : 1;
@@ -786,7 +793,7 @@ function seedParticles() {
   sparks = [];
   alphas = [];
   fusionAcc = 0;
-  neutrons = Array.from({ length: liteMode ? 28 : 64 }, () => ({
+  neutrons = Array.from({ length: liteMode ? 14 : 64 }, () => ({
     th: Math.random() * Math.PI * 2,
     ph: Math.random() * Math.PI * 2,
     life: Math.random(),
@@ -1081,7 +1088,7 @@ function drawReactor(time) {
       tracePts(ctx, pr.pts, true);
       ctx.strokeStyle = `rgba(255,${gg},${bb},${al})`;
       ctx.lineWidth = lw;
-      if (hc > 0.35) { ctx.save(); ctx.shadowColor = "rgba(255,180,120,0.7)"; ctx.shadowBlur = 7 * hc; ctx.stroke(); ctx.restore(); } else { ctx.stroke(); }
+      if (hc > 0.35 && !liteMode) { ctx.save(); ctx.shadowColor = "rgba(255,180,120,0.7)"; ctx.shadowBlur = 7 * hc; ctx.stroke(); ctx.restore(); } else { ctx.stroke(); }   // shadowBlur off on the lite path (very slow on Gecko)
     } });
   }
   // a couple of toroidal vessel hoops for read
@@ -1173,7 +1180,7 @@ function drawReactor(time) {
         ctx.strokeStyle = `rgba(${90 + Math.round(intensity * 60)},${200},${255},${clamp(al, 0, 0.85)})`;
         ctx.lineWidth = 1.0 + b * 1.1 + bNorm * 0.9; // A6: thicker, denser-looking field at higher B
         if (!reduceMotion) { ctx.setLineDash([9, 7]); ctx.lineDashOffset = -time * (0.05 + bNorm * 0.08); } // A6: flow shows direction
-        if (b > 0.6) { ctx.shadowColor = "rgba(120,210,255,0.5)"; ctx.shadowBlur = 5 * b; }
+        if (b > 0.6 && !liteMode) { ctx.shadowColor = "rgba(120,210,255,0.5)"; ctx.shadowBlur = 5 * b; }
         ctx.stroke(); ctx.setLineDash([]); ctx.shadowBlur = 0; ctx.restore();
       } });
     }
@@ -1238,7 +1245,7 @@ function drawReactor(time) {
       tracePts(ctx, pr.pts, false);
       ctx.strokeStyle = `rgba(255,110,90,${0.3 + dLoad * 0.5})`;
       ctx.lineWidth = 3.0 + dLoad * 3.0;
-      ctx.shadowColor = "#ff7a66"; ctx.shadowBlur = 10 * dLoad; ctx.stroke();
+      if (!liteMode) { ctx.shadowColor = "#ff7a66"; ctx.shadowBlur = 10 * dLoad; } ctx.stroke();
       ctx.shadowBlur = 0; ctx.restore();
     } });
   }
@@ -1325,16 +1332,23 @@ function addSmoothQuad(prims, ctx, quad, colA, colB, alpha, zBias) {
   const pr = projectAll(quad);
   prims.push({ z: pr.depth + (zBias || 0), d: () => {
     const a = pr.pts;
-    const mAx = (a[0].x + a[3].x) / 2, mAy = (a[0].y + a[3].y) / 2;
-    const mBx = (a[1].x + a[2].x) / 2, mBy = (a[1].y + a[2].y) / 2;
     let style;
-    if (Math.abs(mAx - mBx) < 0.6 && Math.abs(mAy - mBy) < 0.6) {
-      style = `rgba(${colA[0]},${colA[1]},${colA[2]},${alpha})`;
+    if (liteMode) {
+      // lite path: flat-shade with the averaged edge color, skipping the per-quad gradient object and
+      // gradient fill, which Gecko builds and rasterizes far more slowly than Blink. Coils look a touch
+      // flatter but the frame cost drops a lot across the many faces.
+      style = `rgba(${(colA[0] + colB[0]) >> 1},${(colA[1] + colB[1]) >> 1},${(colA[2] + colB[2]) >> 1},${alpha})`;
     } else {
-      const grd = ctx.createLinearGradient(mAx, mAy, mBx, mBy);
-      grd.addColorStop(0, `rgba(${colA[0]},${colA[1]},${colA[2]},${alpha})`);
-      grd.addColorStop(1, `rgba(${colB[0]},${colB[1]},${colB[2]},${alpha})`);
-      style = grd;
+      const mAx = (a[0].x + a[3].x) / 2, mAy = (a[0].y + a[3].y) / 2;
+      const mBx = (a[1].x + a[2].x) / 2, mBy = (a[1].y + a[2].y) / 2;
+      if (Math.abs(mAx - mBx) < 0.6 && Math.abs(mAy - mBy) < 0.6) {
+        style = `rgba(${colA[0]},${colA[1]},${colA[2]},${alpha})`;
+      } else {
+        const grd = ctx.createLinearGradient(mAx, mAy, mBx, mBy);
+        grd.addColorStop(0, `rgba(${colA[0]},${colA[1]},${colA[2]},${alpha})`);
+        grd.addColorStop(1, `rgba(${colB[0]},${colB[1]},${colB[2]},${alpha})`);
+        style = grd;
+      }
     }
     tracePts(ctx, a, true);
     ctx.fillStyle = style;
@@ -2360,6 +2374,8 @@ function tweenReadouts(dt) {
 }
 
 /* ---------- Animation + ticking ---------- */
+// C3: continuous low-FPS guard state (the escalation logic lives in animate, below).
+let perfWin = 0, perfFrames = 0, perfBad = 0, perfWarm = 2;   // skip ~2s of load settling before judging fps
 function animate(time) {
   const delta = time - lastFrame;
   lastFrame = time;
@@ -2378,6 +2394,20 @@ function animate(time) {
     }
     tweenReadouts(delta);
     positionStoryRing();   // U4: keep the guided-story highlight ring on its control as the page scrolls
+    // C3: continuous low-FPS guard. Escalate to the lite path on sustained slowness, which catches
+    // Firefox (whose backdrop-filter and canvas ctx.filter blur are far slower than Chrome's) that the
+    // old one-shot probe and the Blink-only deviceMemory heuristic miss. Escalate-only, so a fast
+    // browser never trips it; delta < 250 ignores tab-resume / GC stalls; two bad seconds are required.
+    if (!liteMode && delta < 1500) {   // <1500 ignores tab-resume stalls but still counts genuinely slow (>0.67fps) frames
+      perfWin += delta; perfFrames += 1;
+      if (perfWin >= 1000) {
+        const fps = perfFrames * 1000 / perfWin;
+        perfWin = 0; perfFrames = 0;
+        if (perfWarm > 0) perfWarm -= 1;
+        else if (fps < 38) { if ((perfBad += 1) >= 2) { liteMode = true; document.body.classList.add("lite"); seedParticles(); } }
+        else perfBad = 0;
+      }
+    }
   }
   rafId = requestAnimationFrame(animate);
 }
@@ -3375,6 +3405,11 @@ function initBatchControls() {
 }
 
 if (liteMode) document.body.classList.add("lite");   // C3
+// Firefox/Gecko: backdrop-filter blur over the animated reactor canvas is recomposited every frame far
+// more slowly than in Blink (Chrome/Edge), and it is the dominant cause of lag there (the scene is smooth
+// while an overlay occludes the stage, then janks the instant the stage is revealed). Drop those stage
+// blurs up front so Firefox never pays that cost. Chrome/Edge are untouched and keep the full frosted look.
+if (/Gecko\//.test(navigator.userAgent)) document.body.classList.add("gecko");
 seedParticles();
 updateReadouts();
 // U1: a one-time welcome over the reactor on a first visit, offering the tour or "just let me play".
@@ -3516,17 +3551,5 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) stopL
 applyPreset("cruise");
 startLoops();
 
-// ---- C3: FPS safety net - drop to the lite path if early frames are slow ----
-(function fpsProbe() {
-  if (liteMode) return;
-  let frames = 0, t0 = 0;
-  const tick = (t) => {
-    if (t0 === 0) { t0 = t; requestAnimationFrame(tick); return; }
-    const dt = t - t0;
-    if (dt < 600) { requestAnimationFrame(tick); return; }
-    frames++;
-    if (dt < 2100) { requestAnimationFrame(tick); return; }
-    if (frames * 1000 / (dt - 600) < 32) { liteMode = true; document.body.classList.add("lite"); seedParticles(); }
-  };
-  requestAnimationFrame(tick);
-})();
+// ---- C3: the FPS safety net is now a continuous guard inside animate() (see perfWin / perfBad),
+// so it catches a browser that starts fine and bogs down later (e.g. Firefox), not just early frames. ----

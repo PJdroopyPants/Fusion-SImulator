@@ -2102,6 +2102,15 @@ button.plant-stage:focus-visible { outline: 2px solid var(--teal); outline-offse
 .model-note { margin: 14px 0 0; color: var(--faint); font-size: 0.8rem; }
 
 /* ---------- C3: lite render path for weak GPUs ---------- */
-body.lite .panel, body.lite .reactor-stage { backdrop-filter: none; box-shadow: 0 8px 22px var(--shadow); }
+body.lite .panel, body.lite .reactor-stage { box-shadow: 0 8px 22px var(--shadow); }
+/* The lite path must remove EVERY backdrop-filter, not just the panels: Firefox re-blurs the overlays
+   parked over the animated reactor canvas each frame, which is the dominant cause of its lag. */
+body.lite *, body.lite *::before, body.lite *::after { backdrop-filter: none !important; }
+/* Firefox/Gecko (see the body.gecko class in script.js): the reactor canvas animates every frame, which
+   forces a full-page recomposite, and Gecko re-runs EVERY backdrop-filter blur on that recomposite (Blink
+   caches them). With ~10 panels each carrying blur(14px), that is the dominant cause of the Firefox lag.
+   Drop all backdrop-filter on Firefox. Chrome/Edge never get this class, so they keep the full frosted look. */
+body.gecko *, body.gecko *::before, body.gecko *::after { backdrop-filter: none !important; }
+body.lite .lamp.warn.on { animation: none; }   /* stop the continuous blink repaint on the slow path */
 body.lite .ambient::after { display: none; }
 @media (prefers-reduced-motion: reduce) { .scroll-cue { animation: none; } }
