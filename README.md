@@ -87,9 +87,6 @@ The simulator honors the operating system's reduced-motion setting (it stills an
 - `script.js` holds the physics model, the burn-through dynamics, the software 3D renderer, the WebGL plasma shader, and the data visualizations. A host program can rebrand the exhibit by editing the `BRAND` block at the top (program name, attribution, and an optional link flow to the topbar, the About panel, and the takeaway card).
 - `Fusion-Lab-Worksheet.html` is the one-page student lab handout; `Fusion-Lab-Instructor-Key.html` is the matching instructor answer key (marked "do not distribute"). Both carry grade-band, time, and standards metadata.
 - `Fusion-Facilitator-Guide.html` is a one-page booth run-of-show for the volunteer staffing the exhibit.
-- `CHANGELOG.md` records what changed in each release; the version also shows in the in-app About panel.
-- `Fusion-Simulator-Enhancement-Roadmap.html` is the build-status and handover document: what the exhibit includes, what was deliberately left out, and a pre-donation QA checklist.
-- `backups/` holds copies of the files from before the enhancement work. It is reference only and need not ship with the donated bundle.
 
 ## Disclaimer
 
