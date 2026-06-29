@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fusion Simulator: Booth Facilitator Guide</title>
+<meta name="description" content="A one-page run-of-show for volunteers staffing the Fusion Power Generator Simulator at an outreach booth.">
+<style>
+  :root{
+    --bg:#0b0d12; --panel:rgba(22,26,34,.82); --panel2:rgba(31,37,48,.6);
+    --line:rgba(120,132,156,.20); --line2:rgba(120,132,156,.34);
+    --text:#eef2f8; --muted:#9aa4b8; --faint:#6e7889;
+    --teal:#38e1c6; --gold:#ffc24b; --coral:#ff7a66; --green:#7ee787;
+    --shadow:rgba(0,0,0,.45);
+    --mono:ui-monospace,"SFMono-Regular","Cascadia Code",Menlo,Consolas,monospace;
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--text); line-height:1.6; -webkit-font-smoothing:antialiased;}
+  .ambient{position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(60% 50% at 16% 8%, rgba(56,225,198,.10), transparent 70%),
+      radial-gradient(55% 45% at 88% 14%, rgba(168,150,255,.10), transparent 70%),
+      var(--bg);}
+  .wrap{position:relative; z-index:1; width:min(960px,100%); margin:0 auto; padding:52px clamp(16px,4vw,40px) 80px;}
+  .kicker{margin:0 0 10px; color:var(--teal); font-size:.74rem; font-weight:800; letter-spacing:.16em; text-transform:uppercase;}
+  h1{margin:0; font-size:clamp(1.9rem,5vw,2.9rem); line-height:1.05; letter-spacing:-.015em;
+     background:linear-gradient(118deg,#fff 18%,var(--teal) 128%); -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .lede{margin:16px 0 0; max-width:64ch; color:var(--muted); font-size:1.04rem;}
+  h2{font-size:1.18rem; margin:0 0 4px; letter-spacing:-.01em;}
+  section{position:relative; z-index:1; margin-top:30px;}
+  .panel{border:1px solid var(--line); border-radius:14px; background:var(--panel); box-shadow:0 18px 40px var(--shadow);
+         padding:20px clamp(16px,3vw,26px);}
+  .num{font-family:var(--mono); color:var(--teal); font-weight:700; margin-right:8px;}
+  ol,ul{margin:.4rem 0 0; padding-left:1.2rem;} li{margin:.4rem 0; color:var(--muted);}
+  li strong, p strong{color:#fff;}
+  code,kbd{font-family:var(--mono); font-size:.84em; color:var(--teal); background:rgba(56,225,198,.08);
+       border:1px solid rgba(56,225,198,.18); border-radius:5px; padding:1px 6px;}
+  .grid{display:grid; gap:16px;} @media(min-width:720px){ .grid.two{grid-template-columns:1fr 1fr;} }
+  .script{border-left:3px solid var(--gold); background:linear-gradient(180deg,rgba(255,194,75,.08),rgba(255,194,75,.02));
+    border-radius:10px; padding:16px 18px; margin-top:8px;}
+  .script p{margin:.3rem 0; color:#e7ecf5;}
+  .script .say{font-size:1.04rem;}
+  .chip{display:inline-block; padding:3px 10px; border:1px solid var(--line2); border-radius:999px; background:var(--panel2);
+        color:var(--muted); font-size:.78rem; font-weight:600; margin:2px 4px 2px 0;}
+  table{border-collapse:collapse; width:100%; font-size:.92rem; margin-top:6px;}
+  th,td{text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; color:var(--muted);}
+  th{color:var(--faint); font-size:.7rem; letter-spacing:.08em; text-transform:uppercase;}
+  td b{color:var(--text);}
+  footer{margin-top:38px; padding-top:18px; border-top:1px solid var(--line); color:var(--faint); font-size:.82rem;}
+  @media print{
+    .ambient{display:none;} body{background:#fff; color:#13161c;}
+    h1{-webkit-text-fill-color:#0a7c6c; color:#0a7c6c;}
+    .panel{box-shadow:none; background:#fff; border-color:#cdd3dc; break-inside:avoid;}
+    .lede,li,td,.script p{color:#3a4150;} strong,td b{color:#000;}
+    code,kbd{color:#0a7c6c; background:#eef7f5; border-color:#cfe7e2;} section{break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="wrap">
+
+  <p class="kicker">Booth Facilitator Guide</p>
+  <h1>Fusion Power Generator</h1>
+  <p class="lede">A one-page run-of-show for the volunteer staffing the exhibit. You do not need to know fusion physics; the simulator explains itself. Your job is to invite people in and let them drive.</p>
+
+  <section>
+    <div class="panel">
+      <h2><span class="num">1</span>Set it up (2 minutes)</h2>
+      <ol>
+        <li><strong>Open the exhibit:</strong> double-click <code>index.html</code> in the folder. It runs offline in any modern browser, no internet needed.</li>
+        <li><strong>Go fullscreen:</strong> press <strong>Present</strong> (top right). This enlarges the reactor and the headline numbers and hides the denser panels (the booth view).</li>
+        <li><strong>Leave it on Cruise.</strong> It opens on a healthy, net-positive reactor. If no one touches it for a few minutes it gently resets itself, so it is always inviting.</li>
+        <li><strong>Sound is off by default.</strong> Turn it on with the <strong>Sound</strong> button only if the room is quiet; keep the volume low.</li>
+        <li><strong>Tablet kiosk (optional):</strong> "Add to Home Screen" launches it fullscreen with no browser bars.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <div class="grid two">
+      <div class="panel">
+        <h2><span class="num">2</span>The 30-second invite</h2>
+        <p style="color:var(--muted); margin:.3rem 0 0;">A script you can read to anyone walking past.</p>
+        <div class="script">
+          <p class="say">&ldquo;Want to run a fusion reactor? This is the same machine they're building to make power from seawater. Slide the <strong>temperature</strong> up&hellip; now the <strong>magnetic field</strong>&hellip; watch the gain, and when it turns <span style="color:var(--green)">green</span> you're making more power than you put in. Can you reach <strong>ignition</strong>?&rdquo;</p>
+        </div>
+      </div>
+      <div class="panel">
+        <h2><span class="num">3</span>What to point at</h2>
+        <ul>
+          <li>The <strong>presets</strong> (Startup &rarr; Cruise &rarr; High Gain) jump to whole scenarios, great for a quick wow.</li>
+          <li>The three big numbers up top: <strong>state</strong>, <strong>net electric</strong>, and <strong>energy gain Q</strong>. Green is good.</li>
+          <li><strong>High Gain</strong> reaches <strong>Ignition</strong>, and the core flares white-hot. That is the moment people remember.</li>
+          <li><strong>Challenges</strong> (the chip up top) and the <strong>Guided story</strong> button keep curious visitors busy longer.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="panel">
+      <h2><span class="num">4</span>Between visitors &amp; if something looks off</h2>
+      <table>
+        <tr><th>Situation</th><th>What to do</th></tr>
+        <tr><td>Last visitor left it in a weird state</td><td>Click <b>Cruise</b>, or just wait; it auto-resets after a few idle minutes.</td></tr>
+        <tr><td>You want a clean view angle</td><td>Double-click the reactor, or press <kbd>R</kbd>.</td></tr>
+        <tr><td>It looks frozen or the plasma went black</td><td>Reload the page (<kbd>F5</kbd>, or <kbd>Ctrl/Cmd</kbd>+<kbd>R</kbd>). Everything is local, so it comes right back.</td></tr>
+        <tr><td>The tablet is warm / battery dropping</td><td>Normal for an all-day run; it already runs a low-power mode on weaker hardware. Keep it plugged in.</td></tr>
+        <tr><td>A visitor wants to keep their result</td><td>Tap <b>Takeaway card</b> for a shareable image with a QR code to run it themselves.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="panel">
+      <h2><span class="num">5</span>Good to know</h2>
+      <p style="margin:.3rem 0 0; color:var(--muted);">
+        <span class="chip">Keyboard-friendly</span> arrow keys orbit the reactor, <kbd>+</kbd>/<kbd>&minus;</kbd> zoom.
+        <span class="chip">Themes</span> a <strong>Light</strong> theme reads better on a projector in a bright room; <strong>High contrast</strong> and <strong>Colorblind</strong> options are in the Theme menu.
+        <span class="chip">Plain words</span> switches the lessons to plain language for younger visitors.
+        <span class="chip">Real-world units</span> shows temperature in millions of degrees and power in homes powered.
+      </p>
+      <p style="margin:.7rem 0 0; color:var(--muted);">This is a <strong>teaching model</strong>: the numbers are illustrative and tuned for intuition, not engineering accuracy. If a visitor asks a question you can't answer, that's a great thing; point them to the program's table or website.</p>
+    </div>
+  </section>
+
+</div>
+<footer>
+  Booth facilitator guide for the Fusion Power Generator Simulator. Pairs with the student worksheet and instructor answer key. Donated for educational use, free to run and share.
+</footer>
+</body>
+</html>

@@ -25,7 +25,7 @@
     <main class="sim-shell">
       <header class="topbar">
         <div class="brand">
-          <p class="eyebrow">Tokamak Learning Lab</p>
+          <p class="eyebrow" id="brandEyebrow">Tokamak Learning Lab</p>
           <h1>Fusion Power Generator</h1>
           <p class="subtitle">Drive a magnetic-confinement reactor toward ignition and watch the physics respond.</p>
         </div>
@@ -239,6 +239,19 @@
             </ul>
           </div>
           <button type="button" class="nav-help" id="navHelp" aria-label="Show controls" title="Controls" hidden>?</button>
+
+          <!-- U1: first-run welcome (shown once, until the tour is taken or dismissed) -->
+          <div class="welcome-prompt" id="welcomePrompt" hidden>
+            <div class="welcome-card" role="dialog" aria-label="Welcome">
+              <p class="welcome-kicker">Welcome</p>
+              <h3>Run a fusion reactor</h3>
+              <p>New here? A 30-second tour points out the controls. Or just start playing.</p>
+              <div class="welcome-actions">
+                <button type="button" class="welcome-btn primary" id="welcomeTour">Take the 30-second tour</button>
+                <button type="button" class="welcome-btn" id="welcomeSkip">Just let me play</button>
+              </div>
+            </div>
+          </div>
         </section>
 
         <!-- TELEMETRY -->
@@ -307,6 +320,16 @@
               <div class="bar"><span id="tritiumBar"></span></div>
               <strong id="tritiumRatio">0.00</strong>
             </div>
+            <div class="system-row">
+              <span>Radiated loss</span>
+              <div class="bar"><span id="radLossBar"></span></div>
+              <strong id="radLoss">0 MW</strong>
+            </div>
+            <div class="system-row">
+              <span>Density vs limit</span>
+              <div class="bar"><span id="greenwaldBar"></span></div>
+              <strong id="greenwaldFrac">0%</strong>
+            </div>
           </div>
 
           <section class="realworld" id="realWorld" hidden>
@@ -338,7 +361,7 @@
               <span>First-wall life</span>
               <div class="bar"><span id="matLifeBar"></span></div>
             </div>
-            <p class="mat-note">Tungsten plasma-facing surfaces take the neutron and heat flux. Surviving it is a central materials challenge, and the focus of programs like Purdue's.</p>
+            <p class="mat-note">Tungsten plasma-facing surfaces take the neutron and heat flux. Surviving it is a central materials challenge, and a major focus of university fusion programs.</p>
           </section>
 
           <div class="tele-actions">
@@ -586,11 +609,13 @@
         <p class="viz-caption">A simplified but physically motivated teaching model, calibrated for intuition rather than engineering accuracy. The core relations it uses:</p>
         <dl class="model-dl">
           <div><dt>Figure of merit</dt><dd>The fusion triple product <strong>n&middot;T&middot;&tau;<sub>E</sub></strong>; D-T ignition sits near <strong>3&times;10²¹ keV&middot;s&middot;m⁻³</strong> (the Lawson criterion).</dd></div>
-          <div><dt>Energy gain</dt><dd><strong>Q = 5&phi; / (1 &minus; &phi;)</strong>, where &phi; is how far you are toward ignition. The 5 is 1/f<sub>&alpha;</sub> &mdash; alphas carry ~20% of the fusion energy.</dd></div>
+          <div><dt>Energy gain</dt><dd><strong>Q = 5&phi; / (1 &minus; &phi;)</strong>, where &phi; is how far you are toward ignition. The 5 is 1/f<sub>&alpha;</sub>, since alphas carry ~20% of the fusion energy.</dd></div>
           <div><dt>Confinement</dt><dd>Energy confinement time climbs strongly with field, roughly <strong>&tau;<sub>E</sub> &prop; B<sup>1.4</sup></strong>, and improves with the divertor sweep.</dd></div>
           <div><dt>Power split</dt><dd><strong>~20%</strong> of fusion power is alpha particles that stay and heat the plasma; <strong>~80%</strong> is neutrons that deposit in the blanket.</dd></div>
           <div><dt>Burn-through</dt><dd>Core temperature is a real, evolving state: past the ignition threshold, alpha self-heating drives it higher on its own; starve it and the burn collapses.</dd></div>
-          <div><dt>Stability limit</dt><dd>When plasma pressure (&prop; n&middot;T / B&sup2;, the &beta; limit) outruns the magnetic field, confinement is lost &mdash; a disruption.</dd></div>
+          <div><dt>Stability limit</dt><dd>When plasma pressure (&prop; n&middot;T / B&sup2;, the &beta; limit) outruns the magnetic field, confinement is lost: a disruption.</dd></div>
+          <div><dt>Radiated loss</dt><dd>Bremsstrahlung carries energy out of the plasma as X-rays, growing with <strong>n&sup2;&middot;&radic;T</strong>. It is small at reactor conditions but can outpace fusion in a cold, dense plasma, the lower branch of the ignition curve.</dd></div>
+          <div><dt>Density limit</dt><dd>The <strong>Greenwald limit</strong> caps how dense the plasma can run before a density-driven disruption. It rises with plasma current, so with field, a second failure mode alongside the &beta; limit.</dd></div>
         </dl>
         <p class="model-note">Numbers are illustrative. This is a teaching tool, not a reactor design code.</p>
       </section>
@@ -606,7 +631,7 @@
             <div class="why-item"><strong>Fuel from seawater</strong><p>Deuterium comes from ordinary water and tritium is bred from lithium, so the fuel is effectively limitless.</p></div>
             <div class="why-item"><strong>Enormous energy density</strong><p>A few grams of deuterium-tritium fuel release the energy of tons of coal.</p></div>
             <div class="why-item"><strong>No meltdown</strong><p>The reaction stops the instant conditions slip, so a runaway meltdown is not possible.</p></div>
-            <div class="why-item"><strong>No long-lived waste stream</strong><p>It makes no high-level, long-lived radioactive waste the way fission does.</p></div>
+            <div class="why-item"><strong>No long-lived waste stream</strong><p>It makes no high-level, long-lived radioactive waste the way fission does; the neutron-activated structure decays to safe levels in about a century.</p></div>
           </div>
         </article>
 
@@ -618,6 +643,7 @@
           <p class="predict-q" id="predictQ">Loading a question...</p>
           <div class="predict-choices" id="predictChoices"></div>
           <p class="predict-feedback" id="predictFeedback" hidden></p>
+          <p class="predict-score" id="predictScoreLine" aria-live="polite"></p>
           <button type="button" class="tool-btn predict-next" id="predictNext">Next question</button>
         </article>
       </section>
@@ -659,14 +685,15 @@
     <div id="cardOverlay" class="card-overlay" hidden>
       <div class="takeaway-card" role="dialog" aria-modal="true" aria-label="Your fusion run, a takeaway card">
         <button type="button" class="card-close" id="cardClose" aria-label="Close card">&times;</button>
-        <p class="tc-kicker">Tokamak Learning Lab</p>
+        <p class="tc-kicker" id="brandCardKicker">Tokamak Learning Lab</p>
         <h3 class="tc-title">You ran a fusion reactor</h3>
         <p class="tc-verdict" id="tcVerdict">You drove a real fusion plasma.</p>
         <div class="tc-stats">
-          <div class="tc-stat"><span>Best energy gain Q</span><strong id="tcQ">&mdash;</strong></div>
-          <div class="tc-stat"><span>Peak net power</span><strong id="tcNet">&mdash;</strong></div>
-          <div class="tc-stat"><span>Hottest plasma</span><strong id="tcTemp">&mdash;</strong></div>
-          <div class="tc-stat"><span>Missions completed</span><strong id="tcMissions">&mdash;</strong></div>
+          <div class="tc-stat"><span>Best energy gain Q</span><strong id="tcQ">&ndash;</strong></div>
+          <div class="tc-stat"><span>Peak net power</span><strong id="tcNet">&ndash;</strong></div>
+          <div class="tc-stat"><span>Hottest plasma</span><strong id="tcTemp">&ndash;</strong></div>
+          <div class="tc-stat"><span>Missions completed</span><strong id="tcMissions">&ndash;</strong></div>
+          <div class="tc-stat" id="tcQuizStat" hidden><span>Predictions right</span><strong id="tcQuiz">&ndash;</strong></div>
         </div>
         <div class="tc-foot">
           <div class="tc-qr" id="tcQR" aria-hidden="true"></div>
@@ -688,14 +715,15 @@
       <button type="button" class="about-close" id="aboutClose" aria-label="Close about">&times;</button>
       <p class="about-kicker">About this exhibit</p>
       <h3 id="aboutTitle">Fusion Power Generator</h3>
-      <p class="about-lede">An interactive, dependency-free teaching model of a tokamak fusion power plant, built for STEM outreach &mdash; from curious newcomers to engineering undergraduates.</p>
+      <p class="about-lede">An interactive, dependency-free teaching model of a tokamak fusion power plant, built for STEM outreach, from curious newcomers to engineering undergraduates.</p>
       <div class="about-block">
         <p class="about-label">A gift for STEM outreach</p>
         <p>Donated for educational use, free to run and share.<span class="about-note">A hosting program can add its name, logo, and links here.</span></p>
       </div>
       <div class="about-block">
         <p class="about-label">Made by</p>
-        <p>Tokamak Learning Lab</p>
+        <p id="brandMadeBy">Tokamak Learning Lab</p>
+        <p class="about-version">Version <span id="appVersion">&ndash;</span></p>
       </div>
       <p class="about-disclaimer">Simplified teaching model. The numbers are illustrative and calibrated for intuition, not engineering accuracy.</p>
     </aside>

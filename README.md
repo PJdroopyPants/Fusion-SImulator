@@ -84,11 +84,12 @@ The simulator honors the operating system's reduced-motion setting (it stills an
 
 - `index.html` is the structure and content.
 - `styles.css` is the visual theme, including the light, high-contrast, and colorblind variants.
-- `script.js` holds the physics model, the burn-through dynamics, the software 3D renderer, the WebGL plasma shader, and the data visualizations.
-- `Fusion-Lab-Worksheet.html` is the one-page student lab handout; `Fusion-Lab-Instructor-Key.html` is the matching instructor answer key (marked "do not distribute").
+- `script.js` holds the physics model, the burn-through dynamics, the software 3D renderer, the WebGL plasma shader, and the data visualizations. A host program can rebrand the exhibit by editing the `BRAND` block at the top (program name, attribution, and an optional link flow to the topbar, the About panel, and the takeaway card).
+- `Fusion-Lab-Worksheet.html` is the one-page student lab handout; `Fusion-Lab-Instructor-Key.html` is the matching instructor answer key (marked "do not distribute"). Both carry grade-band, time, and standards metadata.
+- `Fusion-Facilitator-Guide.html` is a one-page booth run-of-show for the volunteer staffing the exhibit.
+- `CHANGELOG.md` records what changed in each release; the version also shows in the in-app About panel.
 - `Fusion-Simulator-Enhancement-Roadmap.html` is the current status-and-roadmap document: what is already shipped and a prioritized, verified list of next steps.
 - `backups/` holds copies of the files from before the enhancement work. It is reference only and need not ship with the donated bundle.
-- `3D_assets/` holds reference CAD and 3D-print models (STL and STEP). These are not used by the application; they are kept as reference geometry and as printable handouts.
 
 ## Disclaimer
 
@@ -96,7 +97,7 @@ This is a teaching model, not a scientific reactor code. The numbers are illustr
 
 ## License
 
-Released under the MIT License (see `LICENSE`) — free to run, share, modify, and adapt, including for a host program's own branding, with attribution preserved. The paired worksheet and instructor key may be reproduced for classroom and outreach use. Update the copyright holder in `LICENSE` to the donating party if it is not the Tokamak Learning Lab.
+Released under the MIT License (see `LICENSE`): free to run, share, modify, and adapt, including for a host program's own branding, with attribution preserved. The paired worksheet and instructor key may be reproduced for classroom and outreach use. Update the copyright holder in `LICENSE` to the donating party if it is not the Tokamak Learning Lab.
 
 ## Credits
 

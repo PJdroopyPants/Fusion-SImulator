@@ -196,7 +196,7 @@ h2 {
   border-radius: 8px;
   padding: 7px 16px;
   background: var(--panel-2);
-  /* F2: the three hero results are the numbers a passer-by reads from across a room — make them big. */
+  /* F2: the three hero results are the numbers a passer-by reads from across a room - make them big. */
   font-size: clamp(1rem, 1.5vw, 1.45rem);
   line-height: 1.1;
   font-weight: 800;
@@ -219,7 +219,7 @@ h2 {
   color: var(--gold);
 }
 
-/* U3: status-strip "challenges" chip — a button that jumps to the missions panel. */
+/* U3: status-strip "challenges" chip - a button that jumps to the missions panel. */
 .mission-jump {
   min-height: 40px;
   display: inline-flex;
@@ -1861,6 +1861,41 @@ html[data-theme="cb"] {
 .predict-feedback.right { color: var(--green); }
 .predict-feedback.miss { color: var(--gold); }
 .predict-next { margin-top: 14px; }
+.predict-next:disabled { opacity: 0.5; cursor: not-allowed; }
+/* U2: running quiz score */
+.predict-score { margin: 12px 0 0; font-size: 0.82rem; font-weight: 700; color: var(--teal); font-variant-numeric: tabular-nums; }
+
+/* U1: first-run welcome prompt over the reactor stage */
+.welcome-prompt {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(8, 10, 14, 0.55);
+  backdrop-filter: blur(2px);
+  border-radius: inherit;
+}
+.welcome-card {
+  max-width: 320px;
+  padding: 22px 22px 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--panel-solid);
+  box-shadow: 0 24px 60px var(--shadow);
+  text-align: center;
+}
+.welcome-kicker { margin: 0 0 6px; color: var(--teal); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; }
+.welcome-card h3 { margin: 0 0 8px; font-size: 1.25rem; }
+.welcome-card p { margin: 0; color: var(--muted); font-size: 0.92rem; line-height: 1.5; }
+.welcome-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.welcome-btn { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--text); font: inherit; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: border-color 0.18s ease, background-color 0.18s ease; }
+.welcome-btn:hover { border-color: var(--teal); }
+.welcome-btn.primary { background: var(--teal); color: #062b25; border-color: transparent; }
+.welcome-prompt[hidden] { display: none; }
+body.lite .welcome-prompt { backdrop-filter: none; }
 
 /* ---- C9: plain reading level hides the technical extras ---- */
 body.plain .deeper { display: none; }
@@ -2043,6 +2078,7 @@ button.plant-stage:focus-visible { outline: 2px solid var(--teal); outline-offse
 .about-label { margin: 0 0 3px; color: var(--faint); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
 .about-block p:not(.about-label) { margin: 0; color: var(--text); font-size: 0.92rem; }
 .about-note { display: block; margin-top: 4px; color: var(--muted); font-size: 0.8rem; }
+.about-version { margin: 6px 0 0; color: var(--faint); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
 .about-disclaimer { margin: 4px 0 0; color: var(--faint); font-size: 0.78rem; line-height: 1.5; }
 
 /* ---------- A4: scroll cue for tall side panels ---------- */

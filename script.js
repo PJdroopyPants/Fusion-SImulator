@@ -15,6 +15,28 @@
 
 const $ = (sel) => document.querySelector(sel);
 
+/* ---------- Branding & version (P1 / P2) ----------
+   A host program makes the exhibit its own by editing just this block. The program name appears in the
+   topbar, the About panel, and the takeaway card; set `url` to add a link to the program in About. */
+const BRAND = {
+  program: "Tokamak Learning Lab",   // topbar eyebrow + takeaway-card kicker
+  madeBy: "Tokamak Learning Lab",    // About -> "Made by"
+  url: ""                            // optional program page; shown as a link in About when set
+};
+const APP_VERSION = "1.0.0";
+function applyBrand() {
+  const setText = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+  setText("brandEyebrow", BRAND.program);
+  setText("brandCardKicker", BRAND.program);
+  setText("brandMadeBy", BRAND.madeBy);
+  setText("appVersion", APP_VERSION);
+  const meta = document.querySelector('meta[name="author"]'); if (meta) meta.setAttribute("content", BRAND.madeBy);
+  if (BRAND.url) {
+    const note = document.querySelector(".about-note");
+    if (note) note.innerHTML = ' <a href="' + BRAND.url + '" target="_blank" rel="noopener">' + BRAND.url.replace(/^https?:\/\//, "") + '</a>';
+  }
+}
+
 const controls = {
   temperature: $("#temperature"),
   magneticField: $("#magneticField"),
@@ -108,7 +130,7 @@ const lessons = {
     body: "Fusion begins when deuterium and tritium nuclei move fast enough to overcome their electrical repulsion. Temperature sets the reaction rate, but heat without confinement just leaks away.",
     deeper: "The D-T reaction rate scales with density squared times the reactivity, n²⟨σv⟩. The reactivity climbs steeply from a few keV and is already strong by 10 to 20 keV, the practical operating window. Push too hard and the plasma pressure can exceed what the magnetic field can hold (the beta limit), risking a disruption.",
     formula: "P_fusion ∝ n² · ⟨σv⟩(T) · E_DT",
-    note: "Best operation usually sits near 14 to 20 keV with matching confinement.",
+    note: "Best operation sits in the 10 to 20 keV window, with matching confinement.",
     plain: {
       title: "It starts with a super-hot gas.",
       body: "Heat the hydrogen fuel until its particles slam together hard enough to fuse and release energy. Hotter fuel fuses faster, but you also have to hold that heat in.",
@@ -144,7 +166,7 @@ const lessons = {
   blanket: {
     topic: "Blanket",
     title: "The blanket catches neutrons and breeds fuel.",
-    body: "About 80% of fusion energy leaves as fast 14 MeV neutrons. They deposit heat in a lithium blanket that drives the power cycle, and lithium reactions create fresh tritium.",
+    body: "About 80% of fusion energy leaves as fast 14.1 MeV neutrons. They deposit heat in a lithium blanket that drives the power cycle, and lithium reactions create fresh tritium.",
     deeper: "Tritium does not occur naturally in useful amounts, so a power plant must breed its own. The tritium breeding ratio (TBR) is tritium produced per tritium burned; above 1.0 the plant is self-sufficient. Neutron multipliers and blanket geometry push the TBR over unity.",
     formula: "TBR > 1.0 means fuel self-sufficiency",
     note: "A breeding ratio above 1.0 means the plant is replacing its tritium fuel.",
@@ -327,7 +349,14 @@ function calculateModel() {
 
   // Beta-style pressure vs magnetic pressure -> disruption risk
   const beta = (n20 * T) / (s.magneticField * s.magneticField);
-  const disruptionRisk = clamp((beta - 0.42) * 1.45, 0, 0.92);
+  const betaRisk = clamp((beta - 0.42) * 1.45, 0, 0.92);
+  // D1: Greenwald density limit. The achievable density scales with plasma current, which a stronger
+  // field supports; pushing density past the limit triggers a distinct (non-beta) disruption. The plant
+  // disrupts from whichever limit it crosses first, so the two combine as a max (normal operating points
+  // sit well under the density limit, so this leaves the tuned presets unchanged).
+  const greenwaldFrac = n20 / (0.155 * s.magneticField);
+  const greenwaldRisk = clamp((greenwaldFrac - 0.95) * 1.2, 0, 0.9);
+  const disruptionRisk = Math.max(betaRisk, greenwaldRisk);
 
   // Fusion power (MW)
   const balanceShape = gaussian(s.fuelBalance, 50, 12);
@@ -342,13 +371,17 @@ function calculateModel() {
   const pAlpha = 0.2 * fusionPower;
   const pNeutron = 0.8 * fusionPower;
 
+  // D1: bremsstrahlung radiation, a real loss that grows with density squared and sqrt(T). It is small at
+  // reactor conditions but dominates a cold, dense plasma, which is the lower branch of the ignition curve.
+  const pRad = 8 * n20 * n20 * Math.sqrt(Math.max(1, T));
+
   // External heating implied by Q (consistent with the gain definition)
   let pExt = q > 0.05 ? fusionPower / q : 0;
   pExt = clamp(pExt, s.neutralBeam ? 20 : 5, 400);
 
   // Thermal -> turbine -> electricity
   const capture = clamp(0.8 + s.coolingFlow / 500, 0.8, 0.97);
-  const thermalPower = (pNeutron * 1.1 + pAlpha + pExt) * capture;
+  const thermalPower = Math.max(0, (pNeutron * 1.1 + pAlpha + pExt) * capture - pRad);   // D1: radiated power is not captured by the turbine
   const idealCooling = clamp(45 + (fusionPower / 1500) * 45, 40, 95);
   const coolingMatch = clamp(1 - Math.abs(s.coolingFlow - idealCooling) / 130, 0, 1);
   const overload = Math.max(0, s.turbineLoad - 88) / 400;
@@ -395,7 +428,7 @@ function calculateModel() {
   return {
     ...s, n20, tauE, triple, tripleReq, phi, q, beta, disruptionRisk,
     fusionPower, pAlpha, pNeutron, pExt, thermalPower, grossElec, recirc,
-    netElec, wallLoad, coolantTemp, tritiumRatio, stability, nTauActual,
+    netElec, wallLoad, coolantTemp, tritiumRatio, stability, nTauActual, pRad, greenwaldFrac,
     label, stateColor
   };
 }
@@ -441,6 +474,12 @@ function updateReadouts() {
   setBar(outputs.wallLoadBar, model.wallLoad / 16, model.wallLoad > 12);
   setBar(outputs.coolantBar, (model.coolantTemp - 280) / 380, model.coolantTemp > 620);
   setBar(outputs.tritiumBar, model.tritiumRatio / 1.25, model.tritiumRatio < 1);
+
+  // D1: radiated loss and Greenwald density fraction
+  const radEl = document.getElementById("radLoss"); if (radEl) radEl.textContent = formatMw(model.pRad);
+  const radBar = document.getElementById("radLossBar"); if (radBar) setBar(radBar, model.pRad / 120, model.pRad > model.fusionPower);
+  const gwEl = document.getElementById("greenwaldFrac"); if (gwEl) gwEl.textContent = `${Math.round(model.greenwaldFrac * 100)}%`;
+  const gwBar = document.getElementById("greenwaldBar"); if (gwBar) setBar(gwBar, model.greenwaldFrac / 1.1, model.greenwaldFrac > 0.9);
 
   // Stage readout (stageTemp is tweened in tweenReadouts)
   outputs.stageField.textContent = model.magneticField.toFixed(1);
@@ -553,7 +592,7 @@ function getCoachMessage() {
   if (model.phi >= 0.95)
     return plain
       ? "Ignition! The reactor now heats itself and keeps going on its own. This is the goal."
-      : "Ignition. Alpha self-heating now sustains the burn on its own, external heating is essentially zero, and Q has run away. This is the goal.";
+      : "Ignition. Alpha self-heating now sustains the burn on its own, external heating can be pulled right back, and Q has run away. This is the goal.";
   if (model.tritiumRatio < 1 && model.fusionPower > 200)
     return plain
       ? "Good burn, but it is using fuel faster than it makes it. Nudge the cooling and keep the D-T mix even."
@@ -813,7 +852,7 @@ function bindInput() {
   window.addEventListener("touchend", up);
   reactorCanvas.addEventListener("dblclick", () => resetCamera());
   window.addEventListener("keydown", (e) => { if (e.key === "r" || e.key === "R") resetCamera(); });
-  // A4: keyboard control of the 3D stage — focusable canvas, arrows orbit, +/- zoom, R resets.
+  // A4: keyboard control of the 3D stage - focusable canvas, arrows orbit, +/- zoom, R resets.
   reactorCanvas.setAttribute("tabindex", "0");
   reactorCanvas.addEventListener("keydown", (e) => {
     let used = true; const a = 0.18;
@@ -1016,7 +1055,7 @@ function drawReactor(time) {
   /* ---- assemble depth-sorted primitives ---- */
   const prims = [];
 
-  // central solenoid — a solid, shaded, ribbed coil-stack column up the central axis:
+  // central solenoid - a solid, shaded, ribbed coil-stack column up the central axis:
   // the transformer that drives the plasma current. Subtle field-driven energized tint.
   const solEnergy = clamp((bNorm - 0.18) / 0.82, 0, 1);
   const solRgb = mixColor([140, 148, 172], [152, 172, 236], solEnergy * 0.7);
@@ -1027,7 +1066,7 @@ function drawReactor(time) {
   }
   addRevolution(prims, ctx, [0, -SOL_H, 0], [0, 1, 0], solNodes, 18, solRgb, 1, true);
 
-  // vacuum vessel / blanket shell — ghostly amber cage of poloidal ribs
+  // vacuum vessel / blanket shell - ghostly amber cage of poloidal ribs
   for (let ci = 0; ci < 26; ci += 1) {
     const th = (ci / 26) * Math.PI * 2;
     const loop = [];
@@ -1056,13 +1095,13 @@ function drawReactor(time) {
     }
   });
 
-  // outer poloidal-field coils — solid ring magnets for plasma position + shaping
+  // outer poloidal-field coils - solid ring magnets for plasma position + shaping
   addPFCoils(prims, ctx, bNorm);
 
-  // toroidal field coils — solid, shaded D-shaped magnets caging the plasma
+  // toroidal field coils - solid, shaded D-shaped magnets caging the plasma
   addDCoils(prims, ctx, bNorm);
 
-  // plasma body — WebGL volumetric raymarch if available, else 2D additive discs
+  // plasma body - WebGL volumetric raymarch if available, else 2D additive discs
   const hotCore = mixColor(pColor, [255, 255, 245], 0.5);
   if (initPlasmaGL() && renderPlasmaGL(w, h, pColor, hotCore, intensity, time)) {
     // composite the GL glow at the core's depth so the coils still weave in front/behind
@@ -1078,7 +1117,7 @@ function drawReactor(time) {
     for (let di = 0; di < ND; di += 1) {
       const th = (di / ND) * Math.PI * 2;
       const c = project(R * Math.cos(th), 0, R * Math.sin(th));
-      // A2: living-plasma turbulence — cheap layered sines make the core churn and flicker
+      // A2: living-plasma turbulence - cheap layered sines make the core churn and flicker
       const fl = reduceMotion ? 1 : (0.86 + 0.14 * Math.sin(time * 0.0045 + di * 0.7) + 0.09 * Math.sin(time * 0.012 + di * 2.3));
       const radPulse = reduceMotion ? 1 : (0.97 + 0.05 * Math.sin(time * 0.006 + di * 1.5));
       const rad = Math.max(2, A_PLASMA * c.s) * radPulse;
@@ -1184,10 +1223,10 @@ function drawReactor(time) {
     } });
   }
 
-  // A1: in-core fusion events — flashes and lingering alphas, rate scaled to fusion power
+  // A1: in-core fusion events - flashes and lingering alphas, rate scaled to fusion power
   updateFusionEvents(prims, ctx, dt, time, intensity);
 
-  // divertor — red exhaust ring at the bottom of the tube (split for occlusion)
+  // divertor - red exhaust ring at the bottom of the tube (split for occlusion)
   const sweep = (model.divertorSweep && !reduceMotion) ? Math.sin(time * 0.004) * 0.10 : 0;
   const dLoad = clamp(0.3 + model.wallLoad / 14, 0.3, 1) * (0.5 + intensity * 0.6);
   for (let seg = 0; seg < 6; seg += 1) {
@@ -1656,7 +1695,7 @@ function applyBloom(ctx, w, h, amount) {
   const a = clamp(amount, 0, 1);
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-  // A2: multi-scale bloom — a wide soft halo plus a tighter, brighter core pass
+  // A2: multi-scale bloom - a wide soft halo plus a tighter, brighter core pass
   ctx.globalAlpha = a * 0.55;
   ctx.filter = `blur(${base * 2.2}px)`;
   ctx.drawImage(glowCanvas, 0, 0, w, h);
@@ -1668,7 +1707,7 @@ function applyBloom(ctx, w, h, amount) {
   ctx.restore();
 }
 
-/* ---- A1: in-core fusion events — bright flashes plus lingering alpha particles,
+/* ---- A1: in-core fusion events - bright flashes plus lingering alpha particles,
    spawned in the hot core at a rate that scales with fusion power. Reuses the
    previously unused sparks array and an alphas pool. ---- */
 function updateFusionEvents(prims, ctx, dt, time, intensity) {
@@ -2005,7 +2044,7 @@ function drawLawson() {
   ctx.textBaseline = "bottom";
   ctx.fillText("IGNITION", xOf(24), yOf(ignitionNTau(24)) - 4);
 
-  // C2: real machines — labeled reference operating points (illustrative placement).
+  // C2: real machines - labeled reference operating points (illustrative placement).
   // None of these magnetic devices has crossed the ignition curve; NIF reached it with lasers.
   if (showMachines) {
     const machines = [
@@ -2136,12 +2175,12 @@ function drawReactivity() {
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = "rgba(8,10,14,0.6)"; ctx.fillRect(padL, padT, plotW, plotH);
 
-  // practical operating window (8-25 keV)
+  // practical operating window (10-20 keV) - matches the "reactors run at 10 to 20 keV" copy
   ctx.fillStyle = "rgba(56,225,198,0.09)";
-  ctx.fillRect(xOf(8), padT, xOf(25) - xOf(8), plotH);
+  ctx.fillRect(xOf(10), padT, xOf(20) - xOf(10), plotH);
   ctx.fillStyle = "rgba(56,225,198,0.65)"; ctx.font = "9px Inter, system-ui, sans-serif";
   ctx.textAlign = "center"; ctx.textBaseline = "top";
-  ctx.fillText("practical window", (xOf(8) + xOf(25)) / 2, padT + 4);
+  ctx.fillText("practical window", (xOf(10) + xOf(20)) / 2, padT + 4);
 
   // grid + x labels
   ctx.strokeStyle = "rgba(120,132,156,0.16)"; ctx.lineWidth = 1;
@@ -2459,7 +2498,7 @@ function initNavHud() {
    preset satisfies: each forces a deliberate tradeoff, so they must be hand-tuned. */
 const MISSIONS = [
   { id: "firstlight", name: "First Light", goal: "Produce 400 MW of fusion power", hint: "Try the Cruise preset, then nudge Fuel injection up.", test: (m) => m.fusionPower >= 400 },
-  { id: "netpos", name: "Net Positive", goal: "Send real power to the grid (net above 0)", hint: "Cruise reaches it — net power needs a high Q, not just Q above 1.", test: (m) => m.netElec > 0 },
+  { id: "netpos", name: "Net Positive", goal: "Send real power to the grid (net above 0)", hint: "Cruise reaches it; net power needs a high Q, not just Q above 1.", test: (m) => m.netElec > 0 },
   { id: "leanburn", name: "Lean Burn", goal: "Reach Q of 4 with fuel injection at 65% or less", hint: "From Cruise, ease Fuel injection down toward 65% while keeping the field strong.", test: (m) => m.q >= 4 && m.fuelRate <= 65 },
   { id: "strongfield", name: "Strong Field", goal: "Reach Q of 3 with magnetic field at 8 T or more", hint: "Push Magnetic field to 8 T or more (High Gain is close), temperature up.", test: (m) => m.q >= 3 && m.magneticField >= 8.0 },
   { id: "frugal", name: "Frugal Plant", goal: "Go net positive with turbine load at 70% or less", hint: "From Cruise, lower Turbine load toward 70% but stay net positive.", test: (m) => m.netElec > 0 && m.turbineLoad <= 70 },
@@ -2556,7 +2595,7 @@ function updateMissions() {
 /* ---------- Teachable tooltips ---------- */
 const TIPS = {
   temperature: { title: "Plasma temperature", body: "How hot the fuel ions are. 1 keV is about 11.6 million °C. Hotter ions fuse faster, but the rate only keeps climbing to roughly 65 keV. Reactors run at 10 to 20 keV, where confinement is achievable.", formula: "1 keV ≈ 11.6 million °C" },
-  magneticField: { title: "Magnetic field", body: "Field strength from the superconducting coils, in tesla. A stronger field holds the plasma's energy longer and lets it run at higher pressure before going unstable.", real: "ITER: about 5 to 12 T" },
+  magneticField: { title: "Magnetic field", body: "Field strength from the superconducting coils, in tesla. A stronger field holds the plasma's energy longer and lets it run at higher pressure before going unstable.", real: "ITER: ~5.3 T on axis, up to ~12 T at the coils" },
   fuelRate: { title: "Fuel injection", body: "How fast D-T pellets are fed in, which sets the plasma density. More fuel means more reactions, but more than the field can hold raises disruption risk." },
   fuelBalance: { title: "D-T balance", body: "The deuterium to tritium mix. A 50/50 blend gives the highest reaction rate; drifting either way lowers fusion power." },
   coolingFlow: { title: "Blanket coolant", body: "How much coolant carries blanket heat to the steam cycle. Too little overheats the blanket; too much wastes pumping power. There is a sweet spot." },
@@ -2572,7 +2611,9 @@ const TIPS = {
   tritiumRatio: { title: "Tritium breeding ratio", body: "Tritium bred in the lithium blanket per tritium burned. Above 1.0 the plant makes its own fuel; below 1.0 it runs its supply down.", formula: "TBR > 1.0 = self-sufficient" },
   reactorState: { title: "Reactor state", body: "The current operating regime, from Startup through Burning Plasma to Ignition, plus warnings like Disruption Risk or Thermal Limit." },
   netPowerBadge: { title: "Net electric", body: "Gross turbine electricity minus the plant's own recirculating power. Positive means the reactor is a net energy source." },
-  qBadge: { title: "Energy gain Q", body: "Fusion power out divided by heating power in. Q = 1 is breakeven; ignition is Q to infinity.", formula: "Q = P_fusion / P_heating" }
+  qBadge: { title: "Energy gain Q", body: "Fusion power out divided by heating power in. Q = 1 is breakeven; ignition is Q to infinity.", formula: "Q = P_fusion / P_heating" },
+  radLoss: { title: "Radiated loss", body: "Bremsstrahlung: the plasma glows in X-rays as fast electrons brush past ions. The loss grows with density squared and the square root of temperature. It is small at reactor conditions but can outpace fusion in a cold, dense plasma, which sets a lower limit on useful temperature.", formula: "P_rad ∝ n² · √T" },
+  greenwaldFrac: { title: "Density vs limit", body: "How close the plasma density sits to the Greenwald limit, the empirical ceiling a tokamak can hold before a density-limit disruption. The limit rises with plasma current, so a stronger field allows more density. Past 100% the plasma is likely to disrupt, a separate failure mode from the beta (pressure) limit.", formula: "f = n / n_Greenwald" }
 };
 let tipPop = null;
 function buildTipContent(t) {
@@ -3033,7 +3074,7 @@ const STORY = [
 let storyOn = false, storyStep = 0;
 // U4: reuse the tour's highlight ring to point the learner at the control each story step names.
 // The ring is repositioned every frame (positionStoryRing in animate) so it follows the control after
-// the page scrolls it into view — and it only ever touches the ring while the story owns it, so the
+// the page scrolls it into view - and it only ever touches the ring while the story owns it, so the
 // tour (which shares the ring element) is left alone.
 let storyEl = null;
 function storySpotlight(sel) {
@@ -3146,6 +3187,11 @@ const PREDICT_Q = [
   { q: "To send real power to the grid you need roughly...", choices: ["Q well above 1", "any Q above 0", "Q below 1"], answer: 0, why: "The plant must cover its own recirculating power, so net electricity needs a high Q." }
 ];
 let predictIdx = -1, predictAnswered = false, predictOrder = [];
+let predictScore = 0, predictDone = 0;   // U2: running quiz score
+function updatePredictScore() {
+  const el = document.getElementById("predictScoreLine");
+  if (el) el.textContent = predictDone ? `You have predicted ${predictScore} of ${predictDone} right.` : "";
+}
 function renderPredict() {
   const qEl = document.getElementById("predictQ"), choicesEl = document.getElementById("predictChoices"), fbEl = document.getElementById("predictFeedback");
   if (!qEl || !choicesEl) return;
@@ -3153,6 +3199,8 @@ function renderPredict() {
   qEl.textContent = item.q;
   if (fbEl) { fbEl.hidden = true; fbEl.textContent = ""; }
   predictAnswered = false;
+  const nextBtn = document.getElementById("predictNext");
+  if (nextBtn) nextBtn.disabled = true;   // U2: predict before you can advance
   choicesEl.innerHTML = "";
   // Shuffle so the correct answer is not always in the same slot.
   predictOrder = item.choices.map((text, i) => ({ text, correct: i === item.answer }));
@@ -3183,10 +3231,16 @@ function answerPredict(i) {
     fbEl.className = `predict-feedback ${right ? "right" : "miss"}`;
     fbEl.textContent = `${right ? "Correct. " : "Not quite. "}${item.why} Now try it on the reactor to see.`;
   }
+  // U2: track the running score and unlock the Next button
+  predictDone += 1;
+  if (right) predictScore += 1;
+  updatePredictScore();
+  const nextBtn = document.getElementById("predictNext");
+  if (nextBtn) nextBtn.disabled = false;
 }
 function nextPredict() { predictIdx = (predictIdx + 1) % PREDICT_Q.length; renderPredict(); }
 
-/* ---------- D3: takeaway card — a printable summary of the visitor's run, with a QR.
+/* ---------- D3: takeaway card - a printable summary of the visitor's run, with a QR.
    The QR is baked at build time (error-correction level M) and verified to decode back to
    TAKEAWAY_URL. To point it elsewhere, regenerate TAKEAWAY_QR for the new URL with any QR tool. ---------- */
 const TAKEAWAY_URL = "https://github.com/PJdroopyPants/Fusion-SImulator";
@@ -3209,7 +3263,8 @@ function takeawayStats() {
   else if (bestQ >= 5) verdict = "You ran a strong burning plasma.";
   else if (bestQ >= 1) verdict = "You crossed scientific breakeven, Q of at least 1.";
   else verdict = "You drove a real magnetic-confinement plasma.";
-  return { missions, total, qStr, milC, netStr, verdict };
+  const quiz = predictDone ? `${predictScore} / ${predictDone}` : null;
+  return { missions, total, qStr, milC, netStr, verdict, quiz };
 }
 function qrSvg(modules, px) {
   const N = modules.length, q = 2, size = N + q * 2;
@@ -3225,6 +3280,9 @@ function openTakeaway() {
   set("tcNet", s.netStr);
   set("tcTemp", `${s.milC.toLocaleString()} million °C`);
   set("tcMissions", `${s.missions} of ${s.total}`);
+  const quizStat = document.getElementById("tcQuizStat");
+  if (quizStat) quizStat.hidden = !s.quiz;
+  if (s.quiz) set("tcQuiz", s.quiz);
   set("tcUrl", TAKEAWAY_URL.replace(/^https?:\/\//, ""));
   const qr = document.getElementById("tcQR"); if (qr) qr.innerHTML = qrSvg(TAKEAWAY_QR, 128);
   const ov = document.getElementById("cardOverlay"); if (ov) ov.hidden = false;
@@ -3256,10 +3314,11 @@ function downloadTakeaway() {
   x.fillStyle = "#10141d"; tcRoundRect(x, 24, 24, W - 48, H - 48, 22); x.fill();
   x.strokeStyle = "rgba(120,132,156,0.28)"; x.lineWidth = 1.5; x.stroke();
   x.textAlign = "left"; x.textBaseline = "alphabetic";
-  x.fillStyle = "#38e1c6"; x.font = "700 15px Inter, system-ui, sans-serif"; x.fillText("TOKAMAK LEARNING LAB", 54, 80);
+  x.fillStyle = "#38e1c6"; x.font = "700 15px Inter, system-ui, sans-serif"; x.fillText(BRAND.program.toUpperCase(), 54, 80);
   x.fillStyle = "#eef2f8"; x.font = "800 33px Inter, system-ui, sans-serif"; x.fillText("You ran a fusion reactor", 54, 122);
   x.fillStyle = "#cdd6e6"; x.font = "500 18px Inter, system-ui, sans-serif"; tcWrap(x, s.verdict, 54, 158, W - 108, 25);
   const stats = [["BEST ENERGY GAIN Q", s.qStr], ["PEAK NET POWER", s.netStr], ["HOTTEST PLASMA", s.milC.toLocaleString() + " million °C"], ["MISSIONS COMPLETED", s.missions + " of " + s.total]];
+  if (s.quiz) stats.push(["PREDICTIONS RIGHT", s.quiz]);
   let yy = 224;
   stats.forEach((row) => {
     x.fillStyle = "#0c0f17"; tcRoundRect(x, 54, yy, W - 108, 62, 12); x.fill();
@@ -3318,7 +3377,21 @@ function initBatchControls() {
 if (liteMode) document.body.classList.add("lite");   // C3
 seedParticles();
 updateReadouts();
+// U1: a one-time welcome over the reactor on a first visit, offering the tour or "just let me play".
+// Uses the same fusionTourDone flag the tour sets, so it never reappears once handled.
+function initWelcome() {
+  const prompt = document.getElementById("welcomePrompt");
+  if (!prompt) return;
+  let seen = false;
+  try { seen = !!localStorage.getItem("fusionTourDone"); } catch (e) {}
+  if (!seen) prompt.hidden = false;
+  const stash = () => { try { localStorage.setItem("fusionTourDone", "1"); } catch (e) {} };
+  document.getElementById("welcomeTour")?.addEventListener("click", () => { prompt.hidden = true; stash(); startTour(); });
+  document.getElementById("welcomeSkip")?.addEventListener("click", () => { prompt.hidden = true; stash(); });
+}
 initNavHud();
+applyBrand();   // P1: write the host program's name into the topbar, About, and takeaway card
+initWelcome();  // U1: first-run welcome prompt
 buildMissions();
 // U3: the status-strip "challenges" chip jumps to the missions panel and flashes it.
 document.getElementById("missionChip")?.addEventListener("click", () => {
@@ -3349,7 +3422,7 @@ function initScrollCues() {
 initScrollCues();
 
 // ---- D1: About / credits modal open-close ----
-/* A1: shared modal focus management — focus in, trap Tab inside, restore focus on close, Escape to
+/* A1: shared modal focus management - focus in, trap Tab inside, restore focus on close, Escape to
    close. Wired into the About, Takeaway-card, Tour, and Story dialogs. */
 const _dlg = { panel: null, restore: null, close: null };
 function dialogOpen(panel, firstSel, closeFn) {
@@ -3417,7 +3490,7 @@ function modelTick() {
   updateReadouts();
   updateMissions();
   tickKiosk();
-  // C4: idle watchdog (normal mode) — return to a clean attract state after long inactivity,
+  // C4: idle watchdog (normal mode) - return to a clean attract state after long inactivity,
   // so a visitor never finds a reactor the last person left mid-disruption.
   if (!kioskOn && performance.now() - lastUserAction > WATCHDOG_MS) {
     lastUserAction = performance.now();
@@ -3443,7 +3516,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) stopL
 applyPreset("cruise");
 startLoops();
 
-// ---- C3: FPS safety net — drop to the lite path if early frames are slow ----
+// ---- C3: FPS safety net - drop to the lite path if early frames are slow ----
 (function fpsProbe() {
   if (liteMode) return;
   let frames = 0, t0 = 0;
