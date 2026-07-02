@@ -23,7 +23,7 @@ const BRAND = {
   madeBy: "Tokamak Learning Lab",    // About -> "Made by"
   url: ""                            // optional program page; shown as a link in About when set
 };
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.1.0";   // keep in step with CACHE_VERSION in sw.js and CHANGELOG.md
 function applyBrand() {
   const setText = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
   setText("brandEyebrow", BRAND.program);
@@ -207,6 +207,9 @@ const lessons = {
 let selectedTopic = "plasma";
 let netHistory = Array.from({ length: 120 }, () => 0);
 let fusionHistory = Array.from({ length: 120 }, () => 0);
+let qHistory = Array.from({ length: 120 }, () => 0);
+let tripleHistory = Array.from({ length: 120 }, () => 0);
+let stateHistory = Array.from({ length: 120 }, () => "");
 let trail = [];
 let particles = [];
 let sparks = [];
@@ -313,7 +316,8 @@ function advanceDynamics(dt) {
   if (burnT === null) burnT = smoothed.temperature;
   const n20 = (smoothed.fuelRate / 100) * (controls.pelletPulse.checked ? 1.05 : 0.9);
   const tauE = 2.1 * Math.pow(smoothed.magneticField / 8.8, 1.4) * (controls.divertorSweep.checked ? 1.06 : 1.0) * (quench ? 0.12 : 1);
-  const alphaHeat = BURN_GAIN * n20 * reactivity(burnT) * gaussian(smoothed.fuelBalance, 50, 12) *
+  const mixX = clamp(smoothed.fuelBalance, 0, 100) / 100;
+  const alphaHeat = BURN_GAIN * n20 * reactivity(burnT) * ((mixX * (1 - mixX)) / 0.25) *
     (controls.neutralBeam.checked ? 1.14 : 0.82) * tauE * (quench ? 0.08 : 1);
   const Teq = clamp(smoothed.temperature + alphaHeat, 3, BURN_TMAX);
   const bTau = quench ? 0.5 : BURN_TAU;
@@ -369,8 +373,12 @@ function calculateModel() {
   const greenwaldRisk = clamp((greenwaldFrac - 0.95) * 1.2, 0, 0.9);
   const disruptionRisk = Math.max(betaRisk, greenwaldRisk);
 
-  // Fusion power (MW)
-  const balanceShape = gaussian(s.fuelBalance, 50, 12);
+  // Fusion power (MW). The rate scales with the product of deuterium and tritium densities:
+  // for a deuterium fraction x, n_D*n_T goes as x(1-x), normalized to 1 at 50/50. A 60/40
+  // blend still reaches 96% of the even-mix rate; the mix is one of fusion's most forgiving
+  // knobs (the old gaussian penalty exaggerated it by an order of magnitude).
+  const bx = clamp(s.fuelBalance, 0, 100) / 100;
+  const balanceShape = (bx * (1 - bx)) / 0.25;
   const beamBoost = s.neutralBeam ? 1.14 : 0.82;
   const fusionPower = Math.max(
     0,
@@ -478,7 +486,7 @@ function updateReadouts() {
   // A11y: announce only discrete reactor-state changes (not the continuous number stream).
   if (srStatus && model.label !== lastAnnouncedState) {
     lastAnnouncedState = model.label;
-    srStatus.textContent = `Reactor state: ${model.label}. Net electric ${Math.round(model.netElec)} megawatts.`;
+    announce(`Reactor state: ${model.label}. Net electric ${Math.round(model.netElec)} megawatts.`, 2);
   }
   outputs.reactorState.style.background = model.stateColor;
   outputs.reactorState.style.boxShadow = `0 0 18px ${model.stateColor}66`;
@@ -556,15 +564,61 @@ function updatePlant() {
   if (grid) grid.style.color = model.netElec > 0 ? "var(--green)" : "var(--coral)";
 }
 
+/* ---- A11y: tick-driven writers share one polite region, so same-frame messages are coalesced
+   by priority (3 warnings, 2 state changes, 1 coach guidance) instead of last-write-wins, and
+   nothing important is silently overwritten. One-shot user-triggered messages write directly. ---- */
+let annQueue = [], annTimer = null;
+function announce(msg, prio) {
+  annQueue.push({ msg, prio: prio || 1 });
+  if (annTimer) return;
+  annTimer = setTimeout(() => {
+    annQueue.sort((a, b) => b.prio - a.prio);
+    if (srStatus) srStatus.textContent = annQueue.map((a) => a.msg).join(" ");
+    annQueue = []; annTimer = null;
+  }, 0);
+}
+
 /* ---------- B5: control-room annunciator lamps ---------- */
+let lampWarnThermal = false, lampWarnDisrupt = false, lampWarnLast = 0;
 function updateAnnunciator() {
-  const set = (id, on) => { const e = document.getElementById(id); if (e) e.classList.toggle("on", !!on); };
-  set("lampBurn", model.q >= 5);   // burning = alpha-dominated, not merely breakeven
-  set("lampNet", model.netElec > 0);
-  set("lampIgnite", model.phi >= 0.95);
-  set("lampBreed", model.tritiumRatio >= 1);
-  set("lampThermal", model.coolantTemp > 640 || model.wallLoad > 14);
-  set("lampDisrupt", model.disruptionRisk > 0.6 || model.stability < 28);
+  const set = (id, name, on) => {
+    const e = document.getElementById(id);
+    if (e) { e.classList.toggle("on", !!on); e.setAttribute("aria-label", `${name}: ${on ? "on" : "off"}`); }
+  };
+  const thermal = model.coolantTemp > 640 || model.wallLoad > 14;
+  const disrupt = model.disruptionRisk > 0.6 || model.stability < 28;
+  set("lampBurn", "Burning lamp", model.q >= 5);   // burning = alpha-dominated, not merely breakeven
+  set("lampNet", "Net power lamp", model.netElec > 0);
+  set("lampIgnite", "Ignition lamp", model.phi >= 0.95);
+  set("lampBreed", "Breeding lamp", model.tritiumRatio >= 1);
+  set("lampThermal", "Thermal warning lamp", thermal);
+  set("lampDisrupt", "Disruption warning lamp", disrupt);
+  // A11y: announce warning-lamp onset and recovery, rate-limited so a flapping edge cannot
+  // spam. The previous-state flags commit ONLY when the change is actually announced, so a
+  // transition that lands inside the cooldown is deferred to the next window, never dropped.
+  const nowL = performance.now();
+  if (srStatus && nowL - lampWarnLast > 10000) {
+    const msgs = [];
+    if (thermal !== lampWarnThermal) { msgs.push(thermal ? "Warning: thermal limit." : "Thermal limit cleared."); lampWarnThermal = thermal; }
+    if (disrupt !== lampWarnDisrupt) { msgs.push(disrupt ? "Warning: disruption risk." : "Disruption risk receding."); lampWarnDisrupt = disrupt; }
+    if (msgs.length) { announce(msgs.join(" "), 3); lampWarnLast = nowL; }
+  }
+}
+
+/* ---- A11y (P1): on-demand state snapshot, from the Describe state button or the D key.
+   Turns the sim from event notifications into an instrument a non-visual user can poll. ---- */
+function describeState() {
+  if (!model || !srStatus) return;
+  const qStr = model.phi >= 0.95 ? "effectively infinite" : (model.q || 0).toFixed(1);
+  const tbr = model.tritiumRatio || 0;
+  const msg =
+    `${model.label}. Energy gain Q ${qStr}. Fusion ${Math.round(model.fusionPower || 0)} megawatts, ` +
+    `net electric ${Math.round(model.netElec || 0)} megawatts. ${Math.round((model.phi || 0) * 100)}% of the way to ignition. ` +
+    `Stability ${Math.round(model.stability || 0)}%. Wall load ${(model.wallLoad || 0).toFixed(1)} megawatts per square meter. ` +
+    `Tritium breeding ratio ${tbr.toFixed(2)}, ${tbr >= 1 ? "fuel self-sufficient" : "running down the fuel supply"}.`;
+  // Clear first so a repeated identical snapshot still registers as a change and is re-spoken.
+  srStatus.textContent = "";
+  setTimeout(() => { srStatus.textContent = msg; }, 30);
 }
 
 /* ---------- C3: real-world unit translator ---------- */
@@ -581,6 +635,12 @@ function updateRealWorld() {
   set("rwTempSub", `about ${sun.toFixed(1)}x the Sun's core`);
   set("rwHomes", model.netElec > 0 ? `${Math.round(homes).toLocaleString()} homes` : "not yet net-positive");
   set("rwHomesSub", model.netElec > 0 ? `${formatMw(model.netElec)} reaching the grid` : "raise Q to send power out");
+  // D-T releases ~340 GJ per gram, the most jaw-dropping true number in fusion outreach.
+  const gramsPerHour = (Math.max(0, model.fusionPower) * 3600) / 340000;   // MW = MJ/s; 340 GJ/g = 3.4e5 MJ/g
+  const coalTonsPerHour = (Math.max(0, model.fusionPower) * 3600) / 24 / 1000;   // coal ~24 MJ/kg thermal
+  const burning = model.fusionPower > 25;   // below this the rounded figures read as zero and contradict the point
+  set("rwFuel", burning ? `~${gramsPerHour < 10 ? gramsPerHour.toFixed(1) : Math.round(gramsPerHour)} g per hour` : "no real burn yet");
+  set("rwFuelSub", burning ? `a coal plant burns ~${Math.round(coalTonsPerHour).toLocaleString()} tons for the same heat` : "start the reaction to burn fuel");
 }
 
 function setBar(element, amount, warning) {
@@ -611,11 +671,22 @@ function updateLesson() {
 }
 
 function updateCoach() {
-  // Only write when the message actually changed: identical writes still re-fire aria-live in
-  // some screen readers. (Messages with embedded live numbers still churn; the full announcement
-  // redesign is part of the ARIA pass.)
+  // The visible ticker updates freely; screen readers hear the coach only when the message
+  // CATEGORY changes (numbers stripped for comparison), rate-limited, via #srStatus. The ticker
+  // itself carries no live region, so embedded live values never spam AT.
   const coachMsg = getCoachMessage();
   if (outputs.coachText.textContent !== coachMsg) outputs.coachText.textContent = coachMsg;
+  // The signature commits ONLY when the announcement happens, so a category change that lands
+  // inside the cooldown retries every tick and is announced when the window opens, not dropped.
+  const coachSig = coachMsg.replace(/[\d.,%]+/g, "#");
+  if (coachSig !== updateCoach._sig) {
+    const nowC = performance.now();
+    if (srStatus && (!updateCoach._t || nowC - updateCoach._t > 8000)) {
+      updateCoach._sig = coachSig;
+      updateCoach._t = nowC;
+      announce(coachMsg, 1);
+    }
+  }
 }
 
 function getCoachMessage() {
@@ -672,7 +743,13 @@ function resizeCanvas(canvas, ctx) {
   // On the lite path (forced for Firefox), render at 1x device resolution instead of the full DPR. On a
   // 2x display that is 1/4 the pixels, which is the single biggest cut to the fill-bound software renderer
   // that makes Gecko crawl. The image is slightly softer but the frame rate is transformed.
-  const scale = liteMode ? 1 : (window.devicePixelRatio || 1);
+  // P1: additionally cap every canvas at a total-pixel budget, so a dpr 2.5 Windows-scaled laptop or a
+  // 4K projector in fullscreen never asks the software renderer for 8+ megapixels; the soft upscale is
+  // invisible at booth distance while the fill-rate saving is 3-4x.
+  const MAX_CANVAS_PIXELS = 2200000;
+  let scale = liteMode ? 1 : (window.devicePixelRatio || 1);
+  const budgetScale = Math.sqrt(MAX_CANVAS_PIXELS / Math.max(1, rect.width * rect.height));
+  scale = Math.min(scale, Math.max(0.5, budgetScale));
   const width = Math.max(1, Math.floor(rect.width * scale));
   const height = Math.max(1, Math.floor(rect.height * scale));
   if (canvas.width !== width || canvas.height !== height) {
@@ -909,7 +986,16 @@ function bindInput() {
   }, { passive: false });
   window.addEventListener("touchend", up);
   reactorCanvas.addEventListener("dblclick", () => resetCamera());
-  window.addEventListener("keydown", (e) => { if (e.key === "r" || e.key === "R") resetCamera(); });
+  window.addEventListener("keydown", (e) => {
+    // Guard only genuine typing surfaces: sliders and checkboxes do not consume letters, and
+    // they are exactly where a keyboard user sits when they want the D snapshot.
+    const t = e.target;
+    const typing = t && (t.tagName === "TEXTAREA" || t.tagName === "SELECT" ||
+      (t.tagName === "INPUT" && t.type !== "range" && t.type !== "checkbox"));
+    if (typing) return;
+    if (e.key === "r" || e.key === "R") resetCamera();
+    else if (e.key === "d" || e.key === "D") describeState();   // A11y: on-demand state snapshot
+  });
   // A4: keyboard control of the 3D stage - focusable canvas, arrows orbit, +/- zoom, R resets.
   reactorCanvas.setAttribute("tabindex", "0");
   reactorCanvas.addEventListener("keydown", (e) => {
@@ -1031,7 +1117,10 @@ function renderPlasmaGL(w, h, pColor, hotCore, intensity, time) {
   if (!glReady) return false;
   // F3: supersample the volumetric core so it is sharp on retina tablets (the 2D coils render at full
   // device resolution; the plasma was rendering at CSS px and upscaling). Capped at 2x, off under lite.
-  const s = liteMode ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+  let s = liteMode ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+  // Honor the same total-pixel budget as resizeCanvas: the raymarched shader is the heaviest
+  // per-pixel work in the app, and a 4K projector in fullscreen must not run it at 8+ MP.
+  s = Math.min(s, Math.max(0.5, Math.sqrt(2200000 / Math.max(1, w * h))));
   const W = Math.max(2, Math.floor(w * s)), H = Math.max(2, Math.floor(h * s));
   if (glCanvas.width !== W || glCanvas.height !== H) { glCanvas.width = W; glCanvas.height = H; }
   glx.viewport(0, 0, W, H);
@@ -2479,6 +2568,12 @@ function tickHistory() {
   netHistory.push(model.netElec);
   fusionHistory = fusionHistory.slice(1);
   fusionHistory.push(model.fusionPower);
+  qHistory = qHistory.slice(1);
+  qHistory.push(model.q);
+  tripleHistory = tripleHistory.slice(1);
+  tripleHistory.push(model.triple);
+  stateHistory = stateHistory.slice(1);
+  stateHistory.push(model.label);
   trail.push({ T: model.temperature, nTau: model.nTauActual });
   if (trail.length > 26) trail.shift();
 }
@@ -2490,13 +2585,17 @@ function applyPreset(name) {
     if (typeof value === "boolean") controls[key].checked = value;
     else controls[key].value = value;
   });
-  presets.forEach((b) => b.classList.toggle("active", b.dataset.preset === name));
+  presets.forEach((b) => {
+    const on = b.dataset.preset === name;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-pressed", String(on));
+  });
   trail = [];
   updateReadouts();
 }
 
 function clearPresetHighlight() {
-  presets.forEach((b) => b.classList.remove("active"));
+  presets.forEach((b) => { b.classList.remove("active"); b.setAttribute("aria-pressed", "false"); });
 }
 
 Object.values(controls).forEach((control) => {
@@ -2523,7 +2622,10 @@ presets.forEach((b) => b.addEventListener("click", () => {
 hotspots.forEach((b) => {
   b.addEventListener("click", () => {
     selectedTopic = b.dataset.topic;
-    hotspots.forEach((item) => item.classList.toggle("active", item === b));
+    hotspots.forEach((item) => {
+      item.classList.toggle("active", item === b);
+      item.setAttribute("aria-pressed", String(item === b));
+    });
     updateLesson();
   });
 });
@@ -2679,6 +2781,14 @@ function completeMission(mn, st) {
   st.done = true;
   st.el.classList.add("done");
   if (st.bar) st.bar.style.width = "100%";
+  // A11y: convey the done state in text, not just the checkmark styling.
+  const nameEl = st.el.querySelector(".mission-name");
+  if (nameEl && !nameEl.querySelector(".visually-hidden")) {
+    const doneTag = document.createElement("span");
+    doneTag.className = "visually-hidden";
+    doneTag.textContent = " (complete)";
+    nameEl.appendChild(doneTag);
+  }
   // The debrief line: what this completion just proved. Stays visible in the chip afterward.
   if (mn.learn && !st.el.querySelector(".mission-learn")) {
     const p = document.createElement("p");
@@ -2914,7 +3024,7 @@ const TIPS = {
   temperature: { title: "Plasma temperature", body: "How hot the fuel ions are. 1 keV is about 11.6 million °C. Hotter ions fuse faster, but the rate only keeps climbing to roughly 65 keV. Reactors run at 10 to 20 keV, where confinement is achievable.", formula: "1 keV ≈ 11.6 million °C" },
   magneticField: { title: "Magnetic field", body: "Field strength from the superconducting coils, in tesla. A stronger field holds the plasma's energy longer and lets it run at higher pressure before going unstable.", real: "ITER: ~5.3 T on axis, up to ~12 T at the coils" },
   fuelRate: { title: "Fuel injection", body: "How fast D-T pellets are fed in, which sets the plasma density. More fuel means more reactions, but more than the field can hold raises disruption risk." },
-  fuelBalance: { title: "D-T balance", body: "The deuterium to tritium mix. A 50/50 blend gives the highest reaction rate; drifting either way lowers fusion power." },
+  fuelBalance: { title: "D-T balance", body: "The deuterium to tritium mix. The reaction rate scales with deuterium times tritium, so 50/50 is best, but gently: a 60/40 blend still gives roughly 96% of the rate (power dips a touch more as the burn cools slightly).", formula: "rate ∝ n_D · n_T" },
   coolingFlow: { title: "Blanket coolant", body: "How much coolant carries blanket heat to the steam cycle. Too little overheats the blanket; too much wastes pumping power. There is a sweet spot." },
   turbineLoad: { title: "Turbine load", body: "How hard the turbine-generator is driven. Higher load converts more heat to electricity, but only when the blanket is hot and cooling is matched." },
   fusionPower: { title: "Fusion power", body: "Total power released by fusion, in megawatts. About 20% (alpha particles) stays to heat the plasma; 80% (neutrons) deposits in the blanket.", formula: "P_fus ∝ n² · ⟨σv⟩(T)" },
@@ -2990,6 +3100,7 @@ function setKiosk(on) {
   document.body.classList.toggle("kiosk", on);
   kioskUserOwned = false;
   const dChip = document.getElementById("demoChip"); if (dChip) dChip.hidden = true;
+  closeToolsMenu();   // an open mobile menu would eat kiosk's tight vertical budget
   setAttract(on, on ? "A working fusion reactor, simulated" : undefined);
   const btn = document.getElementById("presentBtn");
   if (btn) { btn.setAttribute("aria-pressed", String(on)); btn.textContent = on ? "Exit" : "Present"; }
@@ -3244,8 +3355,10 @@ function exportRun() {
   L.push(`first_wall_dose_dpa,${wallDose.toFixed(2)}`);
   L.push("");
   L.push("History (oldest to newest)");
-  L.push("sample,net_electric_MW,fusion_power_MW");
-  for (let i = 0; i < netHistory.length; i += 1) L.push(`${i},${Math.round(netHistory[i])},${Math.round(fusionHistory[i])}`);
+  L.push("sample,net_electric_MW,fusion_power_MW,energy_gain_Q,triple_product_e21,reactor_state");
+  for (let i = 0; i < netHistory.length; i += 1) {
+    L.push(`${i},${Math.round(netHistory[i])},${Math.round(fusionHistory[i])},${(qHistory[i] || 0).toFixed(2)},${(tripleHistory[i] || 0).toFixed(2)},${stateHistory[i] || ""}`);
+  }
   const blob = new Blob([L.join("\n")], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -3481,11 +3594,17 @@ function renderStory() {
   const nx = document.getElementById("storyNext"); if (nx) nx.textContent = storyStep === STORY.length - 1 ? "Finish" : "Next";
   storySpotlight(s.sel);
 }
+let storyMetAnnounced = -1;
 function updateStory() {
   if (!storyOn) return;
   const met = !!STORY[storyStep].test(model);
   const badge = document.getElementById("storyCheck");
   if (badge) { badge.textContent = met ? "Goal met" : "Try it"; badge.className = `story-check ${met ? "met" : ""}`; }
+  // A11y: announce the goal-met transition once per step; the visual badge alone is silent.
+  if (met && storyMetAnnounced !== storyStep) {
+    storyMetAnnounced = storyStep;
+    if (srStatus) srStatus.textContent = "Story goal met. The next step is available.";
+  }
 }
 function setStory(on) {
   storyOn = on; storyStep = 0;
@@ -3554,6 +3673,17 @@ function initPhase2Controls() {
   document.getElementById("cardClose")?.addEventListener("click", () => closeTakeaway());
   document.getElementById("cardDownload")?.addEventListener("click", () => downloadTakeaway());
   document.getElementById("cardOverlay")?.addEventListener("click", (e) => { if (e.target && e.target.id === "cardOverlay") closeTakeaway(); });
+  document.getElementById("describeBtn")?.addEventListener("click", () => describeState());
+  const toolsToggle = document.getElementById("toolsToggle");
+  toolsToggle?.addEventListener("click", () => {
+    const row = toolsToggle.closest(".topbar-actions");
+    if (!row) return;
+    const open = row.classList.toggle("open");
+    toolsToggle.setAttribute("aria-expanded", String(open));
+    // The revealed tools sit before the toggle in the DOM, so move focus into them on expand;
+    // otherwise Tab from the Menu button skips everything it just revealed.
+    if (open) setTimeout(() => { document.querySelector("#topbarTools select, #topbarTools button")?.focus(); }, 30);
+  });
   document.getElementById("challengeBtn")?.addEventListener("click", () => startChallenge());
   document.getElementById("chClose")?.addEventListener("click", () => closeChallengeCard());
   document.getElementById("chAgain")?.addEventListener("click", () => { closeChallengeCard(); startChallenge(); });
@@ -3587,7 +3717,13 @@ const PREDICT_Q = [
   { q: "You push fuel high with a weak magnetic field. The likely result is...", choices: ["a disruption", "more net power", "nothing"], answer: 0, why: "Too much pressure for the field (high beta) drives the plasma unstable." },
   { q: "At ignition, the external heating you need is about...", choices: ["near zero", "at its maximum", "negative"], answer: 0, why: "Alpha self-heating sustains the burn, so external heating falls toward zero." },
   { q: "Turning on the divertor sweep mainly...", choices: ["lowers peak wall heat", "raises fusion power", "cools the grid"], answer: 0, why: "It spreads the exhaust load over a larger area, easing the peak heat flux." },
-  { q: "To send real power to the grid you need roughly...", choices: ["Q well above 1", "any Q above 0", "Q below 1"], answer: 0, why: "The plant must cover its own recirculating power, so net electricity needs a high Q." }
+  { q: "To send real power to the grid you need roughly...", choices: ["Q well above 1", "any Q above 0", "Q below 1"], answer: 0, why: "The plant must cover its own recirculating power, so net electricity needs a high Q." },
+  { q: "Which particle carries most of the energy from each D-T fusion?", choices: ["The neutron", "The alpha particle", "They split it evenly"], answer: 0, why: "The neutron carries 14.1 of the 17.6 MeV out to the blanket; the alpha keeps 3.5 MeV in the plasma." },
+  { q: "You shift the fuel mix from 50/50 to 60/40. Fusion power...", choices: ["dips only slightly", "collapses", "doubles"], answer: 0, why: "The rate scales with deuterium times tritium, and 0.6 x 0.4 is still 96% of the even-mix product." },
+  { q: "Why do reactors run near 15 keV when reactivity keeps rising well past that?", choices: ["Hotter plasma pushes the field harder than it can hold", "The fuel would melt", "The magnets would quench"], answer: 0, why: "Pressure grows with temperature; past the beta limit the plasma goes unstable. Watch the stability number if you push the heat." },
+  { q: "Double the plasma density. The X-ray (bremsstrahlung) loss...", choices: ["roughly quadruples", "doubles", "does not change"], answer: 0, why: "Radiated loss grows with density squared, which is why a plasma that is too cold radiates away more than it fuses." },
+  { q: "A tokamak power plant must breed its own tritium because...", choices: ["there is almost no natural supply", "breeding makes the plasma hotter", "deuterium requires it"], answer: 0, why: "Tritium barely exists in nature, so the lithium blanket must make at least as much as the plant burns (TBR above 1)." },
+  { q: "In this machine, a disruption is...", choices: ["a sudden loss of plasma stability", "a scheduled shutdown", "a coolant leak"], answer: 0, why: "Push pressure or density past what the field can hold and confinement collapses abruptly." }
 ];
 let predictIdx = -1, predictAnswered = false, predictOrder = [];
 let predictScore = 0, predictDone = 0;   // U2: running quiz score
@@ -3661,8 +3797,16 @@ function updatePeaks() {
 
 /* ---- C4: per-visitor reset - a clean slate between booth visitors. Invoked by the "New run"
    button, the normal-mode idle watchdog, and the kiosk auto-demo when it takes back over. ---- */
+function closeToolsMenu() {
+  const row = document.querySelector(".topbar-actions");
+  const tg = document.getElementById("toolsToggle");
+  if (row) row.classList.remove("open");
+  if (tg) tg.setAttribute("aria-expanded", "false");
+}
+
 function resetRun() {
   if (_dlg.panel && _dlg.close) _dlg.close();   // closes story/tour/takeaway/about via their own handlers
+  closeToolsMenu();   // the next visitor should not inherit an open mobile menu
   bestQ = 0; bestNet = -Infinity; hotT = 0; everIgnited = false;
   wallDose = 0;
   predictScore = 0; predictDone = 0;
@@ -3672,6 +3816,9 @@ function resetRun() {
   missionsInitialized = false;   // next armed pass completes pre-satisfied milestones silently
   netHistory = Array.from({ length: 120 }, () => 0);
   fusionHistory = Array.from({ length: 120 }, () => 0);
+  qHistory = Array.from({ length: 120 }, () => 0);
+  tripleHistory = Array.from({ length: 120 }, () => 0);
+  stateHistory = Array.from({ length: 120 }, () => "");
   trail = [];
   if (challengeOn) { challengeOn = false; const cch = document.getElementById("challengeChip"); if (cch) cch.hidden = true; }
   challengeEarned = [];
@@ -3776,16 +3923,24 @@ function downloadTakeaway() {
 }
 
 /* ---------- B6: inject plus/minus steppers beside each setpoint slider ---------- */
+const CONTROL_NAMES = {
+  temperature: "Plasma temperature", magneticField: "Magnetic field", fuelRate: "Fuel injection",
+  fuelBalance: "D-T balance", coolingFlow: "Blanket coolant", turbineLoad: "Turbine load"
+};
 function addSteppers() {
   document.querySelectorAll(".control input[type=range]").forEach((range) => {
     const step = Number(range.step) || 1;
     const nudge = step * 5;
+    const nice = CONTROL_NAMES[range.id] || range.id || "value";
+    // A short accessible name for the slider itself; the wrapping label otherwise concatenates
+    // the whole control cluster (name, description, and both stepper buttons) into one mouthful.
+    range.setAttribute("aria-label", nice);
     const wrap = document.createElement("div");
     wrap.className = "stepper";
     const mk = (label, delta) => {
       const b = document.createElement("button");
       b.type = "button"; b.className = "step-btn"; b.textContent = label;
-      b.setAttribute("aria-label", (delta < 0 ? "Decrease " : "Increase ") + (range.id || "value"));
+      b.setAttribute("aria-label", (delta < 0 ? "Decrease " : "Increase ") + (nice === "D-T balance" ? nice : nice.toLowerCase()));
       b.addEventListener("click", () => {
         range.value = clamp(Number(range.value) + delta, Number(range.min), Number(range.max));
         range.dispatchEvent(new Event("input", { bubbles: true }));
@@ -3968,6 +4123,14 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) stopL
 // Startup preset (which teaches that Q > 1 is not net power) stays one click away.
 applyPreset("cruise");
 startLoops();
+
+// P2: offline support - a tiny cache-first service worker so the hosted exhibit keeps working
+// with no network once visited. Inert on file:// (opening the folder copy needs nothing) and on
+// localhost dev servers, where cache-first would serve stale files while editing.
+if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol) &&
+    !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+  window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); });
+}
 
 // ---- C3: the FPS safety net is now a continuous guard inside animate() (see perfWin / perfBad),
 // so it catches a browser that starts fine and bogs down later (e.g. Firefox), not just early frames. ----

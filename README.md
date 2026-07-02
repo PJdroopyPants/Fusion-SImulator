@@ -73,7 +73,7 @@ Live, software-drawn panels accompany the reactor: the Lawson operating-point ma
 
 ## Accessibility
 
-The simulator honors the operating system's reduced-motion setting (it stills animation and freezes flicker), ships high-contrast and colorblind-safe themes, supports keyboard reset and touch gestures, and uses ARIA live regions for the key readouts.
+The simulator honors the operating system's reduced-motion setting (it stills animation and freezes flicker), ships high-contrast and colorblind-safe themes, supports keyboard reset and touch gestures, and announces discrete state changes (reactor state, warnings, story goals, mission and challenge events) through a single polite live region rather than streaming numbers. A **Describe state** button (or the **D** key) speaks a full snapshot of the reactor on demand: state, Q, powers, progress to ignition, stability, and wall load.
 
 ## For educators
 
@@ -88,6 +88,9 @@ The simulator honors the operating system's reduced-motion setting (it stills an
 - `script.js` holds the physics model, the burn-through dynamics, the software 3D renderer, the WebGL plasma shader, and the data visualizations. A host program can rebrand the exhibit by editing the `BRAND` block at the top (program name, attribution, and an optional link flow to the topbar, the About panel, and the takeaway card).
 - `Fusion-Lab-Worksheet.html` is the one-page student lab handout; `Fusion-Lab-Instructor-Key.html` is the matching instructor answer key (marked "do not distribute"). Both carry grade-band, time, and standards metadata.
 - `Fusion-Facilitator-Guide.html` is a one-page booth run-of-show for the volunteer staffing the exhibit.
+- `sw.js` is a small cache-first service worker: once the hosted version has been visited, it keeps working with no network. It does nothing when the folder is opened directly.
+- `manifest.webmanifest`, `icon.svg`, and the PNG icons make "Add to Home Screen" produce a proper app icon on phones and tablets; `og-card.jpg` is the link-preview image.
+- `CHANGELOG.md` records releases; `HANDOFF.md` is the maintenance and rebranding guide for the receiving program.
 
 ## Disclaimer
 

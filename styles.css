@@ -9,7 +9,7 @@
   --line-strong: rgba(120, 132, 156, 0.32);
   --text: #eef2f8;
   --muted: #9aa4b8;
-  --faint: #5e6878;
+  --faint: #7f8aa0;   /* lifted from #5e6878: small caption text now clears 4.5:1 on the dark panels */
   --teal: #38e1c6;
   --gold: #ffc24b;
   --coral: #ff7a66;
@@ -1451,12 +1451,30 @@ meter::-moz-meter-bar {
   align-items: flex-end;
   gap: 12px;
 }
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .topbar-tools {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
   gap: 8px;
+}
+.tools-toggle { display: none; }
+/* P1: on phones (the QR destination) the header collapses so the reactor is visible sooner:
+   subtitle hidden, title tightened, and the tool row folded behind a Menu button. */
+@media (max-width: 920px) {
+  .subtitle { display: none; }
+  .brand h1 { font-size: clamp(1.25rem, 5.4vw, 1.7rem); }
+  .topbar { padding-bottom: 10px; gap: 10px; }
+  .tools-toggle { display: inline-flex; }
+  .topbar-tools { display: none; width: 100%; justify-content: flex-start; }
+  .topbar-actions.open .topbar-tools { display: flex; }
 }
 .tool-select {
   display: inline-flex;
@@ -1605,9 +1623,9 @@ html[data-theme="light"] {
   --line-strong: rgba(40, 52, 74, 0.26);
   --text: #161b24;
   --muted: #4c5666;
-  --faint: #828c9c;
-  --teal: #0f9f8c;
-  --gold: #b9790a;
+  --faint: #5c6675;   /* darkened: small caption text now clears 4.5:1 on the light panels */
+  --teal: #0b7a6c;    /* darkened: kickers and accent text now pass AA on light backgrounds */
+  --gold: #8f5d06;
   --coral: #d65b43;
   --violet: #6f59d9;
   --green: #1f9d4d;
@@ -2164,16 +2182,31 @@ body.kiosk .board-chip { font-size: 0.95rem; }
 }
 .step-btn:hover { border-color: var(--teal); color: var(--teal); }
 
-/* ---- B6: bigger touch targets on touch devices ---- */
+/* ---- B6: bigger touch targets on touch devices. The close/hint/tip controls keep their compact
+   visuals but gain a 44x44 invisible hit area via ::after, so kids stop mashing and missing. ---- */
 @media (pointer: coarse) {
   input[type="range"] { height: 34px; }
   input[type="range"]::-webkit-slider-thumb { width: 24px; height: 24px; margin-top: -9px; }
   input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
   input[type="range"].vol-slider { height: 26px; }
-  .step-btn { width: 40px; height: 40px; font-size: 1.2rem; }
-  .tip-dot { width: 20px; height: 20px; font-size: 11px; }
+  .step-btn { width: 44px; height: 44px; font-size: 1.2rem; }
+  .tip-dot { width: 22px; height: 22px; font-size: 11px; }
   .preset { min-height: 46px; }
-  .gizmo-btn { padding: 7px 0; }
+  .gizmo-btn { padding: 9px 0; }
+  .tc-close, .about-close, .legend-close, .story-close, .tip-dot, .mission-hint-btn {
+    position: relative;
+  }
+  .tc-close::after, .about-close::after, .legend-close::after, .story-close::after,
+  .tip-dot::after, .mission-hint-btn::after {
+    content: "";
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 44px; height: 44px;
+    transform: translate(-50%, -50%);
+  }
+  .mission-hint-btn { min-height: 32px; padding: 6px 12px; }
+  .nav-btn { width: 44px; height: 44px; }
+  .hotspot { min-height: 40px; }
 }
 
 /* ---- Balance of Plant panel (reactor-to-grid flow) ---- */

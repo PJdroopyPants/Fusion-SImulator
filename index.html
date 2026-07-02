@@ -8,8 +8,18 @@
     <meta name="author" content="Tokamak Learning Lab">
     <meta name="theme-color" content="#0b0d12">
     <meta name="color-scheme" content="dark light">
+    <!-- Link previews (update og:url and og:image if the exhibit moves to a new home) -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Fusion Power Generator: drive a reactor to ignition">
+    <meta property="og:description" content="A physically grounded tokamak simulator. Heat the plasma, hold it with the field, and chase ignition. Runs in any browser, no install.">
+    <meta property="og:url" content="https://pjdroopypants.github.io/Fusion-SImulator/">
+    <meta property="og:image" content="https://pjdroopypants.github.io/Fusion-SImulator/og-card.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
-    <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -30,23 +40,26 @@
           <p class="subtitle">Drive a magnetic-confinement reactor toward ignition and watch the physics respond.</p>
         </div>
         <div class="topbar-right">
-          <div class="topbar-tools">
-            <label class="tool-select">
-              <span>Theme</span>
-              <select id="themeSelect" aria-label="Color theme">
-                <option value="dark">Control room</option>
-                <option value="light">Light</option>
-                <option value="contrast">High contrast</option>
-                <option value="cb">Colorblind</option>
-              </select>
-            </label>
-            <button class="tool-btn" id="unitsToggle" type="button" aria-pressed="false" title="Show readouts in everyday units">Real-world units</button>
-            <button class="tool-btn" id="levelToggle" type="button" aria-pressed="false" title="Switch lessons to plain language">Plain words</button>
-            <button class="tool-btn" id="soundToggle" type="button" aria-pressed="false" title="Toggle reactor sound">Sound</button>
-            <input type="range" id="soundVol" class="vol-slider" min="0" max="100" value="60" title="Sound volume" aria-label="Sound volume" hidden>
-            <button class="tool-btn" id="tourBtn" type="button" title="Take a guided tour">Tour</button>
+          <div class="topbar-actions">
+            <div class="topbar-tools" id="topbarTools">
+              <label class="tool-select">
+                <span>Theme</span>
+                <select id="themeSelect" aria-label="Color theme">
+                  <option value="dark">Control room</option>
+                  <option value="light">Light</option>
+                  <option value="contrast">High contrast</option>
+                  <option value="cb">Colorblind</option>
+                </select>
+              </label>
+              <button class="tool-btn" id="unitsToggle" type="button" aria-pressed="false" title="Show readouts in everyday units">Real-world units</button>
+              <button class="tool-btn" id="levelToggle" type="button" aria-pressed="false" title="Switch lessons to plain language">Plain words</button>
+              <button class="tool-btn" id="soundToggle" type="button" aria-pressed="false" title="Toggle reactor sound">Sound</button>
+              <input type="range" id="soundVol" class="vol-slider" min="0" max="100" value="60" title="Sound volume" aria-label="Sound volume" hidden>
+              <button class="tool-btn" id="tourBtn" type="button" title="Take a guided tour">Tour</button>
+              <button class="tool-btn" id="aboutBtn" type="button" aria-haspopup="dialog" title="About this exhibit">About</button>
+            </div>
             <button class="tool-btn" id="presentBtn" type="button" aria-pressed="false" title="Fullscreen exhibit mode">Present</button>
-            <button class="tool-btn" id="aboutBtn" type="button" aria-haspopup="dialog" title="About this exhibit">About</button>
+            <button class="tool-btn tools-toggle" id="toolsToggle" type="button" aria-expanded="false" aria-controls="topbarTools">Menu</button>
           </div>
           <div class="status-strip">
             <span class="status-block">
@@ -177,11 +190,11 @@
         <section class="reactor-stage" aria-label="Tokamak reactor visualization">
           <canvas id="reactorCanvas" aria-label="Interactive 3D reactor. Drag or use arrow keys to orbit; plus and minus to zoom; R resets the view."></canvas>
           <div class="stage-overlay">
-            <button class="hotspot hotspot-magnets" type="button" data-topic="magnets">Magnets</button>
-            <button class="hotspot hotspot-core active" type="button" data-topic="plasma">Plasma core</button>
-            <button class="hotspot hotspot-solenoid" type="button" data-topic="solenoid">Solenoid</button>
-            <button class="hotspot hotspot-blanket" type="button" data-topic="blanket">Blanket</button>
-            <button class="hotspot hotspot-divertor" type="button" data-topic="divertor">Divertor</button>
+            <button class="hotspot hotspot-magnets" type="button" data-topic="magnets" aria-pressed="false">Magnets</button>
+            <button class="hotspot hotspot-core active" type="button" data-topic="plasma" aria-pressed="true">Plasma core</button>
+            <button class="hotspot hotspot-solenoid" type="button" data-topic="solenoid" aria-pressed="false">Solenoid</button>
+            <button class="hotspot hotspot-blanket" type="button" data-topic="blanket" aria-pressed="false">Blanket</button>
+            <button class="hotspot hotspot-divertor" type="button" data-topic="divertor" aria-pressed="false">Divertor</button>
           </div>
           <div class="stage-readout" aria-hidden="true">
             <span><em id="stageTemp">11.0</em> keV</span>
@@ -192,7 +205,9 @@
           <!-- P1: operator HUD - the coach's live read plus a progress-to-ignition bar,
                pinned to the stage so cause-and-effect is visible without scrolling -->
           <div class="stage-hud">
-            <div class="hud-coach" aria-live="polite">
+            <!-- No aria-live here: the ticker embeds live numbers; screen readers get coach
+                 changes through #srStatus (category changes only), and Describe state / D on demand. -->
+            <div class="hud-coach">
               <span class="hud-coach-tag" aria-hidden="true">Operator's read</span>
               <p id="coachText">Bring the plasma up to temperature with confinement to match, then watch the operating point climb toward the ignition curve.</p>
             </div>
@@ -294,46 +309,46 @@
             <h2>Live Telemetry</h2>
           </div>
 
-          <div class="annunciator" aria-label="Status annunciator">
-            <span class="lamp" id="lampBurn">Burning</span>
-            <span class="lamp" id="lampNet">Net power</span>
-            <span class="lamp" id="lampIgnite">Ignition</span>
-            <span class="lamp" id="lampBreed">Breeding</span>
-            <span class="lamp warn" id="lampThermal">Thermal</span>
-            <span class="lamp warn" id="lampDisrupt">Disruption</span>
+          <div class="annunciator" role="group" aria-label="Status annunciator">
+            <span class="lamp" id="lampBurn" role="img" aria-label="Burning lamp: off">Burning</span>
+            <span class="lamp" id="lampNet" role="img" aria-label="Net power lamp: off">Net power</span>
+            <span class="lamp" id="lampIgnite" role="img" aria-label="Ignition lamp: off">Ignition</span>
+            <span class="lamp" id="lampBreed" role="img" aria-label="Breeding lamp: off">Breeding</span>
+            <span class="lamp warn" id="lampThermal" role="img" aria-label="Thermal warning lamp: off">Thermal</span>
+            <span class="lamp warn" id="lampDisrupt" role="img" aria-label="Disruption warning lamp: off">Disruption</span>
           </div>
 
           <div class="metric-grid">
             <article class="metric">
               <span class="metric-label">Fusion power</span>
               <strong id="fusionPower">0 MW</strong>
-              <meter id="fusionPowerMeter" min="0" max="2000" value="0"></meter>
+              <meter id="fusionPowerMeter" aria-hidden="true" min="0" max="2000" value="0"></meter>
             </article>
             <article class="metric metric-q">
               <span class="metric-label">Energy gain Q</span>
               <strong id="qPlasma">0.0</strong>
-              <meter id="qMeter" min="0" max="25" value="0"></meter>
+              <meter id="qMeter" aria-hidden="true" min="0" max="25" value="0"></meter>
             </article>
             <article class="metric">
               <span class="metric-label">Net electric</span>
               <strong id="electricOutput">0 MW</strong>
-              <meter id="electricMeter" min="-300" max="700" value="0"></meter>
+              <meter id="electricMeter" aria-hidden="true" min="-300" max="700" value="0"></meter>
             </article>
             <article class="metric metric-triple">
               <span class="metric-label">Triple product <span class="sym">nT&tau;<sub>E</sub></span></span>
               <strong id="tripleProduct">0.00</strong>
               <span class="metric-unit">×10²¹ keV·s·m⁻³ &nbsp;(ignition ≈ 3)</span>
-              <meter id="tripleMeter" min="0" max="3.5" value="0"></meter>
+              <meter id="tripleMeter" aria-hidden="true" min="0" max="3.5" value="0"></meter>
             </article>
             <article class="metric">
               <span class="metric-label">Confinement <span class="sym">&tau;<sub>E</sub></span></span>
               <strong id="confinementTime">0.0 s</strong>
-              <meter id="confinementMeter" min="0" max="3" value="0"></meter>
+              <meter id="confinementMeter" aria-hidden="true" min="0" max="3" value="0"></meter>
             </article>
             <article class="metric">
               <span class="metric-label">Stability</span>
               <strong id="stability">0%</strong>
-              <meter id="stabilityMeter" min="0" max="100" value="0"></meter>
+              <meter id="stabilityMeter" aria-hidden="true" min="0" max="100" value="0"></meter>
             </article>
           </div>
 
@@ -378,6 +393,11 @@
                 <strong id="rwHomes">.</strong>
                 <span class="rw-sub" id="rwHomesSub">.</span>
               </div>
+              <div class="rw-item">
+                <span class="rw-label">Fuel burned</span>
+                <strong id="rwFuel">.</strong>
+                <span class="rw-sub" id="rwFuelSub">.</span>
+              </div>
             </div>
           </section>
 
@@ -401,6 +421,7 @@
             <button type="button" class="tool-btn wide" id="exportBtn" title="Download this run as a CSV">Export run (CSV)</button>
             <button type="button" class="tool-btn wide" id="cardBtn" title="A takeaway card of your run, with a QR to run it yourself">Your run card (QR)</button>
             <button type="button" class="tool-btn wide" id="newRunBtn" title="Clear missions, records, quiz score, and charts for the next visitor">New run</button>
+            <button type="button" class="tool-btn wide" id="describeBtn" title="Announce the current reactor state for screen readers (or press D)">Describe state (D)</button>
           </div>
         </aside>
       </section>
@@ -527,7 +548,7 @@
             <h2>Output Over Time</h2>
           </div>
           <p class="viz-caption">Net electrical output (teal) and fusion power (amber) over the last ~40 seconds of simulated time.</p>
-          <canvas id="historyCanvas"></canvas>
+          <canvas id="historyCanvas" role="img" aria-label="Chart of net electric and fusion power over the recent past. The CSV export contains the same data as numbers."></canvas>
           <div class="chart-title">
             <span>Peak net electric</span>
             <strong id="chartPeak">0 MW</strong>
