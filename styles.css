@@ -1999,7 +1999,7 @@ body.kiosk .demo-chip { font-size: 1.5rem; padding: 12px 22px; }
 .stage-hud {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 6;
   display: flex; align-items: center; gap: 16px;
-  padding: 20px 14px 10px;
+  padding: 14px 14px 10px;   /* keep the dark scrim's reach into the plasma as short as possible */
   /* Darkens fast enough that even the topmost text row sits over >= 0.75 alpha, so the coach
      stays readable over a white-hot ignition flash. */
   background: linear-gradient(180deg, rgba(8, 10, 14, 0), rgba(8, 10, 14, 0.75) 16%, rgba(8, 10, 14, 0.88) 45%, rgba(8, 10, 14, 0.94));
@@ -2130,9 +2130,12 @@ body.kiosk .demo-chip { font-size: 1.5rem; padding: 12px 22px; }
 .stage-cheer.chief { color: #ffd98a; font-size: clamp(1.5rem, 3.8vw, 2.9rem); }
 .stage-cheer.chief.run { animation-duration: 2.4s; }
 .stage-cheer.static { opacity: 1; transition: opacity 0.2s linear; }
+/* Border-and-halo only: no inset wash. An inner glow briefly brightened the WHOLE stage and its
+   fade-out read as the plasma suddenly dimming, exactly when a milestone (like going net
+   positive) had just been celebrated. */
 @keyframes cheerRing {
-  0% { opacity: 0.95; box-shadow: 0 0 0 0 rgba(56, 225, 198, 0.45), inset 0 0 40px rgba(56, 225, 198, 0.25); }
-  100% { opacity: 0; box-shadow: 0 0 0 26px rgba(56, 225, 198, 0), inset 0 0 4px rgba(56, 225, 198, 0); }
+  0% { opacity: 0.95; box-shadow: 0 0 0 0 rgba(56, 225, 198, 0.45); }
+  100% { opacity: 0; box-shadow: 0 0 0 26px rgba(56, 225, 198, 0); }
 }
 .stage-cheer {
   position: absolute; left: 50%; top: 34%; transform: translateX(-50%); z-index: 9;

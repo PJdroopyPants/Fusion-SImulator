@@ -244,6 +244,15 @@ let liteMode = !!((navigator.hardwareConcurrency && navigator.hardwareConcurrenc
 // slower than Chrome's, so force the lite render path (no bloom, no supersample, fewer particles, no
 // backdrop-filter) from the very first frame. Set BEFORE seedParticles / the first render reads it.
 if (/Gecko\//.test(navigator.userAgent)) liteMode = true;
+// P0: user-visible quality override. "auto" lets the FPS guard manage the lite path; "full"
+// pins full quality and disables the guard entirely (even on Firefox, if the user accepts the
+// frame rate); "lite" pins the light path. Persisted so a booth setup survives reloads.
+let qualityMode = "auto";
+try {
+  const storedQ = localStorage.getItem("fusionQuality");
+  if (storedQ === "full") { qualityMode = "full"; liteMode = false; }
+  else if (storedQ === "lite") { qualityMode = "lite"; liteMode = true; }
+} catch (e) {}
 
 /* ---------- Math helpers ---------- */
 function gaussian(value, center, width) {
@@ -449,7 +458,10 @@ function calculateModel() {
   } else if (q >= 5) {
     label = "Burning Plasma"; stateColor = "#38e1c6";
   } else if (q >= 1) {
-    label = "Breakeven"; stateColor = "#49b8ff";
+    // Luminance-matched to the amber Startup tint (~198) and teal Burning tint (~187): the
+    // ambient stage glow is tinted by this color, and a dimmer state color here made the whole
+    // scene visibly step DOWN in brightness right as the plasma crossed breakeven.
+    label = "Breakeven"; stateColor = "#74d2ff";
   }
 
   const nTauActual = n20 * 1e20 * tauE;
@@ -746,7 +758,9 @@ function resizeCanvas(canvas, ctx) {
   // P1: additionally cap every canvas at a total-pixel budget, so a dpr 2.5 Windows-scaled laptop or a
   // 4K projector in fullscreen never asks the software renderer for 8+ megapixels; the soft upscale is
   // invisible at booth distance while the fill-rate saving is 3-4x.
-  const MAX_CANVAS_PIXELS = 2200000;
+  // 4.8 MP leaves ordinary dpr-2 desktop windows at full resolution (a softer plasma there
+  // reads as duller, not just blurrier) while still capping true 4K fullscreen surfaces.
+  const MAX_CANVAS_PIXELS = 4800000;
   let scale = liteMode ? 1 : (window.devicePixelRatio || 1);
   const budgetScale = Math.sqrt(MAX_CANVAS_PIXELS / Math.max(1, rect.width * rect.height));
   scale = Math.min(scale, Math.max(0.5, budgetScale));
@@ -1120,7 +1134,7 @@ function renderPlasmaGL(w, h, pColor, hotCore, intensity, time) {
   let s = liteMode ? 1 : Math.min(window.devicePixelRatio || 1, 2);
   // Honor the same total-pixel budget as resizeCanvas: the raymarched shader is the heaviest
   // per-pixel work in the app, and a 4K projector in fullscreen must not run it at 8+ MP.
-  s = Math.min(s, Math.max(0.5, Math.sqrt(2200000 / Math.max(1, w * h))));
+  s = Math.min(s, Math.max(0.5, Math.sqrt(4800000 / Math.max(1, w * h))));
   const W = Math.max(2, Math.floor(w * s)), H = Math.max(2, Math.floor(h * s));
   if (glCanvas.width !== W || glCanvas.height !== H) { glCanvas.width = W; glCanvas.height = H; }
   glx.viewport(0, 0, W, H);
@@ -1189,6 +1203,9 @@ function drawReactor(time) {
   PROJ.focal = size * cam.focalK;
   updateViewDir();
 
+  // Original visual tuning, restored deliberately: brightness saturates at 1200 MW and color at
+  // 28 keV, so the ramp climbs decisively and then HOLDS at maximum. Widening these ranges (to
+  // 1600 MW / 30 keV) made the ramp non-monotonic on real hardware and was reverted by request.
   const tNorm = clamp((model.temperature - 6) / 22, 0, 1);
   const intensity = clamp(model.fusionPower / 1200, 0.05, 1);
   const bNorm = clamp(model.magneticField / 8.8, 0.18, 1);
@@ -2526,7 +2543,7 @@ function tweenReadouts(dt) {
 
 /* ---------- Animation + ticking ---------- */
 // C3: continuous low-FPS guard state (the escalation logic lives in animate, below).
-let perfWin = 0, perfFrames = 0, perfBad = 0, perfWarm = 2;   // skip ~2s of load settling before judging fps
+let perfWin = 0, perfFrames = 0, perfBad = 0, perfWarm = 5, perfBaseline = 0;   // 5s warmup: page-load jank must never trip the guard
 function animate(time) {
   const delta = time - lastFrame;
   lastFrame = time;
@@ -2545,18 +2562,27 @@ function animate(time) {
     }
     tweenReadouts(delta);
     positionStoryRing();   // U4: keep the guided-story highlight ring on its control as the page scrolls
-    // C3: continuous low-FPS guard. Escalate to the lite path on sustained slowness, which catches
-    // Firefox (whose backdrop-filter and canvas ctx.filter blur are far slower than Chrome's) that the
-    // old one-shot probe and the Blink-only deviceMemory heuristic miss. Escalate-only, so a fast
-    // browser never trips it; delta < 250 ignores tab-resume / GC stalls; two bad seconds are required.
-    if (!liteMode && delta < 1500) {   // <1500 ignores tab-resume stalls but still counts genuinely slow (>0.67fps) frames
+    // C3/P0: continuous low-FPS guard, rebuilt. It now (1) measures the display's own cadence
+    // during a 5 s warmup and trips RELATIVE to it (a 30 Hz projector or battery-saver laptop is
+    // never punished for its normal rate), (2) needs three consecutive bad seconds, so brief GC
+    // or boot jank cannot trip it (the old 2 s warmup + absolute 38 fps threshold tripped during
+    // page load, dimming the whole stage right as the boot ramp crossed net-zero), (3) announces
+    // itself when it fires, and (4) is disabled entirely when the user pins Quality to Full.
+    if (qualityMode === "auto" && !liteMode && delta < 1500) {
       perfWin += delta; perfFrames += 1;
       if (perfWin >= 1000) {
         const fps = perfFrames * 1000 / perfWin;
         perfWin = 0; perfFrames = 0;
-        if (perfWarm > 0) perfWarm -= 1;
-        else if (fps < 38) { if ((perfBad += 1) >= 2) { liteMode = true; document.body.classList.add("lite"); seedParticles(); } }
-        else perfBad = 0;
+        if (perfWarm > 0) {
+          perfWarm -= 1;
+          perfBaseline = Math.max(perfBaseline, fps);   // best second seen = the display's real cadence
+        } else if (fps < Math.min(38, (perfBaseline || 60) * 0.6)) {
+          if ((perfBad += 1) >= 3) {
+            liteMode = true; document.body.classList.add("lite"); seedParticles();
+            showToastRaw("Switched to lite graphics for smooth playback. The Quality menu can force Full.");
+            if (srStatus) srStatus.textContent = "Switched to lite graphics for smooth playback.";
+          }
+        } else perfBad = 0;
       }
     }
   }
@@ -2766,6 +2792,27 @@ function buildMissions() {
     buildMissions._wired = true;
   }
   missionPrevT = performance.now();
+}
+
+function showToastRaw(text) {
+  const t = document.getElementById("missionToast");
+  if (!t) return;
+  t.textContent = text;
+  t.classList.add("show");
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove("show"), 4200);
+}
+
+/* P0: user-facing render-quality control. "full" disables the FPS guard outright. */
+function setQuality(mode) {
+  qualityMode = mode;
+  try { localStorage.setItem("fusionQuality", mode); } catch (e) {}
+  if (mode === "lite") liteMode = true;
+  else if (mode === "full") liteMode = false;
+  perfBad = 0; perfWin = 0; perfFrames = 0;   // re-arm the guard cleanly for "auto"
+  document.body.classList.toggle("lite", liteMode);
+  seedParticles();
+  chartsDirty = true;
 }
 
 function showMissionToast(name) {
@@ -3674,6 +3721,11 @@ function initPhase2Controls() {
   document.getElementById("cardDownload")?.addEventListener("click", () => downloadTakeaway());
   document.getElementById("cardOverlay")?.addEventListener("click", (e) => { if (e.target && e.target.id === "cardOverlay") closeTakeaway(); });
   document.getElementById("describeBtn")?.addEventListener("click", () => describeState());
+  const qSel = document.getElementById("qualitySelect");
+  if (qSel) {
+    qSel.value = qualityMode;
+    qSel.addEventListener("change", () => setQuality(qSel.value));
+  }
   const toolsToggle = document.getElementById("toolsToggle");
   toolsToggle?.addEventListener("click", () => {
     const row = toolsToggle.closest(".topbar-actions");
