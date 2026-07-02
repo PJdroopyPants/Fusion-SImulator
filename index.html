@@ -63,8 +63,13 @@
             </span>
             <span class="status-block">
               <span class="status-caption">Challenges</span>
-              <button type="button" id="missionChip" class="mission-jump" title="Jump to the challenges"><strong id="missionChipCount">0</strong> / 7</button>
+              <button type="button" id="missionChip" class="mission-jump" title="Jump to the challenges"><strong id="missionChipCount">0</strong> / 10</button>
             </span>
+            <span class="status-block">
+              <span class="status-caption">Power sprint</span>
+              <button type="button" id="challengeBtn" class="mission-jump" title="60 seconds, no presets: the highest net power while stability holds 55% or better wins">60s Challenge</button>
+            </span>
+            <button type="button" id="cardCta" class="card-cta" hidden>Nice run. Get your card</button>
           </div>
         </div>
       </header>
@@ -183,6 +188,34 @@
             <span><em id="stageField">5.2</em> T</span>
             <span><em id="stageDensity">0.61</em>×10²⁰ m⁻³</span>
           </div>
+
+          <!-- P1: operator HUD - the coach's live read plus a progress-to-ignition bar,
+               pinned to the stage so cause-and-effect is visible without scrolling -->
+          <div class="stage-hud">
+            <div class="hud-coach" aria-live="polite">
+              <span class="hud-coach-tag" aria-hidden="true">Operator's read</span>
+              <p id="coachText">Bring the plasma up to temperature with confinement to match, then watch the operating point climb toward the ignition curve.</p>
+            </div>
+            <div class="hud-phi" id="phiBar" role="progressbar" aria-label="Progress to ignition" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <span class="hud-phi-cap" aria-hidden="true">Ignition <em id="phiPct">0%</em></span>
+              <span class="hud-phi-track" aria-hidden="true">
+                <span class="hud-phi-fill" id="phiFill"></span>
+                <span class="hud-phi-mark" style="left:16.7%" data-lab="Q = 1"></span>
+                <span class="hud-phi-mark" style="left:50%" data-lab="Burning"></span>
+                <span class="hud-phi-mark mark-ign" style="left:95%" data-lab="Ignition"></span>
+              </span>
+            </div>
+          </div>
+
+          <!-- P1: kiosk attract narration (shown only while the auto-demo is driving) -->
+          <div id="attractBanner" class="attract-banner" hidden aria-hidden="true">
+            <p class="attract-line" id="attractLine">A working fusion reactor, simulated</p>
+            <p class="attract-invite">Touch anything to take control</p>
+          </div>
+
+          <!-- P1: 60-second Power Challenge - live timer and best-of-day board -->
+          <div id="challengeChip" class="challenge-chip" hidden aria-hidden="true"></div>
+          <div id="boardChip" class="board-chip" hidden></div>
 
           <div class="ion-key" aria-hidden="true">
             <span><i style="background:#96c8ff"></i>D</span>
@@ -366,13 +399,9 @@
 
           <div class="tele-actions">
             <button type="button" class="tool-btn wide" id="exportBtn" title="Download this run as a CSV">Export run (CSV)</button>
-            <button type="button" class="tool-btn wide" id="cardBtn" title="A takeaway card of your run, with a QR to run it yourself">Takeaway card</button>
+            <button type="button" class="tool-btn wide" id="cardBtn" title="A takeaway card of your run, with a QR to run it yourself">Your run card (QR)</button>
+            <button type="button" class="tool-btn wide" id="newRunBtn" title="Clear missions, records, quiz score, and charts for the next visitor">New run</button>
           </div>
-
-          <section class="coach" aria-live="polite">
-            <p class="coach-kicker">Operator's read</p>
-            <p id="coachText">Bring the plasma up to temperature with confinement to match, then watch the operating point climb toward the ignition curve.</p>
-          </section>
         </aside>
       </section>
 
@@ -705,6 +734,31 @@
         </div>
         <div class="tc-actions">
           <button type="button" class="tool-btn" id="cardDownload">Download card (PNG)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- B1: kiosk auto-demo takeover warning (viewport-fixed so it stays visible above any open card or panel) -->
+    <div id="demoChip" class="demo-chip" hidden aria-hidden="true"></div>
+
+    <!-- P1: 60-second Power Challenge result -->
+    <div class="card-overlay" id="challengeOverlay" hidden>
+      <div class="takeaway-card challenge-card" role="dialog" aria-modal="true" aria-labelledby="chTitle">
+        <button type="button" class="tc-close" id="chClose" aria-label="Close challenge result">&times;</button>
+        <p class="tc-kicker">60-second Power Challenge</p>
+        <h3 id="chTitle">Time!</h3>
+        <p class="ch-result" id="chResult">Peak net power: 0 MW</p>
+        <p class="ch-earned" id="chEarned" hidden></p>
+        <div class="ch-entry" id="chEntry" hidden>
+          <label for="chInitials">Top three today! Your initials:</label>
+          <div class="ch-entry-row">
+            <input id="chInitials" maxlength="3" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Your initials, up to three letters">
+            <button type="button" class="tool-btn" id="chSave">Save</button>
+          </div>
+        </div>
+        <ol class="ch-board" id="chBoard" aria-label="Today's best runs"></ol>
+        <div class="tc-actions">
+          <button type="button" class="tool-btn" id="chAgain">Run it again</button>
         </div>
       </div>
     </div>

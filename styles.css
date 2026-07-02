@@ -511,7 +511,7 @@ input[type="range"]::-moz-range-thumb {
 .stage-readout {
   position: absolute;
   left: 18px;
-  bottom: 16px;
+  bottom: 124px;   /* stacked above the stage toggles, which clear the stage HUD */
   display: flex;
   gap: 16px;
   padding: 8px 14px;
@@ -1274,7 +1274,7 @@ meter::-moz-meter-bar {
   position: fixed;
   left: 50%;
   bottom: 26px;
-  z-index: 20;
+  z-index: 60;   /* above the story panel (45), which used to fully occlude it */
   padding: 11px 18px;
   border-radius: 12px;
   background: rgba(13, 24, 22, 0.92);
@@ -1693,10 +1693,10 @@ html[data-theme="cb"] {
 .story-launch small { display: block; margin-top: 2px; color: var(--muted); font-size: 0.74rem; }
 
 /* ---- Stage toggle cluster + cross-section inset ---- */
-.stage-toggles { position: absolute; left: 18px; bottom: 58px; z-index: 4; display: flex; gap: 8px; }
+.stage-toggles { position: absolute; left: 18px; bottom: 84px; z-index: 4; display: flex; gap: 8px; }
 .stage-toggles .stage-toggle { position: static; left: auto; bottom: auto; }
 .cross-inset {
-  position: absolute; right: 14px; bottom: 14px; z-index: 4;
+  position: absolute; right: 14px; bottom: 84px; z-index: 4;   /* clears the stage HUD */
   width: clamp(188px, 22vw, 248px); height: clamp(196px, 24vw, 248px);
   border: 1px solid var(--line-strong); border-radius: 12px;
   background: rgba(8, 10, 14, 0.82); backdrop-filter: blur(8px);
@@ -1915,7 +1915,7 @@ input[type="range"].vol-slider[hidden] { display: none; }
 
 /* ---- A6: ion species key ---- */
 .ion-key {
-  position: absolute; left: 18px; bottom: 96px; z-index: 4;
+  position: absolute; left: 18px; bottom: 164px; z-index: 4;
   display: flex; gap: 10px; padding: 5px 9px;
   border: 1px solid var(--line); border-radius: 8px;
   background: rgba(11, 13, 18, 0.5); backdrop-filter: blur(6px);
@@ -1960,6 +1960,196 @@ input[type="range"].vol-slider[hidden] { display: none; }
 @media (max-width: 460px) {
   .tc-stats { grid-template-columns: 1fr; }
   .tc-foot { flex-direction: column; align-items: flex-start; }
+}
+
+/* ---- B1: kiosk auto-demo countdown chip. Viewport-fixed and above every overlay so the takeover
+   warning stays visible even while the takeaway card or story panel is open. The text color is
+   hard-coded light to match the hard-coded dark pill, so it reads in every theme. ---- */
+.demo-chip {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  max-width: calc(100vw - 32px); white-space: normal; text-align: center;
+  padding: 8px 16px; border-radius: 999px; z-index: 300;
+  background: rgba(11, 13, 18, 0.88); border: 1px solid rgba(56, 225, 198, 0.55);
+  color: #eef2f8; font-size: 0.95rem; font-weight: 600;
+  pointer-events: none;
+}
+body.kiosk .demo-chip { font-size: 1.5rem; padding: 12px 22px; }
+.tool-btn.confirm { border-color: var(--coral); color: var(--coral); }
+
+/* ---- P1: stage operator HUD - coach ticker + progress-to-ignition bar. Sits over the always-
+   dark reactor canvas, so text colors are hard-coded light for every theme. ---- */
+.stage-hud {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 6;
+  display: flex; align-items: center; gap: 16px;
+  padding: 20px 14px 10px;
+  /* Darkens fast enough that even the topmost text row sits over >= 0.75 alpha, so the coach
+     stays readable over a white-hot ignition flash. */
+  background: linear-gradient(180deg, rgba(8, 10, 14, 0), rgba(8, 10, 14, 0.75) 16%, rgba(8, 10, 14, 0.88) 45%, rgba(8, 10, 14, 0.94));
+  pointer-events: none;
+}
+.hud-coach {
+  flex: 1 1 58%; min-width: 0;
+  border-left: 3px solid var(--gold);
+  padding: 1px 0 1px 10px;
+  transition: border-color 0.4s ease;
+}
+.hud-coach-tag {
+  display: block; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.14em;
+  text-transform: uppercase; color: rgba(178, 192, 214, 0.95);
+}
+.hud-coach p {
+  margin: 2px 0 0; font-size: 0.82rem; line-height: 1.35; color: #e8edf6;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.hud-phi { flex: 1 1 42%; display: flex; align-items: center; gap: 10px; }
+.hud-phi-cap {
+  flex: none; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+  color: rgba(178, 192, 214, 0.95);
+}
+.hud-phi-cap em { font-style: normal; color: #eef2f8; font-size: 0.8rem; margin-left: 4px; }
+.hud-phi-track {
+  position: relative; flex: 1 1 auto; height: 9px; border-radius: 999px;
+  background: rgba(120, 132, 156, 0.22);
+}
+.hud-phi-fill {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
+  border-radius: 999px; background: linear-gradient(90deg, #38e1c6, #7ee787);
+  transition: width 0.4s linear;
+}
+.hud-phi.warm .hud-phi-fill { background: linear-gradient(90deg, #38e1c6, #ffc24b); box-shadow: 0 0 12px rgba(255, 194, 75, 0.55); }
+.hud-phi.hot .hud-phi-fill { background: linear-gradient(90deg, #ffc24b, #7ee787); box-shadow: 0 0 16px rgba(126, 231, 135, 0.8); animation: phiPulse 1.2s ease-in-out infinite; }
+@keyframes phiPulse { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
+.hud-phi-mark { position: absolute; top: -3px; bottom: -3px; width: 2px; background: rgba(210, 222, 240, 0.55); }
+.hud-phi-mark::after {
+  content: attr(data-lab);
+  position: absolute; top: 100%; left: 0; transform: translate(-50%, 2px);
+  font-size: 0.56rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: rgba(178, 192, 214, 0.9); white-space: nowrap;
+}
+.hud-phi-mark.mark-ign { background: rgba(126, 231, 135, 0.85); }
+.hud-phi-mark.mark-ign::after { color: #7ee787; transform: translate(-90%, 2px); }
+@media (max-width: 760px) {
+  .stage-hud { flex-direction: column; align-items: stretch; gap: 8px; }
+  .hud-phi { width: 100%; }
+  /* The stacked HUD is taller: allow a third coach line (so the actionable tail of longer
+     messages is not amputated) and lift the left-edge stage furniture clear of it. */
+  .hud-coach p { -webkit-line-clamp: 3; }
+  .stage-toggles { bottom: 148px; }
+  .stage-readout { bottom: 188px; }
+  .ion-key { bottom: 228px; }
+}
+
+/* ---- P1: kiosk attract narration ---- */
+.attract-banner {
+  position: absolute; left: 50%; top: 15%; transform: translateX(-50%);
+  width: min(92%, 900px); text-align: center; z-index: 7; pointer-events: none;
+}
+.attract-line {
+  margin: 0; font-size: clamp(1.3rem, 3.4vw, 2.6rem); font-weight: 800; line-height: 1.15;
+  color: #f2f6fc; text-shadow: 0 3px 22px rgba(0, 0, 0, 0.75);
+}
+.attract-invite {
+  margin: 10px 0 0; font-size: clamp(0.9rem, 1.8vw, 1.4rem); font-weight: 700;
+  color: #38e1c6; text-shadow: 0 2px 14px rgba(0, 0, 0, 0.7);
+  animation: invitePulse 2.2s ease-in-out infinite;
+}
+@keyframes invitePulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+
+/* ---- P1: 60-second Power Challenge ---- */
+.challenge-chip {
+  position: absolute; left: 50%; top: 54px; transform: translateX(-50%); z-index: 7;
+  padding: 8px 16px; border-radius: 999px;
+  background: rgba(11, 13, 18, 0.88); border: 1px solid rgba(255, 194, 75, 0.65);
+  color: #ffd98a; font-size: 1rem; font-weight: 800; letter-spacing: 0.04em; white-space: nowrap;
+  pointer-events: none;
+}
+.challenge-chip.deny { animation: denyShake 0.4s ease; border-color: var(--coral); }
+@keyframes denyShake {
+  0%, 100% { transform: translateX(-50%); }
+  25% { transform: translateX(calc(-50% - 6px)); }
+  75% { transform: translateX(calc(-50% + 6px)); }
+}
+.board-chip {
+  position: absolute; left: 14px; top: 44px; z-index: 6;
+  padding: 5px 11px; border-radius: 999px;
+  background: rgba(11, 13, 18, 0.72); border: 1px solid rgba(56, 225, 198, 0.4);
+  color: #cfe0d9; font-size: 0.72rem; font-weight: 700;
+  pointer-events: none;
+}
+.ch-result { margin: 6px 0 12px; font-size: 1.05rem; font-weight: 700; }
+.ch-entry label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+.ch-entry-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.ch-entry-row input {
+  width: 96px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line-strong);
+  background: var(--panel-2); color: var(--text); font-size: 1.1rem; font-weight: 800;
+  letter-spacing: 0.2em; text-transform: uppercase; text-align: center;
+}
+.ch-board { margin: 0 0 4px; padding-left: 22px; font-size: 0.95rem; font-weight: 700; }
+.ch-board li { margin: 3px 0; }
+.ch-earned { margin: -6px 0 12px; font-size: 0.85rem; color: var(--muted); }
+
+/* ---- P1: takeaway funnel CTA ---- */
+.card-cta {
+  border: 1px solid var(--teal); border-radius: 999px;
+  background: linear-gradient(135deg, rgba(56, 225, 198, 0.22), rgba(126, 231, 135, 0.16));
+  color: var(--text); font-weight: 800; font-size: 0.8rem; padding: 8px 14px;
+  cursor: pointer; animation: ctaPulse 2s ease-in-out infinite;
+}
+.card-cta:hover { border-color: var(--teal); }
+@keyframes ctaPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(56, 225, 198, 0.35); } 50% { box-shadow: 0 0 0 7px rgba(56, 225, 198, 0); } }
+
+/* ---- P1: stage-level celebration (Chief-tier wins get a longer gold treatment) ---- */
+.reactor-stage.celebrate::after,
+.reactor-stage.celebrate-chief::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: 9;
+  border: 3px solid rgba(56, 225, 198, 0.9); pointer-events: none;
+  animation: cheerRing 1.3s ease-out forwards;
+}
+.reactor-stage.celebrate-chief::after {
+  border-color: rgba(255, 194, 75, 0.95);
+  animation-duration: 2.4s;
+}
+.stage-cheer.chief { color: #ffd98a; font-size: clamp(1.5rem, 3.8vw, 2.9rem); }
+.stage-cheer.chief.run { animation-duration: 2.4s; }
+.stage-cheer.static { opacity: 1; transition: opacity 0.2s linear; }
+@keyframes cheerRing {
+  0% { opacity: 0.95; box-shadow: 0 0 0 0 rgba(56, 225, 198, 0.45), inset 0 0 40px rgba(56, 225, 198, 0.25); }
+  100% { opacity: 0; box-shadow: 0 0 0 26px rgba(56, 225, 198, 0), inset 0 0 4px rgba(56, 225, 198, 0); }
+}
+.stage-cheer {
+  position: absolute; left: 50%; top: 34%; transform: translateX(-50%); z-index: 9;
+  font-size: clamp(1.3rem, 3.2vw, 2.4rem); font-weight: 800; text-align: center;
+  color: #7ff5de; text-shadow: 0 3px 24px rgba(0, 0, 0, 0.8); opacity: 0; pointer-events: none;
+  max-width: 92%;
+}
+.stage-cheer.run { animation: cheerText 1.6s ease-out forwards; }
+@keyframes cheerText {
+  0% { opacity: 0; transform: translate(-50%, 10px); }
+  14% { opacity: 1; transform: translate(-50%, 0); }
+  72% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -12px); }
+}
+
+.mission-learn { margin: 8px 0 0; font-size: 0.72rem; font-style: italic; color: var(--muted); }
+
+/* ---- P1: mission tier headers ---- */
+.mission-tier {
+  grid-column: 1 / -1; margin: 4px 0 -3px;
+  font-size: 0.64rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---- P1: kiosk scaling for the new stage furniture ---- */
+body.kiosk .hud-coach p { font-size: 1.02rem; }
+body.kiosk .hud-coach-tag { font-size: 0.7rem; }
+body.kiosk .hud-phi-track { height: 12px; }
+body.kiosk .hud-phi-cap { font-size: 0.78rem; }
+body.kiosk .hud-phi-mark::after { font-size: 0.72rem; }
+body.kiosk .challenge-chip { font-size: 1.4rem; top: 62px; }
+body.kiosk .board-chip { font-size: 0.95rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .attract-invite, .card-cta, .hud-phi.hot .hud-phi-fill { animation: none; }
 }
 
 /* ---- B6: setpoint steppers ---- */

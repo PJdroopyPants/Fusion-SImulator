@@ -58,7 +58,8 @@ Navigate by dragging to orbit, scrolling to zoom, shift-drag or right-drag to pa
 
 - **Guided story** walks a learner from cold gas to ignition one concept at a time, with a live "goal met" check at each step.
 - **Guided tour** spotlights the key controls; start it any time from the **Tour** button.
-- **Missions** are seven challenges, from First Light to Ignition, each forcing a deliberate tradeoff.
+- **Missions** are ten challenges in three tiers (Operator, Engineer, Chief), from First Light up to holding a self-heated burn on a throttled-back drive, each forcing a deliberate tradeoff. Constraint missions must be held for a few seconds, not just touched.
+- **The 60-second Power Challenge** is a no-presets sprint from a standing start: the highest net power reached while stability holds 55% or better wins, so reckless over-fueling scores nothing. Top three of the day go on the initials board.
 - **Real-world units** re-expresses the readouts in everyday terms: temperature in millions of degrees and multiples of the Sun's core, net power in homes powered.
 - **Themes**: a control-room dark theme, a light theme for bright rooms and projectors, a high-contrast theme, and a colorblind-safe palette.
 - **Sound** (off by default) adds a reactor hum that tracks fusion power, with chimes on ignition and mission completion and an alarm on disruption.

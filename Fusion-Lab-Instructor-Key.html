@@ -67,18 +67,22 @@
   <div class="ans"><b>c. Divertor sweep →</b> <b>peak wall heat flux drops</b>. Sweeping the strike point spreads the exhaust load over a larger area.</div>
 
   <h2><span class="n">5</span>Mission pass-conditions</h2>
-  <p class="lead">Exact thresholds the simulator checks (any state that satisfies them counts).</p>
+  <p class="lead">Exact thresholds the simulator checks, in three tiers. Constraint missions must be <b>held</b> for the listed time (a progress bar fills), and the sliders must have settled on their dialed values; a state merely passed through while ramping does not count.</p>
   <table>
     <tr><th>Mission</th><th>Passes when…</th></tr>
-    <tr><td>First Light</td><td>Fusion power ≥ <b>400 MW</b></td></tr>
-    <tr><td>Net Positive</td><td>Net electric <b>&gt; 0</b></td></tr>
-    <tr><td>Lean Burn</td><td>Q ≥ <b>4</b> with fuel injection ≤ <b>65%</b></td></tr>
-    <tr><td>Strong Field</td><td>Q ≥ <b>3</b> with magnetic field ≥ <b>8 T</b></td></tr>
-    <tr><td>Frugal Plant</td><td>Net &gt; 0 with turbine load ≤ <b>70%</b></td></tr>
-    <tr><td>Self-Sufficient</td><td>Tritium breeding ratio ≥ <b>1</b> with coolant ≤ <b>70%</b></td></tr>
-    <tr><td>Ignition</td><td>Reach ignition (φ ≥ 0.95) with fuel injection ≤ <b>75%</b></td></tr>
+    <tr><td>First Light <i>(Operator)</i></td><td>Fusion power ≥ <b>400 MW</b></td></tr>
+    <tr><td>Net Positive <i>(Operator)</i></td><td>Net electric <b>&gt; 0</b></td></tr>
+    <tr><td>Lean Burn <i>(Engineer)</i></td><td>Q ≥ <b>4</b> with fuel injection ≤ <b>65%</b>, held 3 s</td></tr>
+    <tr><td>Strong Field <i>(Engineer)</i></td><td>Q ≥ <b>3</b> with magnetic field ≥ <b>8 T</b>, held 3 s</td></tr>
+    <tr><td>Frugal Plant <i>(Engineer)</i></td><td>Net &gt; 0 with turbine load ≤ <b>70%</b>, held 3 s</td></tr>
+    <tr><td>Self-Sufficient <i>(Engineer)</i></td><td>Tritium breeding ratio ≥ <b>1</b> with coolant ≤ <b>70%</b>, held 3 s</td></tr>
+    <tr><td>Ignition <i>(Chief)</i></td><td>Reach ignition (φ ≥ 0.95) with fuel injection ≤ <b>70%</b>, held 5 s</td></tr>
+    <tr><td>Solo Ignition <i>(Chief)</i></td><td>Ignition (φ ≥ 0.95) with the <b>neutral beam off</b>, held 5 s</td></tr>
+    <tr><td>Hold the Burn <i>(Chief)</i></td><td>Heating drive (the Plasma temperature slider) dialed to ≤ <b>10 keV</b> with Q ≥ <b>10</b>, held 10 s. Demonstrates burn hysteresis: a cold start at a 10 keV drive only reaches Q ≈ 7, so the student must ignite first and then throttle back; alpha self-heating keeps the core hot.</td></tr>
+    <tr><td>Grid Master <i>(Chief)</i></td><td>Net electric ≥ <b>750 MW</b> with stability ≥ <b>55%</b>, held 5 s. High Gain alone settles near 610 MW; reaching 750 takes divertor sweep, more fuel, and matched coolant, while reckless over-fueling drives net past 1,200 MW but collapses stability through wall load.</td></tr>
   </table>
-  <p>The three on the worksheet (First Light, Net Positive, Ignition) form a natural arc: make the reaction happen, make it pay, then make it self-sustaining. A reliable route to Ignition is the High Gain preset, then trimming fuel below 75%.</p>
+  <p>The three on the worksheet (First Light, Net Positive, Ignition) form a natural arc: make the reaction happen, make it pay, then make it self-sustaining. A reliable route to Ignition is the High Gain preset, then trimming fuel below 70%.</p>
+  <p><b>60-second Power Challenge</b> (button in the top status strip): a no-presets sprint from the Startup state. The score is the highest net power reached <b>while stability holds 55% or better</b>, so slamming everything to maximum produces a big number that does not count; the winning play is the same controlled optimization Grid Master teaches. Top three of the day go on the board with their initials. Good closer for a competitive group.</p>
 
   <h2><span class="n">7</span>Short-answer model responses</h2>
   <div class="ans"><b>a. 80/20 split.</b> The <b>alpha particles (≈20%)</b> stay in the plasma and heat it; the <b>neutrons (≈80%)</b> escape into the blanket, where their heat ultimately makes the electricity. Ignition depends on the alpha fraction: once alpha self-heating alone replaces the losses, the burn sustains itself and external heating can fall toward zero.</div>

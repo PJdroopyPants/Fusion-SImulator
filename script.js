@@ -227,8 +227,15 @@ let showMachines = true;     // C2: real-machine points on the Lawson map
 let readLevel = "tech";      // C9: "tech" or "plain" lesson and coach wording
 let kioskCycle = 0;          // B1: presentation-mode auto-demo index
 let kioskLast = 0;           // B1: last auto-demo advance time
-let lastUserAction = performance.now();  // C4: last real interaction (idle watchdog)
+let kioskUserOwned = false;  // B1: a visitor touched the controls during Present mode
+const KIOSK_STEP_MS = 12000;    // B1: cadence between auto-demo presets while idle
+const KIOSK_RESUME_MS = 90000;  // B1: how long a visitor owns the controls after touching anything
+const KIOSK_WARN_MS = 10000;    // B1: countdown shown before the auto-demo takes back over
+let lastUserAction = performance.now();  // C4: last presence signal, including pointer movement (idle watchdog)
+let lastDeliberate = performance.now();  // B1: last deliberate act (tap, key, wheel); starts kiosk ownership
 const WATCHDOG_MS = 180000;  // C4: normal-mode idle reset after 3 minutes
+let runArmed = false;        // C4: missions, records, and wall dose stay quiet until the visitor drives a control,
+                             //     so neither the boot preset nor the kiosk auto-demo earns achievements
 let liteMode = !!((navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2) || (navigator.deviceMemory && navigator.deviceMemory <= 2));  // C3: weak-GPU lite path
 // Firefox/Gecko: its CPU-side canvas blur (bloom) and large-buffer compositing are catastrophically
 // slower than Chrome's, so force the lite render path (no bloom, no supersample, fewer particles, no
@@ -499,6 +506,32 @@ function updateReadouts() {
   outputs.stageField.textContent = model.magneticField.toFixed(1);
   outputs.stageDensity.textContent = model.n20.toFixed(2);
 
+  // P1: progress-to-ignition bar and state-tinted coach strip on the stage HUD
+  const pf = document.getElementById("phiFill");
+  if (pf) {
+    const pct = Math.round(clamp(model.phi || 0, 0, 1) * 100);
+    pf.style.width = `${pct}%`;
+    const barEl = document.getElementById("phiBar");
+    if (barEl) {
+      barEl.setAttribute("aria-valuenow", pct);
+      barEl.setAttribute("aria-valuetext", pct >= 95 ? "Ignited" : `${pct}% of the way to ignition`);
+      barEl.classList.toggle("warm", pct >= 80);
+      barEl.classList.toggle("hot", pct >= 95);
+    }
+    const pl = document.getElementById("phiPct"); if (pl) pl.textContent = pct >= 95 ? "reached" : `${pct}%`;
+  }
+  const hudCoach = document.querySelector(".hud-coach");
+  if (hudCoach) hudCoach.style.borderLeftColor = model.stateColor;
+
+  // P1: takeaway funnel - after a real achievement, invite the visitor to take their card.
+  // Both arms require having actually worked a control; bare preset clicks never earn it.
+  const ctaBtn = document.getElementById("cardCta");
+  if (ctaBtn && ctaBtn.hidden && !cardCtaDone && runArmed && sliderTouched && (missionDoneCount >= 3 || everIgnited)) {
+    cardCtaDone = true;
+    ctaBtn.hidden = false;
+    if (srStatus) srStatus.textContent = "Nice run. Your run card is ready in the top strip.";
+  }
+
   updatePowerBalance();
   updateLesson();
   updateCoach();
@@ -578,7 +611,11 @@ function updateLesson() {
 }
 
 function updateCoach() {
-  outputs.coachText.textContent = getCoachMessage();
+  // Only write when the message actually changed: identical writes still re-fire aria-live in
+  // some screen readers. (Messages with embedded live numbers still churn; the full announcement
+  // redesign is part of the ARIA pass.)
+  const coachMsg = getCoachMessage();
+  if (outputs.coachText.textContent !== coachMsg) outputs.coachText.textContent = coachMsg;
 }
 
 function getCoachMessage() {
@@ -2464,12 +2501,24 @@ function clearPresetHighlight() {
 
 Object.values(controls).forEach((control) => {
   control.addEventListener("input", () => {
+    runArmed = true;   // C4: the visitor is driving; achievements may accrue
+    sliderTouched = true;
     clearPresetHighlight();
     updateReadouts();
   });
 });
 
-presets.forEach((b) => b.addEventListener("click", () => applyPreset(b.dataset.preset)));
+presets.forEach((b) => b.addEventListener("click", () => {
+  // During the Power Challenge presets are locked: the sprint is hands-on-controls skill.
+  if (challengeOn) {
+    const chip = document.getElementById("challengeChip");
+    if (chip) { chip.classList.add("deny"); setTimeout(() => chip.classList.remove("deny"), 500); }
+    if (srStatus) srStatus.textContent = "Presets are locked during the challenge. Use the sliders and toggles.";
+    return;
+  }
+  runArmed = true;
+  applyPreset(b.dataset.preset);
+}));
 
 hotspots.forEach((b) => {
   b.addEventListener("click", () => {
@@ -2549,19 +2598,28 @@ function initNavHud() {
 }
 
 /* ---------- Missions / challenges ---------- */
-/* Two intro milestones a preset can reach, then five constraint puzzles that no
-   preset satisfies: each forces a deliberate tradeoff, so they must be hand-tuned. */
+/* A three-tier ladder. Operator: milestones a preset can reach. Engineer: constraint puzzles
+   solved with one deliberate move plus a sustained hold. Chief: capstones no preset satisfies,
+   each hand-tuned against the model (Ignition needs fuel below High Gain's 73%; Hold the Burn
+   exploits burn hysteresis, since a cold start at a 10 keV drive only reaches Q ~7 while a hot
+   plasma throttled back to 10 keV keeps itself at Q ~13; Grid Master needs ~90 MW more than
+   High Gain alone produces). dialTemperature is the raw heating-drive dial, not the self-heated
+   core temperature. */
+const MISSION_TIERS = ["Operator", "Engineer", "Chief"];
 const MISSIONS = [
-  { id: "firstlight", name: "First Light", goal: "Produce 400 MW of fusion power", hint: "Try the Cruise preset, then nudge Fuel injection up.", test: (m) => m.fusionPower >= 400 },
-  { id: "netpos", name: "Net Positive", goal: "Send real power to the grid (net above 0)", hint: "Cruise reaches it; net power needs a high Q, not just Q above 1.", test: (m) => m.netElec > 0 },
-  { id: "leanburn", name: "Lean Burn", goal: "Reach Q of 4 with fuel injection at 65% or less", hint: "From Cruise, ease Fuel injection down toward 65% while keeping the field strong.", test: (m) => m.q >= 4 && m.fuelRate <= 65 },
-  { id: "strongfield", name: "Strong Field", goal: "Reach Q of 3 with magnetic field at 8 T or more", hint: "Push Magnetic field to 8 T or more (High Gain is close), temperature up.", test: (m) => m.q >= 3 && m.magneticField >= 8.0 },
-  { id: "frugal", name: "Frugal Plant", goal: "Go net positive with turbine load at 70% or less", hint: "From Cruise, lower Turbine load toward 70% but stay net positive.", test: (m) => m.netElec > 0 && m.turbineLoad <= 70 },
-  { id: "breed", name: "Self-Sufficient", goal: "Breed tritium (TBR over 1) with coolant at 70% or less", hint: "Lower Blanket coolant toward 70% while holding a strong burn.", test: (m) => m.tritiumRatio >= 1 && m.coolingFlow <= 70 },
-  { id: "ignition", name: "Ignition", goal: "Reach ignition with fuel injection at 75% or less", hint: "Use High Gain, then trim Fuel injection under 75%.", test: (m) => m.phi >= 0.95 && m.fuelRate <= 75 }
+  { id: "firstlight", tier: 0, name: "First Light", goal: "Produce 400 MW of fusion power", hint: "Try the Cruise preset, then nudge Fuel injection up.", test: (m) => m.fusionPower >= 400 },
+  { id: "netpos", tier: 0, name: "Net Positive", goal: "Send real power to the grid (net above 0)", hint: "Cruise reaches it; net power needs a high Q, not just Q above 1.", test: (m) => m.netElec > 0 },
+  { id: "leanburn", tier: 1, name: "Lean Burn", goal: "Hold Q of 4 with fuel injection at 65% or less", hint: "From Cruise, ease Fuel injection down toward 65% while keeping the field strong.", hold: 3, test: (m) => m.q >= 4 && m.fuelRate <= 65 },
+  { id: "strongfield", tier: 1, name: "Strong Field", goal: "Hold Q of 3 with magnetic field at 8 T or more", hint: "Push Magnetic field to 8 T or more (High Gain is close), temperature up.", hold: 3, test: (m) => m.q >= 3 && m.magneticField >= 8.0 },
+  { id: "frugal", tier: 1, name: "Frugal Plant", goal: "Hold net positive with turbine load at 70% or less", hint: "From Cruise, lower Turbine load toward 70% but stay net positive.", hold: 3, test: (m) => m.netElec > 0 && m.turbineLoad <= 70 },
+  { id: "breed", tier: 1, name: "Self-Sufficient", goal: "Breed tritium (TBR over 1) with coolant at 70% or less", hint: "Lower Blanket coolant toward 70% while holding a strong burn.", hold: 3, test: (m) => m.tritiumRatio >= 1 && m.coolingFlow <= 70 },
+  { id: "ignition", tier: 2, name: "Ignition", goal: "Reach ignition with fuel injection at 70% or less", hint: "Use High Gain, then trim Fuel injection below 70%.", hold: 5, learn: "Self-sustaining: the alphas now do the heating, and Q has effectively run away.", test: (m) => m.phi >= 0.95 && m.fuelRate <= 70 },
+  { id: "solo", tier: 2, name: "Solo Ignition", goal: "Hold ignition with the neutral beam off", hint: "Ignite first, then switch off Neutral beam heating and let the alphas take over the beam's share.", hold: 5, learn: "The beam is off and the burn continues: at ignition, external heating is optional.", test: (m) => m.phi >= 0.95 && !m.neutralBeam },
+  { id: "holdburn", tier: 2, name: "Hold the Burn", goal: "Cut the Plasma temperature dial to 10 keV or less and hold Q of 10 for 10 seconds", hint: "Ignite first. A cold start at a 10 keV drive cannot get there; a hot plasma keeps itself hot.", hold: 10, learn: "Q of 10 at a drive that cannot start a burn: starting is harder than staying lit.", test: (m) => m.q >= 10 && m.dialTemperature <= 10 },
+  { id: "gridmaster", tier: 2, name: "Grid Master", goal: "Hold 750 MW net with stability at 55% or more", hint: "High Gain alone falls short. Divertor sweep on, more fuel, and matched coolant lift the output; over-fueling wrecks stability.", hold: 5, learn: "Power sells only if the plant holds together: output and stability trade off.", test: (m) => m.netElec >= 750 && m.stability >= 55 }
 ];
 const missionState = {};
-let missionPrevT = 0, missionsInitialized = false;
+let missionPrevT = 0, missionsInitialized = false, missionDoneCount = 0, ladderCelebrated = false;
 
 function buildMissions() {
   const list = document.getElementById("missionList");
@@ -2569,7 +2627,17 @@ function buildMissions() {
   if (total) total.textContent = MISSIONS.length;
   if (!list) return;
   list.innerHTML = "";
+  let lastTier = -1;
   MISSIONS.forEach((mn) => {
+    if (mn.tier !== lastTier) {
+      lastTier = mn.tier;
+      const head = document.createElement("p");
+      head.className = "mission-tier";
+      head.setAttribute("role", "heading");
+      head.setAttribute("aria-level", "3");
+      head.textContent = MISSION_TIERS[mn.tier] || "";
+      list.appendChild(head);
+    }
     const chip = document.createElement("div");
     chip.className = "mission-chip";
     chip.innerHTML =
@@ -2611,13 +2679,57 @@ function completeMission(mn, st) {
   st.done = true;
   st.el.classList.add("done");
   if (st.bar) st.bar.style.width = "100%";
+  // The debrief line: what this completion just proved. Stays visible in the chip afterward.
+  if (mn.learn && !st.el.querySelector(".mission-learn")) {
+    const p = document.createElement("p");
+    p.className = "mission-learn";
+    p.textContent = mn.learn;
+    st.el.appendChild(p);
+  }
   if (missionsInitialized) {
     st.el.classList.add("justdone");
     setTimeout(() => st.el.classList.remove("justdone"), 900);
-    showMissionToast(mn.name);
+    if (challengeOn) {
+      challengeEarned.push(mn.name);   // no mid-sprint fanfare; credited on the result card instead
+    } else {
+      showMissionToast(mn.name);
+      stageCelebrate(mn.tier === 2 ? `Chief mission: ${mn.name}` : mn.name, mn.tier);
+    }
     const chip = document.getElementById("missionChip");   // U3: pulse the status-strip chip too
     if (chip) { chip.classList.add("pulse"); setTimeout(() => chip.classList.remove("pulse"), 1000); }
   }
+}
+
+/* ---- P1: stage-level celebration - a ring pulse around the reactor stage plus the mission
+   name in large type, visible from booth distance (the toast is invisible from a meter away
+   and kiosk mode hides it entirely). Chief-tier wins get a longer gold treatment. Under
+   reduced motion the text still shows, statically, for two seconds. ---- */
+function stageCelebrate(text, tier) {
+  const stage = document.querySelector(".reactor-stage");
+  if (!stage) return;
+  const chief = tier === 2;
+  let el = document.getElementById("stageCheer");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "stageCheer"; el.className = "stage-cheer";
+    el.setAttribute("aria-hidden", "true");
+    stage.appendChild(el);
+  }
+  el.textContent = text;
+  el.classList.toggle("chief", chief);
+  if (reduceMotion) {
+    el.classList.remove("run");
+    el.classList.add("static");
+    clearTimeout(stageCelebrate._t);
+    stageCelebrate._t = setTimeout(() => el.classList.remove("static"), 2200);
+    return;
+  }
+  el.classList.remove("static");
+  stage.classList.remove("celebrate", "celebrate-chief"); void stage.offsetWidth;
+  stage.classList.add(chief ? "celebrate-chief" : "celebrate");
+  el.classList.remove("run"); void el.offsetWidth; el.classList.add("run");
+  clearTimeout(stageCelebrate._t);
+  stageCelebrate._t = setTimeout(() => stage.classList.remove("celebrate", "celebrate-chief"), chief ? 2600 : 1400);
 }
 
 function updateMissions() {
@@ -2626,11 +2738,33 @@ function updateMissions() {
   let dt = (now - missionPrevT) / 1000; missionPrevT = now;
   if (!(dt > 0) || dt > 1) dt = 0.36;
   let count = 0;
+  // C4: missions only accrue once the visitor drives (never for the boot preset or the kiosk
+  // auto-demo), and only while the plant has settled onto the dialed setpoints (every slider's
+  // smoothed value within half a step of its dial; temperature is exempt because alpha heating
+  // legitimately pushes the core past the dial). Settled values snap to the exact dial reading,
+  // so "65% or less" completes when the dial reads 65 instead of stalling a hair above it, while
+  // mid-transient states (dial just changed, plasma outputs still reflecting the old settings)
+  // are not judged at all. The hold requirement on the constraint puzzles then demands the state
+  // be sustained, so a decaying burn passing through a qualifying state can never award one.
+  let mt = null;
+  if (runArmed) {
+    const raw = rawInputs();
+    let settled = true;
+    for (const k of SMOOTH_KEYS) {
+      if (k !== "temperature" && Math.abs(model[k] - raw[k]) >= 0.5) { settled = false; break; }
+    }
+    if (settled) {
+      mt = Object.assign({}, model);
+      for (const k of SMOOTH_KEYS) { if (Math.abs(mt[k] - raw[k]) < 0.5) mt[k] = raw[k]; }
+      mt.dialTemperature = raw.temperature;   // the heating-drive dial itself (Hold the Burn tests it)
+    }
+  }
   MISSIONS.forEach((mn) => {
     const st = missionState[mn.id];
     if (!st) return;
     if (st.done) { count += 1; return; }
-    const pass = !!mn.test(model);
+    if (!mt) return;
+    const pass = !!mn.test(mt);
     if (mn.hold) {
       st.hold = pass ? Math.min(mn.hold, st.hold + dt) : 0;
       if (st.bar) st.bar.style.width = `${(st.hold / mn.hold) * 100}%`;
@@ -2640,11 +2774,139 @@ function updateMissions() {
     }
     if (st.done) count += 1;
   });
-  missionsInitialized = true;
+  // The first ARMED evaluation completes already-satisfied milestones silently (no toast), so a
+  // visitor's first slider nudge never celebrates what the boot preset achieved on its own.
+  if (mt) missionsInitialized = true;
+  missionDoneCount = count;
+  // P1: the ladder-complete moment - the exhibit's only "boss kill". Once per run.
+  if (count === MISSIONS.length && !ladderCelebrated && mt) {
+    ladderCelebrated = true;
+    stageCelebrate(`Chief Operator: ${MISSIONS.length} of ${MISSIONS.length} challenges`, 2);
+    if (srStatus) srStatus.textContent = `All ${MISSIONS.length} challenges complete. Chief Operator.`;
+    cardCtaDone = false;   // the full ladder is the strongest reason to re-offer the run card
+  }
   const c = document.getElementById("missionCount");
   if (c) c.textContent = count;
   const cc = document.getElementById("missionChipCount");   // U3: keep the status-strip chip in sync
   if (cc) cc.textContent = count;
+}
+
+/* ---- P1: 60-second Power Challenge - most net power from a standing start, sliders only.
+   A 3-entry best-of-day board (localStorage) gives the booth a score to beat, and gives the
+   facilitator a one-line invite: "think you can beat 412 MW?" ---- */
+let challengeOn = false, challengeLeftMs = 0, challengeLastTick = 0, challengePeak = -Infinity, challengePeakArmed = false;
+let challengeEarned = [], challengeWarned = false;
+const BOARD_KEY = "fusionBoard";
+function loadBoard() {
+  try {
+    const b = JSON.parse(localStorage.getItem(BOARD_KEY) || "null");
+    if (b && b.day === new Date().toDateString() && Array.isArray(b.scores)) return b.scores;
+  } catch (e) {}
+  return [];
+}
+function saveBoard(scores) {
+  try { localStorage.setItem(BOARD_KEY, JSON.stringify({ day: new Date().toDateString(), scores })); } catch (e) {}
+}
+function renderBoard() {
+  const chipEl = document.getElementById("boardChip");
+  const listEl = document.getElementById("chBoard");
+  const scores = loadBoard();
+  if (chipEl) {
+    chipEl.hidden = !scores.length;
+    if (scores.length) chipEl.textContent = `Today's best: ${Math.round(scores[0].mw)} MW · ${scores[0].initials}`;
+  }
+  if (listEl) {
+    listEl.innerHTML = "";
+    scores.forEach((s) => {
+      const li = document.createElement("li");
+      li.textContent = `${s.initials} · ${Math.round(s.mw)} MW`;
+      listEl.appendChild(li);
+    });
+  }
+}
+function startChallenge() {
+  if (challengeOn) return;
+  if (_dlg.panel && _dlg.close) _dlg.close();
+  const wp = document.getElementById("welcomePrompt"); if (wp) wp.hidden = true;
+  runArmed = true;               // starting the sprint is a deliberate act
+  challengeOn = true;
+  challengePeak = -Infinity;
+  challengePeakArmed = false;    // no credit for a previous burn still spinning down
+  challengeEarned = [];
+  challengeWarned = false;
+  challengeLeftMs = 60000;       // ticked time, not wall clock: a hidden tab does not burn (or bank) seconds
+  challengeLastTick = performance.now();
+  applyPreset("startup");        // standing start: sub-net; hand controls only from here
+  const chip = document.getElementById("challengeChip");
+  if (chip) { chip.hidden = false; chip.textContent = "60s · go!"; }
+  if (srStatus) srStatus.textContent = "Power challenge started: 60 seconds for the highest net power while stability holds 55 percent or better. No presets; hands on the controls.";
+}
+function tickChallenge() {
+  if (!challengeOn) return;
+  const now = performance.now();
+  const dt = Math.min(1000, now - challengeLastTick);   // capped: a hidden-tab gap counts as at most one second
+  challengeLastTick = now;
+  challengeLeftMs -= dt;
+  // Peak recording arms only once net power has dipped below zero (any prior burn has to spin
+  // down through negative on the way to the Startup state), or 15 ticked seconds in as a
+  // defensive fallback. Otherwise a visitor who starts the sprint from a hot +800 MW reactor
+  // would be credited the decay of a burn they did not build.
+  if (!challengePeakArmed && model && typeof model.netElec === "number" && (model.netElec < 0 || challengeLeftMs < 45000)) challengePeakArmed = true;
+  // Stability gate: reckless max-everything reaches huge net numbers with the plant shaking
+  // itself apart; only power produced at 55%+ stability counts, so the scored lesson matches
+  // the taught one (same bar as the Grid Master mission).
+  const stable = !!model && model.stability >= 55;
+  if (challengePeakArmed && stable && model.netElec > challengePeak) challengePeak = model.netElec;
+  const chip = document.getElementById("challengeChip");
+  if (chip) {
+    const secs = Math.max(0, Math.ceil(challengeLeftMs / 1000));
+    const peakStr = challengePeak > -Infinity ? Math.round(challengePeak) : 0;
+    chip.textContent = stable ? `${secs}s · peak ${peakStr} MW` : `${secs}s · unstable! not scoring · peak ${peakStr} MW`;
+  }
+  if (!challengeWarned && challengeLeftMs <= 10000) {
+    challengeWarned = true;
+    if (srStatus) srStatus.textContent = "Ten seconds left in the challenge.";
+  }
+  if (challengeLeftMs <= 0) endChallenge();
+}
+function endChallenge() {
+  challengeOn = false;
+  if (_dlg.panel && _dlg.close) _dlg.close();   // never stack over an open card/story/about
+  const chip = document.getElementById("challengeChip"); if (chip) chip.hidden = true;
+  const peak = Math.max(0, Math.round(challengePeak === -Infinity ? 0 : challengePeak));
+  endChallenge._peak = peak;
+  const res = document.getElementById("chResult");
+  if (res) res.textContent = peak > 0 ? `Peak net power: ${peak} MW` : "Peak net power: 0 MW. Nothing counted; go net positive and keep stability at 55% or better.";
+  const earnedEl = document.getElementById("chEarned");
+  if (earnedEl) {
+    earnedEl.hidden = !challengeEarned.length;
+    if (challengeEarned.length) earnedEl.textContent = `Along the way you earned: ${challengeEarned.join(", ")}.`;
+  }
+  const scores = loadBoard();
+  const qualifies = peak > 0 && (scores.length < 3 || peak >= scores[scores.length - 1].mw);
+  const entry = document.getElementById("chEntry");
+  if (entry) entry.hidden = !qualifies;
+  const inp = document.getElementById("chInitials"); if (inp) inp.value = "";
+  renderBoard();
+  const ov = document.getElementById("challengeOverlay");
+  if (ov) { ov.hidden = false; dialogOpen(document.querySelector(".challenge-card"), qualifies ? "#chInitials" : "#chAgain", closeChallengeCard); }
+  if (srStatus) srStatus.textContent = `Challenge over. Peak net power ${peak} megawatts.`;
+}
+function closeChallengeCard() {
+  const ov = document.getElementById("challengeOverlay");
+  if (ov) ov.hidden = true;
+  dialogClose();
+}
+function saveChallengeScore() {
+  const inp = document.getElementById("chInitials");
+  const initials = ((inp && inp.value ? inp.value : "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 3)) || "???";
+  const scores = loadBoard();
+  scores.push({ initials, mw: endChallenge._peak || 0 });
+  scores.sort((a, b) => b.mw - a.mw);
+  saveBoard(scores.slice(0, 3));
+  const entry = document.getElementById("chEntry"); if (entry) entry.hidden = true;
+  renderBoard();
+  document.getElementById("chAgain")?.focus();   // keep keyboard focus inside the open dialog
 }
 
 /* ---------- Teachable tooltips ---------- */
@@ -2726,10 +2988,16 @@ let kioskOn = false;
 function setKiosk(on) {
   kioskOn = on;
   document.body.classList.toggle("kiosk", on);
+  kioskUserOwned = false;
+  const dChip = document.getElementById("demoChip"); if (dChip) dChip.hidden = true;
+  setAttract(on, on ? "A working fusion reactor, simulated" : undefined);
   const btn = document.getElementById("presentBtn");
   if (btn) { btn.setAttribute("aria-pressed", String(on)); btn.textContent = on ? "Exit" : "Present"; }
   if (on) {
     kioskLast = performance.now();
+    // Entering Present is a facilitator act, not a visitor driving: age the deliberate-action
+    // clock past the courtesy window so the attract demo starts cycling right away.
+    lastDeliberate = performance.now() - KIOSK_RESUME_MS - KIOSK_WARN_MS - 1000;
     if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
   } else if (document.fullscreenElement && document.exitFullscreen) {
     document.exitFullscreen().catch(() => {});
@@ -2741,14 +3009,60 @@ function setKiosk(on) {
   }, 90);
 }
 
+/* ---- P1: attract narration - large-type lines synced to the auto-demo's preset cycle, so the
+   exhibit sells itself from booth distance instead of silently changing numbers. ---- */
+const ATTRACT_LINES = {
+  startup: "Startup: past breakeven, but the plant still runs at a loss",
+  cruise: "Cruise: a burning plasma climbing to 300 MW for the grid",
+  gain: "High Gain: watch Q run away to ignition",
+  stress: "Too much fuel, too little field: disruption risk climbs",
+};
+function setAttract(on, line) {
+  const b = document.getElementById("attractBanner");
+  if (!b) return;
+  if (line) { const l = document.getElementById("attractLine"); if (l) l.textContent = line; }
+  b.hidden = !on;
+}
+
 function tickKiosk() {
   if (!kioskOn) return;
   const now = performance.now();
-  if (now - kioskLast > 12000) {
+  const chip = document.getElementById("demoChip");
+  // B1: a visitor owns the controls for a while after any deliberate act (tap, key, wheel); once
+  // owned, mere pointer movement sustains it, and an open dialog (takeaway card, story) doubles
+  // the window since someone is likely reading or scanning the QR. The demo then warns with a
+  // visible countdown before taking back over, and starts the next visitor from a clean slate
+  // instead of inheriting the last person's missions and records.
+  const resumeMs = _dlg.panel ? KIOSK_RESUME_MS * 2 : KIOSK_RESUME_MS;
+  const engaged = challengeOn ||
+    (now - lastDeliberate < resumeMs) || (kioskUserOwned && now - lastUserAction < resumeMs);
+  if (engaged) {
+    kioskUserOwned = true;
+    if (chip) chip.hidden = true;
+    setAttract(false);
+    kioskLast = now;   // park the demo cadence while the visitor drives
+    return;
+  }
+  const sinceUser = now - Math.max(lastDeliberate, kioskUserOwned ? lastUserAction : 0);
+  if (sinceUser < resumeMs + KIOSK_WARN_MS) {
+    if (chip) {
+      // One accessible announcement when the countdown starts; the ticking text itself is aria-hidden.
+      if (chip.hidden && srStatus) srStatus.textContent = "Auto demo resumes in 10 seconds. Touch anything to keep control.";
+      chip.hidden = false;
+      chip.textContent = `Auto demo resumes in ${Math.ceil((resumeMs + KIOSK_WARN_MS - sinceUser) / 1000)}s. Touch anything to keep control.`;
+    }
+    setAttract(false);
+    return;
+  }
+  if (chip) chip.hidden = true;
+  if (kioskUserOwned) { kioskUserOwned = false; resetRun(); }   // the visitor walked away: clean slate
+  setAttract(true);
+  if (now - kioskLast > KIOSK_STEP_MS) {
     kioskLast = now;
     const order = ["startup", "cruise", "gain", "stress", "cruise"];
     kioskCycle = (kioskCycle + 1) % order.length;
     applyPreset(order[kioskCycle]);
+    setAttract(true, ATTRACT_LINES[order[kioskCycle]]);
   }
 }
 
@@ -2770,7 +3084,13 @@ function initPhase1Controls() {
 
   document.getElementById("presentBtn")?.addEventListener("click", () => setKiosk(!kioskOn));
   document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && kioskOn) setKiosk(false); });
-  ["pointerdown", "keydown"].forEach((ev) => document.addEventListener(ev, () => { kioskLast = performance.now(); lastUserAction = performance.now(); }, { passive: true }));
+  // C4/B1: presence vs deliberate action. Pointer movement (mouse or a touch drag) proves someone
+  // is there, so it feeds the normal-mode idle watchdog and sustains kiosk ownership; but only a
+  // deliberate act (tap, key, wheel) STARTS kiosk ownership, so a facilitator walking away after
+  // pressing Present does not stall the attract demo.
+  document.addEventListener("pointermove", () => { lastUserAction = performance.now(); }, { passive: true });
+  ["pointerdown", "keydown", "wheel", "touchstart"].forEach((ev) =>
+    document.addEventListener(ev, () => { lastUserAction = performance.now(); lastDeliberate = performance.now(); }, { passive: true }));
 
   const scaleBtn = document.getElementById("scaleToggle");
   scaleBtn?.addEventListener("click", () => {
@@ -2876,7 +3196,7 @@ function drawCrossSection() {
 let wallDose = 0;
 function updateMaterials(dt) {
   const wl = model.wallLoad || 0;
-  wallDose += wl * dt * 0.004; // illustrative displacement-per-atom accrual
+  if (runArmed) wallDose += wl * dt * 0.004; // illustrative dpa accrual; only the visitor's own run wears the wall
   const dEl = document.getElementById("matDose");
   const sEl = document.getElementById("matStatus");
   const bEl = document.getElementById("matLifeBar");
@@ -3211,10 +3531,37 @@ function initPhase2Controls() {
   document.getElementById("tourSkip")?.addEventListener("click", () => endTour());
   document.getElementById("tourOverlay")?.addEventListener("click", (e) => { if (e.target.id === "tourOverlay") endTour(); });
   document.getElementById("exportBtn")?.addEventListener("click", () => exportRun());
+  // Two-tap confirm: New run sits beside the takeaway card button, and a single stray tap
+  // should never wipe another visitor's earned missions and records.
+  const nrBtn = document.getElementById("newRunBtn");
+  nrBtn?.addEventListener("click", () => {
+    if (!nrBtn.classList.contains("confirm")) {
+      nrBtn.classList.add("confirm");
+      nrBtn.textContent = "Tap again to clear";
+      clearTimeout(nrBtn._t);
+      nrBtn._t = setTimeout(() => { nrBtn.classList.remove("confirm"); nrBtn.textContent = "New run"; }, 4000);
+      return;
+    }
+    clearTimeout(nrBtn._t);
+    nrBtn.classList.remove("confirm");
+    nrBtn.textContent = "New run";
+    resetRun();
+    applyPreset("cruise");
+    resetCamera();
+    if (srStatus) srStatus.textContent = "New run started. Missions, records, and charts cleared.";
+  });
   document.getElementById("cardBtn")?.addEventListener("click", () => openTakeaway());
   document.getElementById("cardClose")?.addEventListener("click", () => closeTakeaway());
   document.getElementById("cardDownload")?.addEventListener("click", () => downloadTakeaway());
   document.getElementById("cardOverlay")?.addEventListener("click", (e) => { if (e.target && e.target.id === "cardOverlay") closeTakeaway(); });
+  document.getElementById("challengeBtn")?.addEventListener("click", () => startChallenge());
+  document.getElementById("chClose")?.addEventListener("click", () => closeChallengeCard());
+  document.getElementById("chAgain")?.addEventListener("click", () => { closeChallengeCard(); startChallenge(); });
+  document.getElementById("chSave")?.addEventListener("click", () => saveChallengeScore());
+  document.getElementById("chInitials")?.addEventListener("keydown", (e) => { if (e.key === "Enter") saveChallengeScore(); });
+  document.getElementById("challengeOverlay")?.addEventListener("click", (e) => { if (e.target && e.target.id === "challengeOverlay") closeChallengeCard(); });
+  document.getElementById("cardCta")?.addEventListener("click", () => { const c = document.getElementById("cardCta"); if (c) c.hidden = true; openTakeaway(); });
+  renderBoard();
   document.getElementById("storyToggle")?.addEventListener("click", () => setStory(!storyOn));
   document.getElementById("storyNext")?.addEventListener("click", () => storyNav(1));
   document.getElementById("storyPrev")?.addEventListener("click", () => storyNav(-1));
@@ -3302,23 +3649,58 @@ function nextPredict() { predictIdx = (predictIdx + 1) % PREDICT_Q.length; rende
 const TAKEAWAY_URL = "https://pjdroopypants.github.io/Fusion-SImulator/";
 const TAKEAWAY_QR = ["111111100101001000101110001111111","100000101000011001001000001000001","101110101100010011110111001011101","101110101111100100000101101011101","101110100111010101100011001011101","100000100110100011001110101000001","111111101010101010101010101111111","000000001111101000100010000000000","100000101101111101001011111001110","011110011000001110110001000011110","000111100110000100100110111010110","101100010011001100001001110111101","100111101111011111111001101100001","000100001001001010001001010001111","111010100110101001010100011111110","110110000110111100010010010101101","011100100010011001011010010111001","000110000000111111111111011001100","001110110000010100011001111101101","001111011010110011111010011011111","111001110000100110010010010111011","110001010111110011101101001110100","101010101010110110100100000011010","101101010110001000000010000111110","110111101000101100011000111111011","000000001011111110011010100010101","111111100011011100101001101010100","100000100001001010001011100011110","101110100101010000100000111111011","101110100111010010000000010110011","101110100110001011010111010110111","100000100110010110111000001111100","111111101111111001010011110100010"];
 let bestQ = 0, bestNet = -Infinity, hotT = 0, everIgnited = false;
+let cardCtaDone = false;   // P1: the "get your card" invite shows once per run
+let sliderTouched = false; // P1: a real hands-on act; a bare preset click does not earn the invite
 function updatePeaks() {
-  if (!model) return;
+  if (!model || !runArmed) return;   // C4: only the visitor's own driving sets records
   if (typeof model.q === "number") { const qv = isFinite(model.q) ? model.q : 99; if (qv > bestQ) bestQ = qv; }
   if (typeof model.phi === "number" && model.phi >= 0.95) everIgnited = true;
   if (typeof model.netElec === "number" && model.netElec > bestNet) bestNet = model.netElec;
   if (typeof model.temperature === "number" && model.temperature > hotT) hotT = model.temperature;
 }
+
+/* ---- C4: per-visitor reset - a clean slate between booth visitors. Invoked by the "New run"
+   button, the normal-mode idle watchdog, and the kiosk auto-demo when it takes back over. ---- */
+function resetRun() {
+  if (_dlg.panel && _dlg.close) _dlg.close();   // closes story/tour/takeaway/about via their own handlers
+  bestQ = 0; bestNet = -Infinity; hotT = 0; everIgnited = false;
+  wallDose = 0;
+  predictScore = 0; predictDone = 0;
+  updatePredictScore();
+  renderPredict();
+  buildMissions();
+  missionsInitialized = false;   // next armed pass completes pre-satisfied milestones silently
+  netHistory = Array.from({ length: 120 }, () => 0);
+  fusionHistory = Array.from({ length: 120 }, () => 0);
+  trail = [];
+  if (challengeOn) { challengeOn = false; const cch = document.getElementById("challengeChip"); if (cch) cch.hidden = true; }
+  challengeEarned = [];
+  cardCtaDone = false;
+  sliderTouched = false;
+  missionDoneCount = 0;
+  ladderCelebrated = false;
+  const ctaEl = document.getElementById("cardCta"); if (ctaEl) ctaEl.hidden = true;
+  runArmed = false;   // achievements stay quiet until the next visitor drives a control
+  const mc = document.getElementById("missionCount"); if (mc) mc.textContent = 0;
+  const mcc = document.getElementById("missionChipCount"); if (mcc) mcc.textContent = 0;
+  chartsDirty = true;
+}
 function takeawayStats() {
   const missions = Number(document.getElementById("missionCount")?.textContent || 0);
   const total = Number(document.getElementById("missionTotal")?.textContent || 7);
-  const qStr = everIgnited ? "≈ ∞" : bestQ.toFixed(1);
-  const milC = Math.round(hotT * 11.6);
-  const netStr = bestNet > 0 ? `${Math.round(bestNet)} MW` : "not net-positive";
+  // Before anyone has driven, the card reflects the live reactor rather than empty records,
+  // so it can never contradict the screen it was printed from.
+  const qBest = bestQ > 0 ? bestQ : (model && model.q) || 0;
+  const netBest = bestNet !== -Infinity ? bestNet : (model && model.netElec) || 0;
+  const tBest = hotT || (model && model.temperature) || 0;
+  const ignited = everIgnited || (bestQ === 0 && !!model && (model.phi || 0) >= 0.95);
+  const qStr = ignited ? "≈ ∞" : qBest.toFixed(1);
+  const milC = Math.round(tBest * 11.6);
+  const netStr = netBest > 0 ? `${Math.round(netBest)} MW` : "not net-positive";
   let verdict;
-  if (everIgnited) verdict = "You reached ignition. The plasma sustained its own burn.";
-  else if (bestQ >= 5) verdict = "You ran a strong burning plasma.";
-  else if (bestQ >= 1) verdict = "You crossed scientific breakeven, Q of at least 1.";
+  if (ignited) verdict = "You reached ignition. The plasma sustained its own burn.";
+  else if (qBest >= 5) verdict = "You ran a strong burning plasma.";
+  else if (qBest >= 1) verdict = "You crossed scientific breakeven, Q of at least 1.";
   else verdict = "You drove a real magnetic-confinement plasma.";
   const quiz = predictDone ? `${predictScore} / ${predictDone}` : null;
   return { missions, total, qStr, milC, netStr, verdict, quiz };
@@ -3552,12 +3934,21 @@ function modelTick() {
   updateReadouts();
   updateMissions();
   tickKiosk();
+  tickChallenge();
   // C4: idle watchdog (normal mode) - return to a clean attract state after long inactivity,
-  // so a visitor never finds a reactor the last person left mid-disruption.
-  if (!kioskOn && performance.now() - lastUserAction > WATCHDOG_MS) {
+  // so a visitor never finds a reactor the last person left mid-disruption, and never inherits
+  // the last person's missions, records, quiz score, or wall dose on their takeaway card.
+  // An open dialog is strong evidence someone is still reading (screen-reader users emit no
+  // pointer or key events while browsing), so the watchdog waits it out - EXCEPT the challenge
+  // result card, which opens itself with no user action and would otherwise block the idle
+  // reset forever after a visitor walks away mid-sprint.
+  const dlgBlocking = _dlg.panel && !(_dlg.panel.classList && _dlg.panel.classList.contains("challenge-card"));
+  if (!kioskOn && !challengeOn && !dlgBlocking && performance.now() - lastUserAction > WATCHDOG_MS) {
     lastUserAction = performance.now();
+    resetRun();
     applyPreset("cruise");
     resetCamera();
+    if (srStatus) srStatus.textContent = "Idle reset: reactor returned to Cruise for the next visitor.";
   }
   updateMaterials(0.36);
   updateSound();
