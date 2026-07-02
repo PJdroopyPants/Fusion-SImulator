@@ -73,7 +73,7 @@ Live, software-drawn panels accompany the reactor: the Lawson operating-point ma
 
 ## Accessibility
 
-The simulator honors the operating system's reduced-motion setting (it stills animation and freezes flicker), ships high-contrast and colorblind-safe themes, supports keyboard reset and touch gestures, and announces discrete state changes (reactor state, warnings, story goals, mission and challenge events) through a single polite live region rather than streaming numbers. A **Describe state** button (or the **D** key) speaks a full snapshot of the reactor on demand: state, Q, powers, progress to ignition, stability, and wall load.
+The simulator honors the operating system's reduced-motion setting (it stills animation and freezes flicker), ships high-contrast and colorblind-safe themes, supports keyboard reset and touch gestures, and announces discrete state changes (reactor state, warnings, story goals, mission and challenge events) through a single polite live region rather than streaming numbers. A **Describe state** button (or the **D** key) shows and speaks a full snapshot of the reactor on demand: state, Q, powers, progress to ignition, stability, wall load, and tritium breeding.
 
 ## For educators
 

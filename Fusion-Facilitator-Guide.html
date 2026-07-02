@@ -82,10 +82,11 @@
     <div class="grid two">
       <div class="panel">
         <h2><span class="num">2</span>The 30-second invite</h2>
-        <p style="color:var(--muted); margin:.3rem 0 0;">A script you can read to anyone walking past.</p>
+        <p style="color:var(--muted); margin:.3rem 0 0;">A script you can read to anyone walking past. Tap <b>Startup</b> first, so the visitor starts from a struggling reactor and personally turns it around.</p>
         <div class="script">
-          <p class="say">&ldquo;Want to run a fusion reactor? This is the same machine they're building to make power from seawater. Slide the <strong>temperature</strong> up&hellip; now the <strong>magnetic field</strong>&hellip; watch the gain, and when it turns <span style="color:var(--green)">green</span> you're making more power than you put in. Can you reach <strong>ignition</strong>?&rdquo;</p>
+          <p class="say">&ldquo;Want to run a fusion reactor? This is the same kind of machine they're building to make power from seawater. Right now it's losing power: see <strong>Net electric</strong> up top, in <span style="color:var(--coral)">red</span>? Slide the <strong>temperature</strong> up&hellip; now give the magnets more <strong>field</strong>&hellip; there: it flipped <span style="color:var(--teal)">green</span>. You're sending real power to the grid. Think you can reach <strong>ignition</strong>?&rdquo;</p>
         </div>
+        <p style="color:var(--muted); font-size:.85rem; margin:.5rem 0 0;">Watch <b>Net electric</b> in the top strip (red to green), not the gold Q number. If they stall, the coach line under the reactor says what to fix next.</p>
       </div>
       <div class="panel">
         <h2><span class="num">3</span>What to point at</h2>
@@ -109,14 +110,28 @@
         <tr><td>You want a clean view angle</td><td>Double-click the reactor, or press <kbd>R</kbd>.</td></tr>
         <tr><td>It looks frozen or the plasma went black</td><td>Reload the page (<kbd>F5</kbd>, or <kbd>Ctrl/Cmd</kbd>+<kbd>R</kbd>). Everything is local, so it comes right back.</td></tr>
         <tr><td>The tablet is warm / battery dropping</td><td>Normal for an all-day run; it already runs a low-power mode on weaker hardware. Keep it plugged in.</td></tr>
-        <tr><td>A visitor wants to keep their result</td><td>Tap <b>Takeaway card</b> for a shareable image with a QR code to run it themselves.</td></tr>
+        <tr><td>A visitor wants to keep their result</td><td>Tap <b>Your run card (QR)</b> (bottom of the telemetry panel) for a shareable image with a QR code to run it themselves.</td></tr>
       </table>
     </div>
   </section>
 
   <section>
     <div class="panel">
-      <h2><span class="num">5</span>Good to know</h2>
+      <h2><span class="num">5</span>Questions people actually ask</h2>
+      <table>
+        <tr><th>They ask</th><th>You say</th></tr>
+        <tr><td>&ldquo;Is this a real reactor design?&rdquo;</td><td>It's a physically grounded teaching model of a tokamak like ITER. The trends and tradeoffs are real; the exact numbers are illustrative.</td></tr>
+        <tr><td>&ldquo;Why hasn't anyone done this yet?&rdquo;</td><td>Holding a 150-million-degree plasma steady takes enormous magnets and decades of engineering. The record for a magnetic machine like this one is about two-thirds of breakeven (JET, 1997); a laser experiment (NIF) first crossed breakeven in 2022, a different approach. Point at the ignition bar under the reactor, or exit Present mode to show the operating-point map: the diamonds are real machines, and none has crossed the ignition curve.</td></tr>
+        <tr><td>&ldquo;When will fusion power homes?&rdquo;</td><td>ITER is being built to demonstrate a tenfold energy gain, with its full-power fuel runs starting around 2039; serious roadmaps put the first power plants in the 2040s. Private ventures are racing to beat that.</td></tr>
+        <tr><td>&ldquo;Where does the fuel come from?&rdquo;</td><td>Deuterium comes from seawater. Tritium barely exists in nature, so the plant breeds its own from lithium in the blanket: that's the &ldquo;Tritium breeding&rdquo; readout.</td></tr>
+        <tr><td>&ldquo;Is it dangerous?&rdquo;</td><td>There's no chain reaction to run away. Any upset and the plasma fizzles out in about a second: that's the disruption you can trigger yourself with the <b>Stress</b> preset.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="panel">
+      <h2><span class="num">6</span>Good to know</h2>
       <p style="margin:.3rem 0 0; color:var(--muted);">
         <span class="chip">Keyboard-friendly</span> arrow keys orbit the reactor, <kbd>+</kbd>/<kbd>&minus;</kbd> zoom.
         <span class="chip">Themes</span> a <strong>Light</strong> theme reads better on a projector in a bright room; <strong>High contrast</strong> and <strong>Colorblind</strong> options are in the Theme menu.

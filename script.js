@@ -631,6 +631,9 @@ function describeState() {
   // Clear first so a repeated identical snapshot still registers as a change and is re-spoken.
   srStatus.textContent = "";
   setTimeout(() => { srStatus.textContent = msg; }, 30);
+  // Show the same summary visibly: the snapshot is useful to sighted visitors too, and a
+  // button that only feeds the screen-reader region looks broken to everyone else.
+  showToastRaw(msg, 9000);
 }
 
 /* ---------- C3: real-world unit translator ---------- */
@@ -2794,13 +2797,13 @@ function buildMissions() {
   missionPrevT = performance.now();
 }
 
-function showToastRaw(text) {
+function showToastRaw(text, ms) {
   const t = document.getElementById("missionToast");
   if (!t) return;
   t.textContent = text;
   t.classList.add("show");
   clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.remove("show"), 4200);
+  t._timer = setTimeout(() => t.classList.remove("show"), ms || 4200);
 }
 
 /* P0: user-facing render-quality control. "full" disables the FPS guard outright. */
@@ -3562,19 +3565,36 @@ function showTourStep(i) {
   const card = document.getElementById("tourCard");
   const ring = document.getElementById("tourRing");
   if (!card || !ring) return;
+  // P0: skip steps whose target is not visible in the current mode (kiosk hides the analysis
+  // charts, so the Lawson step would otherwise ring an invisible, zero-size canvas).
+  // offsetParent is null inside any display:none subtree and is immune to transient reflow,
+  // unlike a bounding-rect width check.
+  const stepVisible = (k) => {
+    const n = document.querySelector(TOUR[k].sel);
+    return !!(n && n.offsetParent !== null);
+  };
+  while (i >= 0 && i < TOUR.length && !stepVisible(i)) i += 1;
   if (i < 0 || i >= TOUR.length) { endTour(); return; }
   tourStep = i;
   const step = TOUR[i];
   const el = document.querySelector(step.sel);
+  // Progress counts VISIBLE steps only, so a kiosk tour reads "5 / 5" with a Done button
+  // instead of "5 / 6" followed by the dialog vanishing.
+  const visible = TOUR.map((t, k) => (stepVisible(k) ? k : -1)).filter((k) => k >= 0);
+  const pos = visible.indexOf(i);
+  const isLast = pos === visible.length - 1;
   if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
   setTimeout(() => {
+    // The reveal is async: bail if the tour ended or moved on while we waited (e.g. the story
+    // preempted it), or a stale timeout would resurrect the card over the story.
+    if (tourStep !== i || document.getElementById("tourOverlay")?.hidden) return;
     const r = el ? el.getBoundingClientRect() : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 0, height: 0 };
     ring.style.left = `${r.left - 6}px`; ring.style.top = `${r.top - 6}px`;
     ring.style.width = `${r.width + 12}px`; ring.style.height = `${r.height + 12}px`;
     ring.hidden = false;
     const set = (id, t) => { const n = document.getElementById(id); if (n) n.textContent = t; };
-    set("tourTitle", step.title); set("tourBody", step.body); set("tourProg", `${i + 1} / ${TOUR.length}`);
-    const nb = document.getElementById("tourNext"); if (nb) nb.textContent = i === TOUR.length - 1 ? "Done" : "Next";
+    set("tourTitle", step.title); set("tourBody", step.body); set("tourProg", `${pos + 1} / ${visible.length}`);
+    const nb = document.getElementById("tourNext"); if (nb) nb.textContent = isLast ? "Done" : "Next";
     let cx2 = r.left, cy2 = r.top + r.height + 12;
     if (cy2 + 170 > window.innerHeight) cy2 = Math.max(12, r.top - 176);
     card.style.left = `${clamp(cx2, 12, Math.max(12, window.innerWidth - 332))}px`;
@@ -3582,7 +3602,17 @@ function showTourStep(i) {
     card.hidden = false;
   }, 240);
 }
-function startTour() { const o = document.getElementById("tourOverlay"); if (o) o.hidden = false; showTourStep(0); dialogOpen(document.getElementById("tourCard"), "#tourNext", endTour); }
+function startTour() {
+  // P0: the tour and the guided story share the highlight ring and the single dialog slot;
+  // they are mutually exclusive so they can never fight over either.
+  const opener = document.activeElement;   // remember the real opener: closing the story moves focus
+  if (storyOn) setStory(false);
+  const o = document.getElementById("tourOverlay"); if (o) o.hidden = false;
+  showTourStep(0);
+  if (tourStep < 0) return;   // every target hidden: showTourStep already ended the tour cleanly
+  dialogOpen(document.getElementById("tourCard"), "#tourNext", endTour);
+  if (opener && opener.focus) _dlg.restore = opener;   // tour-end returns focus to the Tour button, not the story launcher
+}
 function endTour() {
   ["tourOverlay", "tourCard", "tourRing"].forEach((id) => { const e = document.getElementById(id); if (e) e.hidden = true; });
   tourStep = -1;
@@ -3655,6 +3685,7 @@ function updateStory() {
 }
 function setStory(on) {
   storyOn = on; storyStep = 0;
+  if (on && tourStep >= 0) endTour();   // P0: mutually exclusive with the tour (shared ring + dialog slot)
   if (on) {
     // Step 1 ("just cold gas") must match the screen: snap the plasma genuinely cold
     // so the core stays dark until the learner heats it themselves in step 2.
@@ -3672,7 +3703,9 @@ function setStory(on) {
   const btn = document.getElementById("storyToggle");
   if (btn) btn.setAttribute("aria-pressed", String(on));
   renderStory();
-  if (on) dialogOpen(document.getElementById("storyPanel"), "#storyNext", () => setStory(false));   // A1
+  // P0: trap: false - the story is a non-modal companion panel. Escape still closes it and
+  // focus starts on Next, but Tab is free to reach the sliders each step asks the learner to move.
+  if (on) dialogOpen(document.getElementById("storyPanel"), "#storyNext", () => setStory(false), { trap: false });
   else dialogClose();
 }
 function storyNav(d) {
@@ -3859,6 +3892,10 @@ function closeToolsMenu() {
 function resetRun() {
   if (_dlg.panel && _dlg.close) _dlg.close();   // closes story/tour/takeaway/about via their own handlers
   closeToolsMenu();   // the next visitor should not inherit an open mobile menu
+  // Bring the reactor back on screen: the last visitor may have left the page scrolled down at
+  // the missions panel, and an attract loop playing above the fold sells nothing. Instant, not
+  // smooth: this runs between visitors, and smooth scrolling silently no-ops on some setups.
+  window.scrollTo(0, 0);
   bestQ = 0; bestNet = -Infinity; hotT = 0; everIgnited = false;
   wallDose = 0;
   predictScore = 0; predictDone = 0;
@@ -4075,10 +4112,22 @@ initScrollCues();
 // ---- D1: About / credits modal open-close ----
 /* A1: shared modal focus management - focus in, trap Tab inside, restore focus on close, Escape to
    close. Wired into the About, Takeaway-card, Tour, and Story dialogs. */
-const _dlg = { panel: null, restore: null, close: null };
-function dialogOpen(panel, firstSel, closeFn) {
+const _dlg = { panel: null, restore: null, close: null, trap: true };
+function dialogOpen(panel, firstSel, closeFn, opts) {
   if (!panel) return;
+  // Only one dialog owns the slot: close the incumbent through its own handler first, so a
+  // keyboard user opening About over the (untrapped) story never orphans the story with a
+  // dead Escape and a lost focus-restore target.
+  if (_dlg.panel && _dlg.panel !== panel && _dlg.close) {
+    const closeIncumbent = _dlg.close;
+    _dlg.close = null;
+    closeIncumbent();
+  }
   _dlg.panel = panel; _dlg.close = closeFn || null; _dlg.restore = document.activeElement;
+  // P0: non-modal companions (the guided story's bottom sheet) keep Escape-to-close, initial
+  // focus, and focus restore, but do NOT trap Tab: the story explicitly asks the learner to go
+  // work the sliders, so confining focus to its own three buttons locked keyboard users out.
+  _dlg.trap = !opts || opts.trap !== false;
   const first = (firstSel && panel.querySelector(firstSel)) ||
     panel.querySelector('a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])');
   const tryFocus = () => { if (_dlg.panel === panel && first) { try { first.focus(); } catch (e) {} } };
@@ -4093,7 +4142,7 @@ function dialogClose() {
 document.addEventListener("keydown", (e) => {
   if (!_dlg.panel) return;
   if (e.key === "Escape") { if (_dlg.close) _dlg.close(); return; }
-  if (e.key !== "Tab") return;
+  if (e.key !== "Tab" || _dlg.trap === false) return;
   const f = Array.from(_dlg.panel.querySelectorAll(
     'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])'
   )).filter((el) => el.offsetParent !== null);

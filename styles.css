@@ -12,6 +12,13 @@
   --faint: #7f8aa0;   /* lifted from #5e6878: small caption text now clears 4.5:1 on the dark panels */
   --teal: #38e1c6;
   --gold: #ffc24b;
+  /* HUD text tokens: for surfaces that stay dark in EVERY theme (overlays on the reactor
+     canvas, tooltips, toasts). They deliberately never change with the theme, so dark-on-dark
+     text cannot happen when a theme swaps --text/--muted to dark values. (P0: light theme) */
+  --hud-text: #eef2f8;
+  --hud-muted: #9aa4b8;
+  --hud-faint: #7f8aa0;
+  --hud-accent: #38e1c6;
   --coral: #ff7a66;
   --violet: #a896ff;
   --green: #7ee787;
@@ -476,7 +483,7 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 999px;
   background: rgba(11, 13, 18, 0.66);
   backdrop-filter: blur(8px);
-  color: var(--text);
+  color: var(--hud-text);
   font-size: 0.78rem;
   font-weight: 700;
   transition: all 0.18s ease;
@@ -519,7 +526,7 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 10px;
   background: rgba(11, 13, 18, 0.6);
   backdrop-filter: blur(6px);
-  color: var(--muted);
+  color: var(--hud-muted);
   font-size: 0.74rem;
   font-variant-numeric: tabular-nums;
 }
@@ -527,7 +534,7 @@ input[type="range"]::-moz-range-thumb {
 .stage-readout em {
   font-style: normal;
   font-weight: 800;
-  color: var(--text);
+  color: var(--hud-text);
 }
 
 /* ---------- Telemetry ---------- */
@@ -949,7 +956,7 @@ meter::-moz-meter-bar {
   border: 1px solid var(--line-strong);
   border-radius: 6px;
   background: rgba(20, 26, 34, 0.7);
-  color: var(--muted);
+  color: var(--hud-muted);
   font-size: 0.6rem;
   font-weight: 800;
   letter-spacing: 0.07em;
@@ -958,7 +965,7 @@ meter::-moz-meter-bar {
 }
 
 .gizmo-btn:hover {
-  color: var(--text);
+  color: var(--hud-text);
   border-color: var(--teal);
   background: rgba(56, 225, 198, 0.16);
 }
@@ -990,7 +997,7 @@ meter::-moz-meter-bar {
   border-radius: 10px;
   background: rgba(11, 13, 18, 0.6);
   backdrop-filter: blur(8px);
-  color: var(--muted);
+  color: var(--hud-muted);
   cursor: pointer;
   transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -1006,7 +1013,7 @@ meter::-moz-meter-bar {
 }
 
 .nav-btn:hover {
-  color: var(--text);
+  color: var(--hud-text);
   border-color: var(--teal);
   background: rgba(56, 225, 198, 0.15);
   box-shadow: 0 0 16px rgba(56, 225, 198, 0.2);
@@ -1046,7 +1053,7 @@ meter::-moz-meter-bar {
 
 .legend-title {
   margin: 0 0 8px;
-  color: var(--text);
+  color: var(--hud-text);
   font-size: 0.74rem;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -1066,7 +1073,7 @@ meter::-moz-meter-bar {
   display: flex;
   align-items: center;
   gap: 7px;
-  color: var(--muted);
+  color: var(--hud-muted);
   font-size: 0.72rem;
 }
 
@@ -1075,7 +1082,7 @@ meter::-moz-meter-bar {
   border: 1px solid var(--line-strong);
   border-radius: 5px;
   background: rgba(31, 37, 48, 0.8);
-  color: var(--text);
+  color: var(--hud-text);
   font-size: 0.64rem;
   font-weight: 700;
   white-space: nowrap;
@@ -1088,14 +1095,14 @@ meter::-moz-meter-bar {
   padding: 0 4px;
   border: none;
   background: none;
-  color: var(--faint);
+  color: var(--hud-faint);
   font-size: 0.95rem;
   line-height: 1;
   cursor: pointer;
 }
 
 .legend-close:hover {
-  color: var(--text);
+  color: var(--hud-text);
 }
 
 .nav-help {
@@ -1111,7 +1118,7 @@ meter::-moz-meter-bar {
   border-radius: 50%;
   background: rgba(11, 13, 18, 0.6);
   backdrop-filter: blur(8px);
-  color: var(--muted);
+  color: var(--hud-muted);
   font-size: 0.86rem;
   font-weight: 800;
   cursor: pointer;
@@ -1120,7 +1127,7 @@ meter::-moz-meter-bar {
 }
 
 .nav-help:hover {
-  color: var(--text);
+  color: var(--hud-text);
   border-color: var(--teal);
 }
 
@@ -1275,12 +1282,15 @@ meter::-moz-meter-bar {
   left: 50%;
   bottom: 26px;
   z-index: 60;   /* above the story panel (45), which used to fully occlude it */
+  max-width: min(92vw, 620px);   /* long notices (the Describe state summary) wrap instead of overflowing */
+  text-align: center;
+  line-height: 1.5;
   padding: 11px 18px;
   border-radius: 12px;
   background: rgba(13, 24, 22, 0.92);
   border: 1px solid rgba(56, 225, 198, 0.55);
   box-shadow: 0 12px 34px var(--shadow), 0 0 26px rgba(56, 225, 198, 0.2);
-  color: var(--text);
+  color: var(--hud-text);
   font-size: 0.86rem;
   font-weight: 700;
   opacity: 0;
@@ -1340,13 +1350,13 @@ meter::-moz-meter-bar {
 .tip-pop strong {
   display: block;
   margin-bottom: 4px;
-  color: var(--text);
+  color: var(--hud-text);
   font-size: 0.82rem;
 }
 
 .tip-pop span {
   display: block;
-  color: var(--muted);
+  color: var(--hud-muted);
   font-size: 0.76rem;
   line-height: 1.45;
 }
@@ -1354,7 +1364,7 @@ meter::-moz-meter-bar {
 .tip-pop code {
   display: block;
   margin-top: 7px;
-  color: var(--teal);
+  color: var(--hud-accent);
   font-size: 0.72rem;
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
@@ -1362,7 +1372,7 @@ meter::-moz-meter-bar {
 .tip-pop em {
   display: block;
   margin-top: 6px;
-  color: var(--faint);
+  color: var(--hud-faint);
   font-size: 0.72rem;
   font-style: normal;
 }
@@ -1539,12 +1549,12 @@ meter::-moz-meter-bar {
   border-radius: 999px;
   background: rgba(11, 13, 18, 0.6);
   backdrop-filter: blur(8px);
-  color: var(--muted);
+  color: var(--hud-muted);
   font-size: 0.76rem;
   font-weight: 700;
   transition: color 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
 }
-.stage-toggle:hover { color: var(--text); border-color: var(--blue); }
+.stage-toggle:hover { color: var(--hud-text); border-color: var(--blue); }
 .stage-toggle[aria-pressed="true"] {
   color: #061018;
   background: var(--blue);
@@ -1600,10 +1610,11 @@ meter::-moz-meter-bar {
 }
 
 /* ---- Presentation / kiosk mode ---- */
-body.kiosk .missions,
+/* P0: the missions panel and the toast stay AVAILABLE in kiosk mode: the facilitator guide
+   points visitors at the Challenges chip (which scrolls here), and the toast carries notices.
+   Only the dense analysis and learning grids are hidden from the booth view. */
 body.kiosk .analysis-grid,
-body.kiosk .learn-grid,
-body.kiosk .mission-toast { display: none !important; }
+body.kiosk .learn-grid { display: none !important; }
 body.kiosk .sim-shell { padding-top: 16px; padding-bottom: 18px; }
 body.kiosk .topbar { padding-bottom: 12px; }
 body.kiosk .sim-grid > .panel,
@@ -1655,6 +1666,11 @@ html[data-theme="contrast"] {
   --text: #ffffff;
   --muted: #e6ebf5;
   --faint: #b9c2d4;
+  /* High-contrast users chose maximum contrast: brighten the HUD tokens to match. */
+  --hud-text: #ffffff;
+  --hud-muted: #e6ebf5;
+  --hud-faint: #b9c2d4;
+  --hud-accent: #4dffe0;
   --teal: #4dffe0;
   --gold: #ffd24d;
   --coral: #ff9a7d;
@@ -1746,7 +1762,7 @@ html[data-theme="cb"] {
   pointer-events: none;
 }
 .powerup[hidden] { display: none; }
-.powerup span { color: var(--teal); font-size: 1.1rem; font-weight: 800; letter-spacing: 0.3em; text-transform: uppercase; opacity: 0; }
+.powerup span { color: var(--hud-accent); font-size: 1.1rem; font-weight: 800; letter-spacing: 0.3em; text-transform: uppercase; opacity: 0; }
 .powerup.run { animation: powerupFade 1.9s ease forwards; }
 .powerup.run span { animation: powerupText 1.9s ease forwards; }
 @keyframes powerupFade { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
@@ -1828,9 +1844,9 @@ html[data-theme="cb"] {
   padding: 6px 8px;
   border: 1px solid var(--line);
   border-radius: 7px;
-  background: rgba(8, 10, 14, 0.5);
+  background: rgba(10, 13, 18, 0.92);   /* opaque: HUD tokens require a dark surface in EVERY theme */
   /* F4: brighter off-state + a leading LED dot so each lamp reads as an instrument, not a dead pixel. */
-  color: var(--muted);
+  color: var(--hud-muted);
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -1937,7 +1953,7 @@ input[type="range"].vol-slider[hidden] { display: none; }
   display: flex; gap: 10px; padding: 5px 9px;
   border: 1px solid var(--line); border-radius: 8px;
   background: rgba(11, 13, 18, 0.5); backdrop-filter: blur(6px);
-  font-size: 0.66rem; font-weight: 700; color: var(--muted); pointer-events: none;
+  font-size: 0.66rem; font-weight: 700; color: var(--hud-muted); pointer-events: none;
 }
 .ion-key span { display: inline-flex; align-items: center; gap: 4px; }
 .ion-key i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
@@ -2168,6 +2184,8 @@ body.kiosk .hud-phi-cap { font-size: 0.78rem; }
 body.kiosk .hud-phi-mark::after { font-size: 0.72rem; }
 body.kiosk .challenge-chip { font-size: 1.4rem; top: 62px; }
 body.kiosk .board-chip { font-size: 0.95rem; }
+body.kiosk .mission-name { font-size: 1rem; }
+body.kiosk .mission-goal { font-size: 0.85rem; }
 
 @media (prefers-reduced-motion: reduce) {
   .attract-invite, .card-cta, .hud-phi.hot .hud-phi-fill { animation: none; }
