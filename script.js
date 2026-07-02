@@ -349,7 +349,7 @@ function calculateModel() {
   const phi = clamp(triple / tripleReq, 0, 0.985);
 
   // Energy gain Q = 5*phi/(1-phi); 5 = 1/f_alpha (alphas carry ~20% of energy)
-  const q = (5 * phi) / Math.max(0.015, 1 - phi);
+  let q = (5 * phi) / Math.max(0.015, 1 - phi);
 
   // Beta-style pressure vs magnetic pressure -> disruption risk
   const beta = (n20 * T) / (s.magneticField * s.magneticField);
@@ -382,6 +382,13 @@ function calculateModel() {
   // External heating implied by Q (consistent with the gain definition)
   let pExt = q > 0.05 ? fusionPower / q : 0;
   pExt = clamp(pExt, s.neutralBeam ? 20 : 5, 400);
+  // Near ignition the heating floor binds (the beam cannot go below its minimum drive), so cap
+  // Q at the ratio of the two powers actually shown (fusion out over heating delivered). The
+  // badge, the power-balance bars, and the CSV then agree instead of implying three different
+  // gains; ignition is signaled by phi, not by a runaway Q. Taking the minimum leaves every
+  // sub-ignition state (and the tuned presets) untouched, and a cold plasma keeps its tiny Q
+  // rather than inheriting an inflated one from the floor.
+  q = Math.min(q, fusionPower / pExt);
 
   // Thermal -> turbine -> electricity
   const capture = clamp(0.8 + s.coolingFlow / 500, 0.8, 0.97);
@@ -410,7 +417,8 @@ function calculateModel() {
     100
   );
 
-  // Operating-state label
+  // Operating-state label. "Burning Plasma" is reserved for an alpha-dominated burn (Q of 5 or
+  // more); crossing Q = 1 is scientific breakeven, a milestone but not yet a burning plasma.
   let label = "Startup";
   let stateColor = "#ffc24b";
   if (s.emergencyQuench) {
@@ -423,8 +431,10 @@ function calculateModel() {
     label = "Ignition"; stateColor = "#7ee787";
   } else if (netElec > 0) {
     label = "Net Power"; stateColor = "#7ee787";
-  } else if (q >= 1) {
+  } else if (q >= 5) {
     label = "Burning Plasma"; stateColor = "#38e1c6";
+  } else if (q >= 1) {
+    label = "Breakeven"; stateColor = "#49b8ff";
   }
 
   const nTauActual = n20 * 1e20 * tauE;
@@ -516,7 +526,7 @@ function updatePlant() {
 /* ---------- B5: control-room annunciator lamps ---------- */
 function updateAnnunciator() {
   const set = (id, on) => { const e = document.getElementById(id); if (e) e.classList.toggle("on", !!on); };
-  set("lampBurn", model.q >= 1);
+  set("lampBurn", model.q >= 5);   // burning = alpha-dominated, not merely breakeven
   set("lampNet", model.netElec > 0);
   set("lampIgnite", model.phi >= 0.95);
   set("lampBreed", model.tritiumRatio >= 1);
@@ -605,10 +615,14 @@ function getCoachMessage() {
     return plain
       ? `Net positive: ${formatMw(model.netElec)} going to the grid. You are about ${Math.round(model.phi * 100)}% of the way to ignition.`
       : `Net positive: ${formatMw(model.netElec)} after recirculating power. The triple product is ${model.triple.toFixed(2)}×10²¹, about ${Math.round(model.phi * 100)}% of the way to ignition.`;
+  if (model.q >= 5)
+    return plain
+      ? "The plasma now heats itself as much as you do, or more. Push the field and fuel toward ignition."
+      : "Burning plasma. Alpha particles now supply at least as much heating as you inject (Q of 5 or more). Push confinement and density toward ignition and net electricity.";
   if (model.q >= 1)
     return plain
-      ? "It is now making more energy than you put in. Push the field and fuel to turn that into real electricity."
-      : "Burning plasma. Fusion power now exceeds the heating you supply (Q above 1). Push confinement and density to turn that into net electricity.";
+      ? "Past breakeven: fusion now gives back more heat than you put in. The plant still uses more electricity than it makes, so keep pushing."
+      : "Scientific breakeven (Q above 1). Fusion power now exceeds the heating you inject, but the plant as a whole still runs at a loss. Net electricity needs roughly Q above 5.";
   return plain
     ? "Not there yet. Turn up the temperature and the magnetic field together to get closer to ignition."
     : "Below breakeven. Build temperature and confinement together to lift the operating point toward the ignition curve at right.";
@@ -2058,14 +2072,27 @@ function drawLawson() {
   ctx.textBaseline = "bottom";
   ctx.fillText("IGNITION", xOf(24), yOf(ignitionNTau(24)) - 4);
 
-  // C2: real machines - labeled reference operating points (illustrative placement).
-  // None of these magnetic devices has crossed the ignition curve; NIF reached it with lasers.
+  // trail (drawn before the machine labels so an accumulated trail never speckles the text)
+  trail.forEach((pt, i) => {
+    const a = (i / trail.length) * 0.4;
+    ctx.fillStyle = `rgba(56,225,198,${a})`;
+    ctx.beginPath();
+    ctx.arc(clamp(xOf(pt.T), padL, w - padR), clamp(yOf(pt.nTau), padT, h - padB), 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // C2: real machines - reference points placed so each diamond's implied gain against this
+  // model's own curves matches the machine's demonstrated or design-target gain: JET's 1997 D-T
+  // record is Q = 0.67 (so it sits below the Q = 1 curve), ITER is designed for Q = 10 and SPARC
+  // projects Q ~ 11 (between breakeven and ignition), and EAST runs long pulses without tritium
+  // far below breakeven. No magnetic device has crossed the ignition curve; NIF reached energy
+  // gain with lasers, a different confinement scheme.
   if (showMachines) {
     const machines = [
-      { k: "JET", T: 13, nTau: 4.2e19 },
-      { k: "EAST", T: 9, nTau: 5.0e19 },
-      { k: "SPARC", T: 17, nTau: 1.3e20 },
-      { k: "ITER", T: 13, nTau: 1.6e20 }
+      { k: "JET", d: "1997 · Q 0.67", T: 13, nTau: 2.7e19, right: false, dy: 0 },
+      { k: "EAST", d: "long pulse · no tritium", T: 9, nTau: 1.2e19, right: false, dy: -8 },
+      { k: "SPARC", d: "building · projected Q ≈ 11", T: 17, nTau: 1.24e20, right: true, dy: 10 },
+      { k: "ITER", d: "building · target Q = 10", T: 13, nTau: 1.54e20, right: true, dy: 0 }
     ];
     machines.forEach((mc) => {
       const mx = clamp(xOf(mc.T), padL + 5, w - padR - 5);
@@ -2076,23 +2103,19 @@ function drawLawson() {
       ctx.beginPath();
       ctx.moveTo(mx, my - 4); ctx.lineTo(mx + 4, my); ctx.lineTo(mx, my + 4); ctx.lineTo(mx - 4, my);
       ctx.closePath(); ctx.fill(); ctx.stroke();
+      const lx = mx + (mc.right ? -7 : 7);
+      const ly = my + mc.dy;
+      ctx.textAlign = mc.right ? "right" : "left";
+      ctx.textBaseline = "middle";
       ctx.fillStyle = "rgba(210,226,250,0.96)";
       ctx.font = "700 9px Inter, system-ui, sans-serif";
-      ctx.textAlign = mc.T > 19 ? "right" : "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText(mc.k, mx + (mc.T > 19 ? -7 : 7), my);
+      ctx.fillText(mc.k, lx, ly);
+      ctx.fillStyle = "rgba(168,186,214,0.88)";
+      ctx.font = "600 8px Inter, system-ui, sans-serif";
+      ctx.fillText(mc.d, lx, ly + 10);
       ctx.restore();
     });
   }
-
-  // trail
-  trail.forEach((pt, i) => {
-    const a = (i / trail.length) * 0.4;
-    ctx.fillStyle = `rgba(56,225,198,${a})`;
-    ctx.beginPath();
-    ctx.arc(clamp(xOf(pt.T), padL, w - padR), clamp(yOf(pt.nTau), padT, h - padB), 2.5, 0, Math.PI * 2);
-    ctx.fill();
-  });
 
   // current operating point
   const px = clamp(xOf(model.temperature), padL, w - padR);
@@ -2349,14 +2372,16 @@ function drawFuelCycle(time) {
 let disp = null;
 function tweenReadouts(dt) {
   if (!model || model.q === undefined) return;
-  if (!disp) disp = { net: model.netElec, q: Math.min(model.q, 50), fus: model.fusionPower, tri: model.triple, tau: model.tauE, stab: model.stability, wall: model.wallLoad, cool: model.coolantTemp, tbr: model.tritiumRatio, temp: model.temperature };
+  if (!disp) disp = { net: model.netElec, q: Math.min(model.q, 99), fus: model.fusionPower, tri: model.triple, tau: model.tauE, stab: model.stability, wall: model.wallLoad, cool: model.coolantTemp, tbr: model.tritiumRatio, temp: model.temperature };
   const k = clamp(dt / 130, 0, 1);
   const lp = (key, target) => { disp[key] += (target - disp[key]) * k; return disp[key]; };
-  const net = lp("net", model.netElec), q = lp("q", Math.min(model.q, 50)), fus = lp("fus", model.fusionPower);
+  const net = lp("net", model.netElec), q = lp("q", Math.min(model.q, 99)), fus = lp("fus", model.fusionPower);
   const tri = lp("tri", model.triple), tau = lp("tau", model.tauE), stab = lp("stab", model.stability);
   const wall = lp("wall", model.wallLoad), cool = lp("cool", model.coolantTemp), tbr = lp("tbr", model.tritiumRatio);
   const temp = lp("temp", model.temperature);
-  const qStr = model.q >= 50 ? "≈ ∞" : q.toFixed(1);
+  // "≈ ∞" is the ignition presentation (self-sustaining burn), keyed to phi so it always
+  // agrees with the Ignition state pill; below ignition the badge shows the literal ratio.
+  const qStr = model.phi >= 0.95 ? "≈ ∞" : q.toFixed(1);
   const set = (el, v) => { if (el) el.textContent = v; };
   set(outputs.netPowerBadge, formatMw(net));
   set(outputs.qBadge, qStr);
@@ -2639,7 +2664,7 @@ const TIPS = {
   wallLoad: { title: "Wall load", body: "Heat flux on the plasma-facing wall, in MW per square meter. Materials cap this near 10; sweeping the divertor spreads the load.", real: "Limit: roughly 10 MW/m²" },
   coolantTemp: { title: "Coolant outlet", body: "Temperature of coolant leaving the blanket. Hotter coolant gives more efficient electricity, up to material limits." },
   tritiumRatio: { title: "Tritium breeding ratio", body: "Tritium bred in the lithium blanket per tritium burned. Above 1.0 the plant makes its own fuel; below 1.0 it runs its supply down.", formula: "TBR > 1.0 = self-sufficient" },
-  reactorState: { title: "Reactor state", body: "The current operating regime, from Startup through Burning Plasma to Ignition, plus warnings like Disruption Risk or Thermal Limit." },
+  reactorState: { title: "Reactor state", body: "The current operating regime, from Startup through Breakeven and Burning Plasma to Ignition, plus warnings like Disruption Risk or Thermal Limit." },
   netPowerBadge: { title: "Net electric", body: "Gross turbine electricity minus the plant's own recirculating power. Positive means the reactor is a net energy source." },
   qBadge: { title: "Energy gain Q", body: "Fusion power out divided by heating power in. Q = 1 is breakeven; ignition is Q to infinity.", formula: "Q = P_fusion / P_heating" },
   radLoss: { title: "Radiated loss", body: "Bremsstrahlung: the plasma glows in X-rays as fast electrons brush past ions. The loss grows with density squared and the square root of temperature. It is small at reactor conditions but can outpace fusion in a cold, dense plasma, which sets a lower limit on useful temperature.", formula: "P_rad ∝ n² · √T" },
@@ -2889,6 +2914,7 @@ function exportRun() {
   L.push("Outputs");
   L.push(`fusion_power_MW,${Math.round(m.fusionPower || 0)}`);
   L.push(`energy_gain_Q,${(m.q || 0).toFixed(2)}`);
+  L.push(`reactor_state,${m.label || ""}`);
   L.push(`net_electric_MW,${Math.round(m.netElec || 0)}`);
   L.push(`triple_product_e21,${(m.triple || 0).toFixed(2)}`);
   L.push(`confinement_tauE_s,${(m.tauE || 0).toFixed(2)}`);
@@ -3098,7 +3124,7 @@ const STORY = [
   { title: "2. Heat the fuel", body: "Raise plasma temperature. Hotter ions collide hard enough to fuse, and the reaction rate climbs steeply.", hint: "Set temperature to about 15 keV.", sel: "#temperature", test: () => Number(controls.temperature.value) >= 14 },
   { title: "3. Hold it with the field", body: "Heat leaks out unless you confine it. Raise the magnetic field to keep the energy in long enough to matter.", hint: "Set magnetic field near 7 T.", sel: "#magneticField", test: () => Number(controls.magneticField.value) >= 6.8 },
   { title: "4. Feed the fire", body: "More fuel means more reactions. Increase injection and watch fusion power climb.", hint: "Get fusion power above 400 MW.", sel: "#fuelRate", test: (m) => (m.fusionPower || 0) >= 400 },
-  { title: "5. Cross breakeven", body: "When fusion power passes the heating you supply, Q passes 1. You now get more out than you put in.", hint: "Push Q above 1.", sel: "#qPlasma", test: (m) => (m.q || 0) >= 1 },
+  { title: "5. Cross breakeven", body: "Fusion power has passed the heating you put in: Q is above 1, called scientific breakeven. No magnetic fusion machine has crossed it yet. The plant as a whole still uses more electricity than it makes; selling power needs roughly Q above 5.", hint: "Check Q on the plasma panel: past 1 is breakeven.", sel: "#qPlasma", test: (m) => (m.q || 0) >= 1 },
   { title: "6. Ignition", body: "Near ignition the plasma heats itself and Q runs away. This is the goal of fusion energy.", hint: "Reach the ignition state.", sel: ".reactor-stage", test: (m) => (m.phi || 0) >= 0.95 }
 ];
 let storyOn = false, storyStep = 0;
@@ -3275,21 +3301,22 @@ function nextPredict() { predictIdx = (predictIdx + 1) % PREDICT_Q.length; rende
    TAKEAWAY_URL. To point it elsewhere, regenerate TAKEAWAY_QR for the new URL with any QR tool. ---------- */
 const TAKEAWAY_URL = "https://pjdroopypants.github.io/Fusion-SImulator/";
 const TAKEAWAY_QR = ["111111100101001000101110001111111","100000101000011001001000001000001","101110101100010011110111001011101","101110101111100100000101101011101","101110100111010101100011001011101","100000100110100011001110101000001","111111101010101010101010101111111","000000001111101000100010000000000","100000101101111101001011111001110","011110011000001110110001000011110","000111100110000100100110111010110","101100010011001100001001110111101","100111101111011111111001101100001","000100001001001010001001010001111","111010100110101001010100011111110","110110000110111100010010010101101","011100100010011001011010010111001","000110000000111111111111011001100","001110110000010100011001111101101","001111011010110011111010011011111","111001110000100110010010010111011","110001010111110011101101001110100","101010101010110110100100000011010","101101010110001000000010000111110","110111101000101100011000111111011","000000001011111110011010100010101","111111100011011100101001101010100","100000100001001010001011100011110","101110100101010000100000111111011","101110100111010010000000010110011","101110100110001011010111010110111","100000100110010110111000001111100","111111101111111001010011110100010"];
-let bestQ = 0, bestNet = -Infinity, hotT = 0;
+let bestQ = 0, bestNet = -Infinity, hotT = 0, everIgnited = false;
 function updatePeaks() {
   if (!model) return;
-  if (typeof model.q === "number") { const qv = isFinite(model.q) ? model.q : 50; if (qv > bestQ) bestQ = qv; }
+  if (typeof model.q === "number") { const qv = isFinite(model.q) ? model.q : 99; if (qv > bestQ) bestQ = qv; }
+  if (typeof model.phi === "number" && model.phi >= 0.95) everIgnited = true;
   if (typeof model.netElec === "number" && model.netElec > bestNet) bestNet = model.netElec;
   if (typeof model.temperature === "number" && model.temperature > hotT) hotT = model.temperature;
 }
 function takeawayStats() {
   const missions = Number(document.getElementById("missionCount")?.textContent || 0);
   const total = Number(document.getElementById("missionTotal")?.textContent || 7);
-  const qStr = bestQ >= 50 ? "≈ ∞" : bestQ.toFixed(1);
+  const qStr = everIgnited ? "≈ ∞" : bestQ.toFixed(1);
   const milC = Math.round(hotT * 11.6);
   const netStr = bestNet > 0 ? `${Math.round(bestNet)} MW` : "not net-positive";
   let verdict;
-  if (bestQ >= 50) verdict = "You reached ignition. The plasma sustained its own burn.";
+  if (everIgnited) verdict = "You reached ignition. The plasma sustained its own burn.";
   else if (bestQ >= 5) verdict = "You ran a strong burning plasma.";
   else if (bestQ >= 1) verdict = "You crossed scientific breakeven, Q of at least 1.";
   else verdict = "You drove a real magnetic-confinement plasma.";

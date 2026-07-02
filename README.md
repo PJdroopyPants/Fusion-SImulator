@@ -23,7 +23,7 @@ Setpoints: plasma temperature (the heating drive), magnetic field, fuel injectio
 
 Toggles: neutral beam heating, pellet pacing, divertor sweep, and emergency quench.
 
-Presets: **Startup** (sub-breakeven), **Cruise** (a strong burning plasma), **High Gain** (a clean, self-sustaining ignition), **Stress** (pushes into a disruption), and **Shutdown**.
+Presets: **Startup** (just past breakeven, still net-negative), **Cruise** (a strong burning plasma), **High Gain** (a clean, self-sustaining ignition), **Stress** (pushes into a disruption), and **Shutdown**.
 
 A note on temperature: it is now a heating drive rather than a fixed dial. See burn-through dynamics below.
 
@@ -34,7 +34,7 @@ The model is simplified but physically motivated, and calibrated for intuition r
 - **Burn-through dynamics.** The actual core temperature is a real state that evolves over time. Alpha particles from each fusion reaction stay in the plasma and heat it, so once you cross the ignition threshold the temperature climbs on its own and the plant becomes self-sustaining. The temperature slider sets the external heating; alpha self-heating can push the real core hotter than the slider. Push too hard and rising pressure trips a disruption; starve the plasma and the burn collapses. Ignition is something you trigger and then manage.
 - **Fusion triple product** n times T times tau_E, shown as the live figure of merit, against the D-T ignition target of about 3 x 10^21 keV s m^-3.
 - **Lawson operating-point map**, a log plot of confinement parameter n times tau_E versus temperature, with the ignition and breakeven (Q = 1) curves, your live operating point and its trail, and labeled reference points for real machines (ITER, SPARC, JET, EAST).
-- **Energy gain Q**, derived consistently from the triple product. Q = 1 is scientific breakeven and Q running to infinity is ignition.
+- **Energy gain Q**, kept consistent with the heating and fusion power shown on the power-balance panel. Q = 1 is scientific breakeven, a burning plasma is roughly Q above 5, and Q running to infinity is ignition.
 - **Power balance**: external heating in versus fusion power out, split into alpha self-heating (stays in the plasma) and neutron power (deposited in the blanket).
 - **Plant telemetry**: confinement time tau_E, beta-limit driven disruption risk, wall heat load, coolant outlet temperature, and tritium breeding ratio.
 - **First wall and materials**: an integrated neutron dose that accrues over a run, with a wall-life indicator. Surviving the neutron and heat flux is one of fusion's defining materials challenges.
